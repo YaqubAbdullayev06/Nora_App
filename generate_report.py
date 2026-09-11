@@ -172,17 +172,18 @@ def build_report():
         ("2.", "Project Overview"),
         ("3.", "System Architecture"),
         ("4.", "Tech Stack"),
-        ("5.", "Adaptive Persona System (4 Age Groups)"),
-        ("6.", "Feature Modules (15 Screens)"),
-        ("7.", "AI System & Digital Assistant"),
-        ("8.", "Backend API"),
-        ("9.", "Services Layer (Flutter)"),
-        ("10.", "UI/UX Design System"),
-        ("11.", "Data Models"),
-        ("12.", "Project File Structure"),
-        ("13.", "How It Works End-to-End"),
-        ("14.", "Business Model"),
-        ("15.", "Future Roadmap"),
+        ("5.", "Free Infrastructure Stack ($0/month)"),
+        ("6.", "Adaptive Persona System (4 Age Groups)"),
+        ("7.", "Feature Modules (15 Screens)"),
+        ("8.", "AI System & Digital Assistant"),
+        ("9.", "Backend API"),
+        ("10.", "Services Layer (Flutter)"),
+        ("11.", "UI/UX Design System"),
+        ("12.", "Data Models"),
+        ("13.", "Project File Structure"),
+        ("14.", "How It Works End-to-End"),
+        ("15.", "Business Model"),
+        ("16.", "Future Roadmap"),
     ]
     for num, title in toc:
         pdf.set_font("Helvetica", "B", 11)
@@ -205,22 +206,24 @@ def build_report():
     pdf.body_text(
         "The app features a unique adaptive persona system with four age groups (Baby 1-6, Kid 6-12, "
         "Teen 12-18, Adult 18+), each receiving a personalized AI personality, UI theme, content "
-        "strategy, and interaction style. Nora uses a local Ollama LLM for privacy-first AI inference "
-        "and provides real device control capabilities including app scanning, blocking, screen time "
-        "tracking, and focus session management."
+        "strategy, and interaction style. Nora uses a Unified LLM Provider that auto-falls back "
+        "across Groq API (fast, free), Ollama local, and Colab GPU (heavy models) for privacy-first "
+        "AI inference. The backend runs on PocketBase (Oracle Cloud free tier) and Firebase Crashlytics "
+        "for crash reporting -- all at zero cost."
     )
     pdf.body_text(
         "The architecture is a Flutter frontend communicating with a Python FastAPI backend. The backend "
-        "integrates with Ollama for LLM inference, SQLAlchemy for database persistence, and JWT for "
-        "authentication. The frontend uses Provider for state management and platform channels for "
-        "Android-native device integration."
+        "integrates with a unified LLM provider (Groq + Ollama + Colab), SQLAlchemy for database "
+        "persistence, and JWT for authentication. The frontend uses Provider for state management and "
+        "platform channels for Android-native device integration."
     )
     pdf.section_title("Key Metrics", 2)
     pdf.key_value("Screens", "15 feature modules")
     pdf.key_value("Services", "6 Flutter services + 5 backend services")
-    pdf.key_value("AI Models", "4 age-group personality prompts + assistant prompts")
-    pdf.key_value("Backend Endpoints", "Auth, Chat, Command, App Classification, Health")
+    pdf.key_value("AI Providers", "Groq API (fast) + Ollama (local) + Colab GPU (heavy)")
+    pdf.key_value("Backend Endpoints", "Auth, Chat, Command, App Classification, Health, AI Chat")
     pdf.key_value("Target Platforms", "Android (primary), iOS (planned)")
+    pdf.key_value("Monthly Cost", "$0 -- no credit cards, no surprise bills")
     pdf.key_value("Design Philosophy", "Dark mode, minimalist, neptun green & purple neon accents")
 
     # ═══════════════════════════════════════════════════
@@ -256,8 +259,8 @@ def build_report():
     pdf.section_title("3. System Architecture")
     pdf.body_text(
         "NoraApp follows a clean three-tier architecture: Presentation (Flutter/Dart), Business Logic "
-        "(Services + Provider), and Data (FastAPI + SQLAlchemy + Ollama). The frontend communicates "
-        "with the backend via REST API over HTTP."
+        "(Services + Provider), and Data (FastAPI + SQLAlchemy + Unified LLM Provider). The frontend "
+        "communicates with the backend via REST API over HTTP."
     )
     pdf.section_title("Architecture Diagram (Text)", 2)
     pdf.code_block(
@@ -268,20 +271,20 @@ def build_report():
         "| - 15 Screens       |                        | - /auth (JWT)     |\n"
         "| - Provider State   |                        | - /ai/chat        |\n"
         "| - 6 Services       |                        | - /ai/command     |\n"
-        "| - Platform Channels|                        | - /ai/classify    |\n"
-        "| - Design Tokens    |                        | - /ai/health      |\n"
+        "| - Platform Channels|                        | - /ai/health      |\n"
+        "| - Design Tokens    |                        | - /ai/takeover    |\n"
         "+-------------------+                        +-------------------+\n"
         "         |                                            |\n"
         "   MethodChannel                              SQLAlchemy ORM\n"
         "   (Android Native)                                 |\n"
-        "         |                                      +-------+\n"
-        "  +-----------+                               | SQLite |\n"
-        "  | Android   |                               +-------+\n"
-        "  | OS APIs   |                                    |\n"
+        "         |                                      +--------+\n"
+        "  +-----------+                               | Unified |\n"
+        "  | Android   |                               | LLM     |\n"
+        "  | OS APIs   |                               | Provider|\n"
         "  | - Scanner |                               +--------+\n"
-        "  | - Usage   |                               | Ollama |\n"
-        "  | - Focus   |                               |  (LLM) |\n"
-        "  +-----------+                               +--------+"
+        "  | - Usage   |                               |  |  |  |\n"
+        "  | - Focus   |                          Groq Oll Col CB\n"
+        "  +-----------+                          API  Loc  GPU  d"
     )
 
     pdf.section_title("Communication Flow", 2)
@@ -313,12 +316,12 @@ def build_report():
     pdf.key_value("Framework", "FastAPI 0.104.1")
     pdf.key_value("ASGI Server", "Uvicorn 0.24.0")
     pdf.key_value("ORM", "SQLAlchemy 2.0.23")
-    pdf.key_value("Database", "SQLite (dev) / PostgreSQL (prod via psycopg2)")
+    pdf.key_value("Database", "SQLite (dev) / MariaDB / PocketBase (prod)")
     pdf.key_value("Authentication", "JWT (python-jose) + bcrypt password hashing")
-    pdf.key_value("AI/LLM", "Ollama (local LLM inference via httpx)")
+    pdf.key_value("AI/LLM", "Unified LLM Provider: Groq API + Ollama + Colab GPU")
     pdf.key_value("Validation", "Pydantic 2.5.2")
-    pdf.key_value("HTTP Client", "httpx 0.25.2 (for Ollama communication)")
-    pdf.key_value("OpenAI SDK", "openai 1.6.1 (optional cloud fallback)")
+    pdf.key_value("HTTP Client", "httpx 0.25.2 (for Groq + Ollama communication)")
+    pdf.key_value("Crash Reporting", "Firebase Crashlytics (unlimited, $0)")
 
     pdf.section_title("Android Native", 2)
     pdf.key_value("Language", "Kotlin (via Flutter MethodChannel)")
@@ -328,10 +331,69 @@ def build_report():
     pdf.key_value("Permissions", "Usage Access, Accessibility, Query All Packages")
 
     # ═══════════════════════════════════════════════════
-    # 5. ADAPTIVE PERSONA SYSTEM
+    # 5. FREE INFRASTRUCTURE STACK
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("5. Adaptive Persona System")
+    pdf.section_title("5. Free Infrastructure Stack ($0/month)")
+    pdf.body_text(
+        "NoraApp runs on a complete zero-cost infrastructure stack. No credit cards are required "
+        "for any component. There are no surprise bills, no vendor lock-in, and no risk of "
+        "unexpected charges. All services use free tiers that are permanently free, not trial periods."
+    )
+
+    pdf.section_title("LLM Inference Providers", 2)
+    providers = [
+        ("Groq API", "Fast LLM inference", "30 RPM, 14400 RPD", "No", "Primary (fastest)"),
+        ("Ollama Local", "Self-hosted LLM", "Unlimited", "No", "Fallback 1"),
+        ("Colab GPU", "Heavy models via T4", "~12h/day", "No", "Fallback 2 (GPU)"),
+    ]
+    widths = [28, 35, 35, 15, 35]
+    pdf.table_row(["Provider", "Type", "Free Limit", "CC?", "Role"], widths, bold=True, fill=True)
+    for row in providers:
+        pdf.table_row(row, widths)
+
+    pdf.ln(4)
+    pdf.section_title("Infrastructure Services", 2)
+    infra = [
+        ("PocketBase", "Oracle Cloud", "4 OCPUs, 24GB RAM", "No", "Backend/DB"),
+        ("Crashlytics", "Firebase", "Unlimited events", "No", "Crash reporting"),
+        ("MariaDB", "Self-hosted", "Unlimited", "No", "Primary DB"),
+    ]
+    pdf.table_row(["Service", "Provider", "Free Limit", "CC?", "Purpose"], widths, bold=True, fill=True)
+    for row in infra:
+        pdf.table_row(row, widths)
+
+    pdf.ln(4)
+    pdf.section_title("Unified LLM Provider", 2)
+    pdf.body_text(
+        "The UnifiedLLMProvider class in backend/ai/llm_provider.py automatically selects the best "
+        "available LLM provider with automatic fallback:"
+    )
+    pdf.bullet("Priority 1: Groq API -- fastest response times (30 requests/minute free)")
+    pdf.bullet("Priority 2: Ollama Local -- runs on localhost:11434 (unlimited)")
+    pdf.bullet("Priority 3: Colab GPU -- connects via ngrok tunnel to T4 GPU (15GB VRAM)")
+    pdf.body_text(
+        "Set LLM_PROVIDER=auto in .env to enable automatic fallback. The provider tries Groq first, "
+        "falls back to Ollama local, then to Colab GPU. All existing code that uses "
+        "from ai.ollama_client import ollama continues to work unchanged."
+    )
+
+    pdf.section_title("Total Monthly Cost", 2)
+    pdf.code_block(
+        "Groq API .................. $0  (free tier, 30 RPM)\n"
+        "Colab GPU (T4) ........... $0  (free when running)\n"
+        "Ollama Local ............. $0  (runs on your machine)\n"
+        "PocketBase (Oracle) ...... $0  (4 OCPUs, 24GB RAM forever)\n"
+        "Firebase Crashlytics ..... $0  (unlimited events)\n"
+        "----------------------------------------\n"
+        "TOTAL .................... $0/month"
+    )
+
+    # ═══════════════════════════════════════════════════
+    # 6. ADAPTIVE PERSONA SYSTEM
+    # ═══════════════════════════════════════════════════
+    pdf.add_page()
+    pdf.section_title("6. Adaptive Persona System")
     pdf.body_text(
         "Nora's defining feature is its adaptive persona system. Based on the user's age group, the "
         "entire app experience changes: AI personality, language complexity, UI colors, mascot, content "
@@ -362,10 +424,10 @@ def build_report():
     )
 
     # ═══════════════════════════════════════════════════
-    # 6. FEATURE MODULES
+    # 7. FEATURE MODULES
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("6. Feature Modules (15 Screens)")
+    pdf.section_title("7. Feature Modules (15 Screens)")
     features = [
         ("Splash", "App loading screen with brand animation", "splash_screen.dart"),
         ("Welcome", "First-time user greeting and onboarding start", "welcome_screen.dart"),
@@ -435,10 +497,10 @@ def build_report():
     )
 
     # ═══════════════════════════════════════════════════
-    # 7. AI SYSTEM
+    # 8. AI SYSTEM
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("7. AI System & Digital Assistant")
+    pdf.section_title("8. AI System & Digital Assistant")
     pdf.body_text(
         "Nora's AI system is the core intelligence layer. It operates in two modes: Chat Mode "
         "(conversational AI for Q&A and guidance) and Command Mode (digital assistant with device "
@@ -469,12 +531,13 @@ def build_report():
     for action, desc in actions:
         pdf.key_value(action, desc, indent=20)
 
-    pdf.section_title("Ollama Integration", 2)
+    pdf.section_title("Unified LLM Provider Integration", 2)
     pdf.body_text(
-        "The backend communicates with a local Ollama instance via HTTP. The OllamaClient class "
-        "handles the connection to http://localhost:11434. It sends chat completion requests with "
-        "the age-group system prompt and user messages. The local LLM processes the request and "
-        "returns a response. This ensures complete privacy -- no data leaves the device."
+        "The backend communicates with multiple LLM providers via the UnifiedLLMProvider class. "
+        "It automatically selects the best available provider: Groq API (fastest, free tier), "
+        "Ollama local (localhost:11434), or Colab GPU (via ngrok tunnel). The system sends chat "
+        "completion requests with age-group system prompts and user messages. The LLM processes "
+        "the request and returns a response. All providers are free with no credit card required."
     )
     pdf.section_title("App Classification AI", 2)
     pdf.body_text(
@@ -485,10 +548,10 @@ def build_report():
     )
 
     # ═══════════════════════════════════════════════════
-    # 8. BACKEND API
+    # 9. BACKEND API
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("8. Backend API (FastAPI)")
+    pdf.section_title("9. Backend API (FastAPI)")
     pdf.body_text(
         "The backend is a Python FastAPI application with SQLAlchemy ORM, JWT authentication, "
         "and Ollama LLM integration. It runs on Uvicorn and supports SQLite (development) or "
@@ -525,10 +588,10 @@ def build_report():
     )
 
     # ═══════════════════════════════════════════════════
-    # 9. SERVICES LAYER
+    # 10. SERVICES LAYER
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("9. Services Layer (Flutter)")
+    pdf.section_title("10. Services Layer (Flutter)")
     services = [
         ("LlmService", "Connects to backend /ai/chat and /ai/command endpoints. Sends messages, "
          "receives responses, checks Ollama availability. Handles both chat and command modes."),
@@ -548,10 +611,10 @@ def build_report():
         pdf.body_text(desc)
 
     # ═══════════════════════════════════════════════════
-    # 10. UI/UX DESIGN SYSTEM
+    # 11. UI/UX DESIGN SYSTEM
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("10. UI/UX Design System")
+    pdf.section_title("11. UI/UX Design System")
     pdf.section_title("Design Philosophy", 2)
     pdf.body_text(
         "NoraApp follows Apple Human Interface Guidelines with a dark-mode-first approach. "
@@ -599,10 +662,10 @@ def build_report():
         pdf.bullet(comp)
 
     # ═══════════════════════════════════════════════════
-    # 11. DATA MODELS
+    # 12. DATA MODELS
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("11. Data Models")
+    pdf.section_title("12. Data Models")
     models = [
         ("User", "id, email, name, ageGroup, personaName, streakDays, totalPoints, createdAt, lastActiveAt"),
         ("TimerSession", "id, userId, durationMinutes, completed, blockedAppsJson, createdAt"),
@@ -623,10 +686,10 @@ def build_report():
         pdf.body_text(fields)
 
     # ═══════════════════════════════════════════════════
-    # 12. PROJECT FILE STRUCTURE
+    # 13. PROJECT FILE STRUCTURE
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("12. Project File Structure")
+    pdf.section_title("13. Project File Structure")
     pdf.code_block(
         "NoraApp/\n"
         "  lib/\n"
@@ -662,8 +725,10 @@ def build_report():
         "      nora_components.dart            # Shared UI components\n"
         "  backend/\n"
         "    main.py                           # FastAPI entry point\n"
+        "    .env                              # GROQ_API_KEY, LLM_PROVIDER\n"
         "    ai/\n"
-        "      ollama_client.py                # Ollama LLM client\n"
+        "      llm_provider.py                 # Unified Groq/Ollama/Colab provider\n"
+        "      ollama_client.py                # Backward-compatible wrapper\n"
         "      prompts.py                      # Age-group system prompts\n"
         "    api/                              # Route handlers\n"
         "    services/\n"
@@ -671,14 +736,22 @@ def build_report():
         "      app_classifier.py               # App classification logic\n"
         "    models/                           # SQLAlchemy ORM models\n"
         "    utils/                            # Utility functions\n"
-        "    requirements.txt                  # Python dependencies"
+        "    requirements.txt                  # Python dependencies\n"
+        "  free-stack/\n"
+        "    README.md                         # Full documentation\n"
+        "    QUICKSTART.md                     # 5-minute setup guide\n"
+        "    groq/                             # Standalone Groq scripts\n"
+        "    colab-gpu/                        # Colab notebook + client\n"
+        "    pocketbase/                       # Oracle Cloud setup\n"
+        "    crashlytics/                      # Firebase integration\n"
+        "    config/providers.json             # Provider registry"
     )
 
     # ═══════════════════════════════════════════════════
-    # 13. HOW IT WORKS END-TO-END
+    # 14. HOW IT WORKS END-TO-END
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("13. How It Works End-to-End")
+    pdf.section_title("14. How It Works End-to-End")
     pdf.section_title("User Journey", 2)
     steps = [
         "1. Install & Open: User installs NoraApp, sees splash screen with brand animation.",
@@ -714,10 +787,10 @@ def build_report():
     )
 
     # ═══════════════════════════════════════════════════
-    # 14. BUSINESS MODEL
+    # 15. BUSINESS MODEL
     # ═══════════════════════════════════════════════════
     pdf.add_page()
-    pdf.section_title("14. Business Model")
+    pdf.section_title("15. Business Model")
     pdf.section_title("B2C Freemium", 2)
     pdf.bullet("Free Tier: Basic timer, manual app blocking, limited AI chat (5 messages/day)")
     pdf.bullet("Premium ($4.99/mo): Unlimited AI chat, smart blocking, weekly reports, custom themes")
@@ -733,9 +806,9 @@ def build_report():
     )
 
     # ═══════════════════════════════════════════════════
-    # 15. FUTURE ROADMAP
+    # 16. FUTURE ROADMAP
     # ═══════════════════════════════════════════════════
-    pdf.section_title("15. Future Roadmap")
+    pdf.section_title("16. Future Roadmap")
     roadmap = [
         ("Phase 1 (Current)", "Core app with AI chat, app scanning, focus timer, daily planning"),
         ("Phase 2 (Q4 2026)", "iOS support (Screen Time API), cloud sync, social features, achievement system"),
