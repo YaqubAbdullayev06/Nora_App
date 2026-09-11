@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- Background glow -->
+  <circle cx="60" cy="60" r="55" fill="url(#glow_amazing)" opacity="0.3"/>
+  <!-- Main face circle -->
+  <circle cx="60" cy="60" r="45" fill="url(#face_amazing)"/>
+  <!-- Shine highlight -->
+  <ellipse cx="45" cy="42" rx="12" ry="8" fill="white" opacity="0.25" transform="rotate(-15 45 42)"/>
+  <!-- Left eye -->
+  <ellipse cx="42" cy="52" rx="6" ry="7" fill="#1a1a2e"/>
+  <circle cx="40" cy="50" r="2.5" fill="white"/>
+  <!-- Right eye -->
+  <ellipse cx="78" cy="52" rx="6" ry="7" fill="#1a1a2e"/>
+  <circle cx="76" cy="50" r="2.5" fill="white"/>
+  <!-- Big smile -->
+  <path d="M38 70 Q60 92 82 70" stroke="#1a1a2e" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- Smile fill -->
+  <path d="M38 70 Q60 92 82 70 Q60 82 38 70" fill="#ff6b6b" opacity="0.6"/>
+  <!-- Star sparkles -->
+  <path d="M20 25 L23 18 L26 25 L33 28 L26 31 L23 38 L20 31 L13 28 Z" fill="#ffd93d" opacity="0.9"/>
+  <path d="M92 18 L94 13 L96 18 L101 20 L96 22 L94 27 L92 22 L87 20 Z" fill="#ffd93d" opacity="0.7"/>
+  <path d="M100 75 L102 71 L104 75 L108 77 L104 79 L102 83 L100 79 L96 77 Z" fill="#ffd93d" opacity="0.6"/>
+  <!-- Blush circles -->
+  <circle cx="32" cy="65" r="8" fill="#ff9999" opacity="0.4"/>
+  <circle cx="88" cy="65" r="8" fill="#ff9999" opacity="0.4"/>
+  <defs>
+    <radialGradient id="glow_amazing" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd93d"/>
+      <stop offset="100%" stop-color="#ffd93d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="face_amazing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd93d"/>
+      <stop offset="100%" stop-color="#ffb347"/>
+    </linearGradient>
+  </defs>
+</svg>

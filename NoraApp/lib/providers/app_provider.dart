@@ -1,0 +1,1006 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import '../core/enums/age_group.dart';
+import '../core/constants/design_tokens.dart';
+import '../core/theme/persona_theme.dart';
+import '../models/models.dart';
+import '../services/api_service.dart';
+import '../services/focus_protection_service.dart';
+import '../services/usage_tracker_service.dart';
+
+/// AppProvider - Central state management
+/// Manages: persona, auth, timer, focus data, content, achievements
+class AppProvider extends ChangeNotifier {
+  final ApiService _api = ApiService();
+  final FocusProtectionService _focusProtection = FocusProtectionService();
+  final UsageTrackerService _usageTracker = UsageTrackerService();
+  Timer? _screenTimeRefreshTimer;
+
+  // ─── Persona State ───
+  AgeGroup _ageGroup = AgeGroup.adult;
+  PersonaTheme _persona = PersonaTheme.adultTheme;
+
+  AgeGroup get ageGroup => _ageGroup;
+  PersonaTheme get persona => _persona;
+
+  // ─── Auth State ───
+  User? _currentUser;
+  bool _isLoading = false;
+  String? _error;
+
+  User? get currentUser => _currentUser;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  bool get isAuthenticated => _currentUser != null;
+
+  Future<FocusProtectionStatus> requestFocusProtectionAuthorization() {
+    return _focusProtection.requestAuthorization();
+  }
+
+  Future<FocusProtectionStatus> getFocusProtectionStatus() {
+    return _focusProtection.getStatus();
+  }
+
+  Future<void> openFocusProtectionSettings() {
+    return _focusProtection.openSettings();
+  }
+
+  Future<FocusProtectionStatus> selectFocusApps() {
+    return _focusProtection.selectApps();
+  }
+
+  Future<FocusProtectionStatus> enableFocusProtection() {
+    return _focusProtection.enableBlocking();
+  }
+
+  Future<FocusProtectionStatus> disableFocusProtection() {
+    return _focusProtection.disableBlocking();
+  }
+
+  Future<Map<String, dynamic>> getAgentCapabilities() {
+    return _api.getAgentCapabilities();
+  }
+
+  Future<Map<String, dynamic>> getAgentFocusStatus() {
+    return _api.getAgentFocusStatus();
+  }
+
+  Future<Map<String, dynamic>> scheduleAgentFocus({
+    required String startTime,
+    required int durationMinutes,
+    String label = 'Focus session',
+  }) {
+    return _api.scheduleAgentFocus(
+      startTime: startTime,
+      durationMinutes: durationMinutes,
+      label: label,
+    );
+  }
+
+  Future<Map<String, dynamic>> startAgentFocus({
+    required int durationMinutes,
+    String label = 'Focus session',
+  }) {
+    return _api.startAgentFocus(durationMinutes: durationMinutes, label: label);
+  }
+
+  Future<Map<String, dynamic>> stopAgentFocus() {
+    return _api.stopAgentFocus();
+  }
+
+  Future<Map<String, dynamic>> readAgentDeviceSetting(String setting) {
+    return _api.readAgentDeviceSetting(setting);
+  }
+
+  Future<Map<String, dynamic>> updateAgentDeviceSetting({
+    required String setting,
+    required dynamic value,
+    required bool userApproved,
+  }) {
+    return _api.updateAgentDeviceSetting(
+      setting: setting,
+      value: value,
+      userApproved: userApproved,
+    );
+  }
+
+  Future<Map<String, dynamic>> getAgentSocialPlatforms() {
+    return _api.getAgentSocialPlatforms();
+  }
+
+  Future<Map<String, dynamic>> startAgentSocialOAuth({
+    required String platform,
+    required String redirectUri,
+  }) {
+    return _api.startAgentSocialOAuth(
+      platform: platform,
+      redirectUri: redirectUri,
+    );
+  }
+
+  Future<Map<String, dynamic>> connectAgentSocialAccount({
+    required String platform,
+    required String accountId,
+  }) {
+    return _api.connectAgentSocialAccount(
+      platform: platform,
+      accountId: accountId,
+    );
+  }
+
+  Future<Map<String, dynamic>> postAgentSocialContent({
+    required String platform,
+    required String accountId,
+    required String text,
+  }) {
+    return _api.postAgentSocialContent(
+      platform: platform,
+      accountId: accountId,
+      text: text,
+    );
+  }
+
+  // ─── App Access State ───
+  bool _isAppLocked = false;
+  bool get isAppLocked => _isAppLocked;
+
+  // ─── Focus State ───
+  int _focusScore = 0;
+  int _totalFocusMinutes = 0;
+  int _streakDays = 0;
+  int _sessionsCompleted = 0;
+  List<String> _achievements = [];
+
+  int get focusScore => _focusScore;
+  int get totalFocusMinutes => _totalFocusMinutes;
+  int get streakDays => _streakDays;
+  int get sessionsCompleted => _sessionsCompleted;
+  List<String> get achievements => _achievements;
+
+  // ─── Timer State ───
+  bool _isTimerRunning = false;
+  int _timerSeconds = 0;
+  int _totalTimerSeconds = 0;
+  Timer? _timer;
+
+  // ─── Pomodoro Cycle State ───
+  bool _isBreakPhase = false;
+  int _completedSessionsInCycle = 0;
+
+  bool get isTimerRunning => _isTimerRunning;
+  int get timerSeconds => _timerSeconds;
+  int get totalTimerSeconds => _totalTimerSeconds;
+  bool get isBreakPhase => _isBreakPhase;
+  int get completedSessionsInCycle => _completedSessionsInCycle;
+
+  /// Whether the current break is a long break (after completing a full cycle).
+  bool get isLongBreak =>
+      _completedSessionsInCycle > 0 &&
+      _completedSessionsInCycle % _persona.ageGroup.pomodoroSessionsPerCycle == 0;
+
+  /// Duration of the current break in seconds.
+  int get breakDurationSeconds =>
+      (isLongBreak
+              ? _persona.ageGroup.longBreakMinutes
+              : _persona.ageGroup.breakMinutes) *
+          60;
+
+  String get timerDisplay {
+    int minutes = _timerSeconds ~/ 60;
+    int secs = _timerSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  double get timerProgress =>
+      _totalTimerSeconds > 0 ? _timerSeconds / _totalTimerSeconds : 0;
+
+  // ─── Sessions History ───
+  List<FocusSession> _sessions = [];
+  List<FocusSession> get sessions => _sessions;
+
+  // ─── Screen Time Tracking ───
+  int _screenTimeTodayMinutes = 0;
+  int get screenTimeTodayMinutes => _screenTimeTodayMinutes;
+  bool get isScreenTimeExceeded {
+    if (_persona.ageGroup.screenTimeLimitMinutes == 0) return false;
+    return _screenTimeTodayMinutes >= _persona.ageGroup.screenTimeLimitMinutes;
+  }
+
+  double get screenTimeProgress {
+    if (_persona.ageGroup.screenTimeLimitMinutes == 0) return 0;
+    return _screenTimeTodayMinutes / _persona.ageGroup.screenTimeLimitMinutes;
+  }
+
+  // ─── Daily Planning State ───
+  DailyPlan? _todayPlan;
+  List<DailyPlan> _planHistory = [];
+
+  DailyPlan? get todayPlan => _todayPlan;
+  List<DailyPlan> get planHistory => _planHistory;
+  bool get hasPlannedToday => _todayPlan != null && _todayPlan!.morningPlanned;
+  bool get hasReflectedToday => _todayPlan?.eveningReflected ?? false;
+  int get completedTasksToday => _todayPlan?.completedCount ?? 0;
+  int get totalTasksToday => _todayPlan?.tasks.length ?? 0;
+  double get planProgress => _todayPlan?.progress ?? 0.0;
+  int get pointsEarnedToday => _todayPlan?.pointsEarned ?? 0;
+
+  bool get isEveningTime {
+    final now = DateTime.now();
+    return now.hour >= 18;
+  }
+
+  // ─── Weekly Review State ───
+  WeeklyReview? _currentWeeklyReview;
+  List<WeeklyReview> _weeklyReviewHistory = [];
+
+  WeeklyReview? get currentWeeklyReview => _currentWeeklyReview;
+  List<WeeklyReview> get weeklyReviewHistory => _weeklyReviewHistory;
+
+  /// Get the current week's start date (Monday).
+  DateTime get _currentWeekStart {
+    final now = DateTime.now();
+    return now.subtract(Duration(days: now.weekday - 1));
+  }
+
+  /// Get the current week's end date (Sunday).
+  DateTime get _currentWeekEnd {
+    final start = _currentWeekStart;
+    return start.add(const Duration(days: 6, hours: 23, minutes: 59));
+  }
+
+  /// Get or create the current weekly review.
+  WeeklyReview getOrCreateCurrentWeeklyReview() {
+    if (_currentWeeklyReview != null &&
+        _currentWeeklyReview!.weekStart == _currentWeekStart) {
+      return _currentWeeklyReview!;
+    }
+
+    // Create new weekly review for this week
+    _currentWeeklyReview = WeeklyReview(
+      id: 'review_${_currentWeekStart.millisecondsSinceEpoch}',
+      weekStart: _currentWeekStart,
+      weekEnd: _currentWeekEnd,
+      reflections: [],
+      goals: WeeklyReview.getDefaultGoals(_ageGroup),
+      totalFocusMinutes: weeklyFocusMinutes.fold(0, (a, b) => a + b),
+      totalSessions: _sessions.where((s) =>
+          s.startTime.isAfter(_currentWeekStart) &&
+          s.startTime.isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
+          s.completed).length,
+      totalPointsEarned: _sessions.where((s) =>
+          s.startTime.isAfter(_currentWeekStart) &&
+          s.startTime.isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
+          s.completed).fold(0, (a, b) => a + b.pointsEarned),
+      streakDays: computedStreakDays,
+      createdAt: DateTime.now(),
+    );
+    notifyListeners();
+    return _currentWeeklyReview!;
+  }
+
+  /// Set the mood for the current weekly review.
+  void setWeeklyMood(WeeklyMood mood) {
+    final review = getOrCreateCurrentWeeklyReview();
+    _currentWeeklyReview = WeeklyReview(
+      id: review.id,
+      weekStart: review.weekStart,
+      weekEnd: review.weekEnd,
+      mood: mood,
+      reflections: review.reflections,
+      goals: review.goals,
+      totalFocusMinutes: review.totalFocusMinutes,
+      totalSessions: review.totalSessions,
+      totalPointsEarned: review.totalPointsEarned,
+      streakDays: review.streakDays,
+      aiInsight: review.aiInsight,
+      createdAt: review.createdAt,
+    );
+    notifyListeners();
+  }
+
+  /// Add a reflection to the current weekly review.
+  void addWeeklyReflection(String question, String answer) {
+    final review = getOrCreateCurrentWeeklyReview();
+    final reflection = WeeklyReflection(
+      id: 'ref_${DateTime.now().millisecondsSinceEpoch}',
+      question: question,
+      answer: answer,
+      createdAt: DateTime.now(),
+    );
+    _currentWeeklyReview = WeeklyReview(
+      id: review.id,
+      weekStart: review.weekStart,
+      weekEnd: review.weekEnd,
+      mood: review.mood,
+      reflections: [...review.reflections, reflection],
+      goals: review.goals,
+      totalFocusMinutes: review.totalFocusMinutes,
+      totalSessions: review.totalSessions,
+      totalPointsEarned: review.totalPointsEarned,
+      streakDays: review.streakDays,
+      aiInsight: review.aiInsight,
+      createdAt: review.createdAt,
+    );
+    notifyListeners();
+  }
+
+  /// Update a goal's progress in the current weekly review.
+  void updateWeeklyGoalProgress(String goalId, int completedMinutes) {
+    final review = getOrCreateCurrentWeeklyReview();
+    final updatedGoals = review.goals.map((goal) {
+      if (goal.id == goalId) {
+        return goal.copyWith(
+          completedMinutes: completedMinutes,
+          isCompleted: completedMinutes >= goal.targetMinutes,
+        );
+      }
+      return goal;
+    }).toList();
+
+    _currentWeeklyReview = WeeklyReview(
+      id: review.id,
+      weekStart: review.weekStart,
+      weekEnd: review.weekEnd,
+      mood: review.mood,
+      reflections: review.reflections,
+      goals: updatedGoals,
+      totalFocusMinutes: review.totalFocusMinutes,
+      totalSessions: review.totalSessions,
+      totalPointsEarned: review.totalPointsEarned,
+      streakDays: review.streakDays,
+      aiInsight: review.aiInsight,
+      createdAt: review.createdAt,
+    );
+    notifyListeners();
+  }
+
+  /// Add a new custom goal to the current weekly review.
+  void addWeeklyGoal(String title, int targetMinutes) {
+    final review = getOrCreateCurrentWeeklyReview();
+    final newGoal = WeeklyGoal(
+      id: 'goal_${DateTime.now().millisecondsSinceEpoch}',
+      title: title,
+      targetMinutes: targetMinutes,
+      createdAt: _currentWeekStart,
+    );
+    _currentWeeklyReview = WeeklyReview(
+      id: review.id,
+      weekStart: review.weekStart,
+      weekEnd: review.weekEnd,
+      mood: review.mood,
+      reflections: review.reflections,
+      goals: [...review.goals, newGoal],
+      totalFocusMinutes: review.totalFocusMinutes,
+      totalSessions: review.totalSessions,
+      totalPointsEarned: review.totalPointsEarned,
+      streakDays: review.streakDays,
+      aiInsight: review.aiInsight,
+      createdAt: review.createdAt,
+    );
+    notifyListeners();
+  }
+
+  /// Remove a goal from the current weekly review.
+  void removeWeeklyGoal(String goalId) {
+    final review = getOrCreateCurrentWeeklyReview();
+    _currentWeeklyReview = WeeklyReview(
+      id: review.id,
+      weekStart: review.weekStart,
+      weekEnd: review.weekEnd,
+      mood: review.mood,
+      reflections: review.reflections,
+      goals: review.goals.where((g) => g.id != goalId).toList(),
+      totalFocusMinutes: review.totalFocusMinutes,
+      totalSessions: review.totalSessions,
+      totalPointsEarned: review.totalPointsEarned,
+      streakDays: review.streakDays,
+      aiInsight: review.aiInsight,
+      createdAt: review.createdAt,
+    );
+    notifyListeners();
+  }
+
+  /// Set AI insight for the current weekly review.
+  void setWeeklyAiInsight(String insight) {
+    final review = getOrCreateCurrentWeeklyReview();
+    _currentWeeklyReview = WeeklyReview(
+      id: review.id,
+      weekStart: review.weekStart,
+      weekEnd: review.weekEnd,
+      mood: review.mood,
+      reflections: review.reflections,
+      goals: review.goals,
+      totalFocusMinutes: review.totalFocusMinutes,
+      totalSessions: review.totalSessions,
+      totalPointsEarned: review.totalPointsEarned,
+      streakDays: review.streakDays,
+      aiInsight: insight,
+      createdAt: review.createdAt,
+    );
+    notifyListeners();
+  }
+
+  /// Save the current weekly review to history.
+  void saveWeeklyReview() {
+    if (_currentWeeklyReview != null) {
+      _weeklyReviewHistory.add(_currentWeeklyReview!);
+      _currentWeeklyReview = null;
+      notifyListeners();
+    }
+  }
+
+  /// Get weekly review data for a specific past week.
+  WeeklyReview? getWeeklyReviewForWeek(DateTime weekStart) {
+    try {
+      return _weeklyReviewHistory.firstWhere(
+        (r) => r.weekStart == weekStart,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ─── Weekly Data ───
+
+  /// Returns focus minutes for each of the last 7 days (Mon–Sun).
+  List<int> get weeklyFocusMinutes {
+    final now = DateTime.now();
+    // Start of this week (Monday)
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final today = DateTime(now.year, now.month, now.day);
+
+    final List<int> minutes = List.filled(7, 0);
+    for (final session in _sessions) {
+      if (!session.completed) continue;
+      final sessionDate = DateTime(
+        session.startTime.year,
+        session.startTime.month,
+        session.startTime.day,
+      );
+      final dayIndex = sessionDate.difference(startOfWeek).inDays;
+      if (dayIndex >= 0 && dayIndex < 7) {
+        minutes[dayIndex] += session.durationMinutes;
+      }
+    }
+    return minutes;
+  }
+
+  /// Compute streak days from actual session history.
+  int get computedStreakDays {
+    if (_sessions.isEmpty) return 0;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final completedDates = _sessions
+        .where((s) => s.completed)
+        .map((s) => DateTime(s.startTime.year, s.startTime.month, s.startTime.day))
+        .toSet()
+      ..removeWhere((d) => d.isAfter(today));
+
+    if (completedDates.isEmpty) return 0;
+
+    // Check if today or yesterday has a session to start the streak
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (!completedDates.contains(today) && !completedDates.contains(yesterday)) {
+      return 0;
+    }
+
+    // Count consecutive days backwards
+    int streak = 0;
+    DateTime checkDate = completedDates.contains(today) ? today : yesterday;
+    while (completedDates.contains(checkDate)) {
+      streak++;
+      checkDate = checkDate.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
+  // ─── Initialization ───
+
+  Future<void> init() async {
+    // Set default timer based on age group
+    _totalTimerSeconds = _persona.ageGroup.defaultFocusMinutes * 60;
+    _timerSeconds = _totalTimerSeconds;
+
+    // Fetch real screen time from device
+    await refreshScreenTime();
+
+    // Start periodic refresh every 5 minutes
+    _startScreenTimeRefresh();
+
+    notifyListeners();
+  }
+
+  /// Fetch real screen time from Android's UsageStatsManager.
+  Future<void> refreshScreenTime() async {
+    try {
+      final todayUsage = await _usageTracker.getTodayUsage();
+      if (todayUsage != null) {
+        _screenTimeTodayMinutes = todayUsage.totalScreenTimeMinutes;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Failed to refresh screen time: $e');
+    }
+  }
+
+  /// Start periodic refresh of screen time data.
+  void _startScreenTimeRefresh() {
+    _screenTimeRefreshTimer?.cancel();
+    _screenTimeRefreshTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => refreshScreenTime(),
+    );
+  }
+
+  /// Switch persona based on age group selection.
+  void setAgeGroup(AgeGroup group) {
+    _ageGroup = group;
+    _persona = PersonaTheme.forAgeGroup(group);
+    DesignTokens.init(_persona);
+    // Reset timer to age-appropriate default
+    if (!_isTimerRunning) {
+      _totalTimerSeconds = group.defaultFocusMinutes * 60;
+      _timerSeconds = _totalTimerSeconds;
+    }
+    notifyListeners();
+  }
+
+  void _loadMockData() {
+    _focusScore = 0;
+    _totalFocusMinutes = 0;
+    _streakDays = 0;
+    _sessionsCompleted = 0;
+    _achievements = [];
+    _screenTimeTodayMinutes = 0;
+    _sessions = [];
+
+  }
+
+  // ─── Auth Actions ───
+
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final data = await _api.login(email: email, password: password);
+      _currentUser = User.fromJson(data['user']);
+      // Set persona from user's age group
+      setAgeGroup(_currentUser!.ageGroup);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> register(String email, String name, String password,
+      {AgeGroup ageGroup = AgeGroup.adult}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final data = await _api.register(
+        email: email,
+        name: name,
+        password: password,
+      );
+      _currentUser = User.fromJson(data['user']);
+      // Override with selected age group
+      setAgeGroup(ageGroup);
+      _currentUser = _currentUser!.copyWith(ageGroup: ageGroup);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void logout() {
+    unlockApp();
+    _currentUser = null;
+    _api.setToken(null);
+    _focusScore = 0;
+    _totalFocusMinutes = 0;
+    _streakDays = 0;
+    _sessionsCompleted = 0;
+    _achievements = [];
+    _sessions = [];
+    _screenTimeRefreshTimer?.cancel();
+    _screenTimeTodayMinutes = 0;
+    notifyListeners();
+  }
+
+  /// Lock the app without logging the user out or discarding their session.
+  void lockApp() {
+    if (_isAppLocked) return;
+    pauseTimer();
+    _isAppLocked = true;
+    notifyListeners();
+  }
+
+  /// Release the in-app lock after the user confirms access.
+  void unlockApp() {
+    if (!_isAppLocked) return;
+    _isAppLocked = false;
+    notifyListeners();
+  }
+
+  // ─── Timer Actions ───
+
+  void setTimerDuration(int minutes) {
+    _totalTimerSeconds = minutes * 60;
+    _timerSeconds = _totalTimerSeconds;
+    // Reset break phase and cycle when manually changing duration
+    if (_isBreakPhase) {
+      _isBreakPhase = false;
+      _completedSessionsInCycle = 0;
+    }
+    notifyListeners();
+  }
+
+  void startTimer() {
+    if (_isTimerRunning) return;
+    unawaited(_focusProtection.enableBlocking());
+    _isTimerRunning = true;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_timerSeconds > 0) {
+        _timerSeconds--;
+        notifyListeners();
+      } else {
+        _timerComplete();
+      }
+    });
+    notifyListeners();
+  }
+
+  void pauseTimer() {
+    _isTimerRunning = false;
+    _timer?.cancel();
+    unawaited(_focusProtection.disableBlocking());
+    notifyListeners();
+  }
+
+  void resetTimer() {
+    _isTimerRunning = false;
+    _timer?.cancel();
+    _timerSeconds = _totalTimerSeconds;
+    unawaited(_focusProtection.disableBlocking());
+    notifyListeners();
+  }
+
+  void _timerComplete() {
+    _timer?.cancel();
+    _isTimerRunning = false;
+    unawaited(_focusProtection.disableBlocking());
+    final minutes = _totalTimerSeconds ~/ 60;
+    final points = (minutes * 10 * _persona.ageGroup.pointsMultiplier).toInt();
+    _focusScore += points;
+    _totalFocusMinutes += minutes;
+    _sessionsCompleted++;
+    _completedSessionsInCycle++;
+
+    // Record the session
+    final now = DateTime.now();
+    _sessions.add(FocusSession(
+      id: 'session_${now.millisecondsSinceEpoch}',
+      startTime: now.subtract(Duration(seconds: _totalTimerSeconds)),
+      endTime: now,
+      durationMinutes: minutes,
+      pointsEarned: points,
+      completed: true,
+    ));
+
+    // Recompute streak from actual session history
+    _streakDays = computedStreakDays;
+
+    // Auto-earn achievements based on real data
+    _checkAchievements();
+
+    // Vibrate on phase change
+    _vibrate();
+
+    // Transition to break phase
+    _isBreakPhase = true;
+    _timerSeconds = breakDurationSeconds;
+    _totalTimerSeconds = breakDurationSeconds;
+
+    notifyListeners();
+  }
+
+  /// Complete the current break and return to focus phase.
+  void completeBreak() {
+    _timer?.cancel();
+    _isTimerRunning = false;
+    _isBreakPhase = false;
+
+    // If cycle complete (after long break), reset session counter
+    if (isLongBreak) {
+      _completedSessionsInCycle = 0;
+    }
+
+    // Reset to focus duration
+    _timerSeconds = _persona.ageGroup.defaultFocusMinutes * 60;
+    _totalTimerSeconds = _timerSeconds;
+
+    _vibrate();
+    notifyListeners();
+  }
+
+  /// Skip the current break.
+  void skipBreak() {
+    completeBreak();
+  }
+
+  /// Start the break timer (auto-countdown).
+  void startBreakTimer() {
+    if (_isTimerRunning || !_isBreakPhase) return;
+    _isTimerRunning = true;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_timerSeconds > 0) {
+        _timerSeconds--;
+        notifyListeners();
+      } else {
+        completeBreak();
+      }
+    });
+    notifyListeners();
+  }
+
+  /// Vibrate on phase change.
+  void _vibrate() {
+    try {
+      HapticFeedback.mediumImpact();
+    } catch (_) {
+      // Haptic feedback may not be available on all platforms
+    }
+  }
+
+  /// Public method to complete the timer (for skip/complete actions).
+  void completeTimer() {
+    _timerComplete();
+  }
+
+  // ─── Focus Actions ───
+
+  void addFocusTime(int minutes) {
+    _totalFocusMinutes += minutes;
+    final points = (minutes * 10 * _persona.ageGroup.pointsMultiplier).toInt();
+    _focusScore += points;
+    _sessionsCompleted++;
+
+    // Record the session
+    final now = DateTime.now();
+    _sessions.add(FocusSession(
+      id: 'session_${now.millisecondsSinceEpoch}',
+      startTime: now.subtract(Duration(minutes: minutes)),
+      endTime: now,
+      durationMinutes: minutes,
+      pointsEarned: points,
+      completed: true,
+    ));
+
+    _streakDays = computedStreakDays;
+    _checkAchievements();
+    notifyListeners();
+  }
+
+  void updateStreak(int days) {
+    _streakDays = days;
+    notifyListeners();
+  }
+
+  void addAchievement(String achievement) {
+    if (!_achievements.contains(achievement)) {
+      _achievements.add(achievement);
+      notifyListeners();
+    }
+  }
+
+  /// Auto-earn achievements based on real session data.
+  void _checkAchievements() {
+    if (_sessionsCompleted >= 1 && !_achievements.contains('First Focus')) {
+      _achievements.add('First Focus');
+    }
+    if (_streakDays >= 3 && !_achievements.contains('3-Day Streak')) {
+      _achievements.add('3-Day Streak');
+    }
+    if (_totalFocusMinutes >= 60 && !_achievements.contains('Early Bird')) {
+      _achievements.add('Early Bird');
+    }
+    if (_sessionsCompleted >= 10 && !_achievements.contains('Focus Master')) {
+      _achievements.add('Focus Master');
+    }
+    if (_focusScore >= 1000 && !_achievements.contains('High Scorer')) {
+      _achievements.add('High Scorer');
+    }
+    if (!_achievements.contains('Lifelong Learner') && _focusScore >= 2500) {
+      _achievements.add('Lifelong Learner');
+    }
+  }
+
+  /// Update user profile details
+  void updateProfile({required String name}) {
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(name: name);
+    } else {
+      _currentUser = User(
+        id: '1',
+        email: 'explorer@nora.app',
+        name: name,
+        ageGroup: _ageGroup,
+        createdAt: DateTime.now(),
+      );
+    }
+    notifyListeners();
+  }
+
+  // ─── Daily Planning Actions ───
+
+  /// Load today's plan from local state (mock).
+  void loadTodayPlan() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Check if we already have a plan for today
+    if (_todayPlan != null &&
+        DateTime(_todayPlan!.date.year, _todayPlan!.date.month, _todayPlan!.date.day)
+            .isAtSameMomentAs(today)) {
+      return; // Already loaded
+    }
+
+    // Create a mock plan for today
+    _todayPlan = DailyPlan(
+      id: 'plan_${today.millisecondsSinceEpoch}',
+      userId: _currentUser?.id ?? '1',
+      date: today,
+      tasks: [],
+      morningPlanned: false,
+      eveningReflected: false,
+      pointsEarned: 0,
+    );
+    notifyListeners();
+  }
+
+  /// Create a daily plan with the given task titles.
+  void createDailyPlan(List<String> taskTitles) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final maxTasks = _ageGroup.maxDailyTasks;
+
+    final tasks = <PlanTask>[];
+    for (var i = 0; i < taskTitles.length && i < maxTasks; i++) {
+      tasks.add(PlanTask(
+        id: 'task_${today.millisecondsSinceEpoch}_$i',
+        title: taskTitles[i],
+        priority: i + 1,
+        completed: false,
+        iconAsset: _ageGroup.defaultTaskIcon,
+      ));
+    }
+
+    _todayPlan = DailyPlan(
+      id: 'plan_${today.millisecondsSinceEpoch}',
+      userId: _currentUser?.id ?? '1',
+      date: today,
+      tasks: tasks,
+      morningPlanned: true,
+      eveningReflected: false,
+      pointsEarned: 0,
+    );
+    notifyListeners();
+  }
+
+  /// Toggle a task's completed state.
+  void toggleTask(String taskId) {
+    if (_todayPlan == null) return;
+
+    final updatedTasks = _todayPlan!.tasks.map((task) {
+      if (task.id == taskId) {
+        final nowCompleted = !task.completed;
+        return task.copyWith(
+          completed: nowCompleted,
+          completedAt: nowCompleted ? DateTime.now() : null,
+        );
+      }
+      return task;
+    }).toList();
+
+    // Calculate points earned
+    final pointsPerTask = _ageGroup.pointsPerTask;
+    final newPointsEarned =
+        updatedTasks.where((t) => t.completed).length * pointsPerTask;
+
+    _todayPlan = _todayPlan!.copyWith(
+      tasks: updatedTasks,
+      pointsEarned: newPointsEarned,
+    );
+    notifyListeners();
+  }
+
+  /// Submit evening reflection.
+  void submitReflection(String note) {
+    if (_todayPlan == null) return;
+
+    _todayPlan = _todayPlan!.copyWith(
+      eveningReflected: true,
+      reflectionNote: note,
+    );
+
+    // Add to history
+    _planHistory = [_todayPlan!, ..._planHistory];
+    notifyListeners();
+  }
+
+  /// Load mock plan history for the last 7 days.
+  void loadPlanHistory() {
+    final now = DateTime.now();
+    final history = <DailyPlan>[];
+
+    for (var i = 1; i <= 7; i++) {
+      final date = now.subtract(Duration(days: i));
+      final dayOnly = DateTime(date.year, date.month, date.day);
+      final completedCount = (i % 3) + 1; // 1-3 tasks completed
+      final totalTasks = 3;
+      final points = completedCount * _ageGroup.pointsPerTask;
+
+      final tasks = List.generate(totalTasks, (index) {
+        final isCompleted = index < completedCount;
+        return PlanTask(
+          id: 'history_task_${dayOnly.millisecondsSinceEpoch}_$index',
+          title: _getMockTaskTitle(index),
+          priority: index + 1,
+          completed: isCompleted,
+          completedAt: isCompleted ? dayOnly.add(const Duration(hours: 12)) : null,
+        );
+      });
+
+      history.add(DailyPlan(
+        id: 'plan_${dayOnly.millisecondsSinceEpoch}',
+        userId: _currentUser?.id ?? '1',
+        date: dayOnly,
+        tasks: tasks,
+        morningPlanned: true,
+        eveningReflected: i % 2 == 0, // Reflected every other day
+        pointsEarned: points,
+      ));
+    }
+
+    _planHistory = history;
+    notifyListeners();
+  }
+
+  String _getMockTaskTitle(int index) {
+    switch (_ageGroup) {
+      case AgeGroup.baby:
+        return ['Color time', 'Story time', 'Play time'][index % 3];
+      case AgeGroup.kid:
+        return ['Math homework', 'Read a chapter', 'Practice guitar'][index % 3];
+      case AgeGroup.teen:
+        return ['Study for test', 'Finish project', 'Go for a run'][index % 3];
+      case AgeGroup.adult:
+        return ['Finish report', 'Exercise', 'Meal prep'][index % 3];
+    }
+  }
+
+  // ─── Cleanup ───
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _screenTimeRefreshTimer?.cancel();
+    super.dispose();
+  }
+}

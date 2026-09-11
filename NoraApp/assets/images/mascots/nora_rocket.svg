@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#EDE9FE"/>
+  <!-- Rocket body -->
+  <path d="M100 30 Q120 50 120 90 L120 130 L80 130 L80 90 Q80 50 100 30Z" fill="#FFF"/>
+  <!-- Rocket window -->
+  <circle cx="100" cy="75" r="18" fill="#EDE9FE"/>
+  <circle cx="100" cy="75" r="14" fill="#8B5CF6"/>
+  <!-- Eyes in window -->
+  <circle cx="94" cy="73" r="4" fill="#FFF"/>
+  <circle cx="106" cy="73" r="4" fill="#FFF"/>
+  <circle cx="94" cy="73" r="2" fill="#1E293B"/>
+  <circle cx="106" cy="73" r="2" fill="#1E293B"/>
+  <!-- Smile -->
+  <path d="M94 80 Q100 86 106 80" stroke="#FFF" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Nose cone -->
+  <path d="M100 30 L110 55 L90 55Z" fill="#8B5CF6"/>
+  <!-- Fins -->
+  <path d="M80 110 L60 140 L80 130Z" fill="#8B5CF6"/>
+  <path d="M120 110 L140 140 L120 130Z" fill="#8B5CF6"/>
+  <!-- Center fin -->
+  <path d="M95 130 L100 155 L105 130Z" fill="#8B5CF6"/>
+  <!-- Flame -->
+  <path d="M88 130 Q92 155 100 170 Q108 155 112 130" fill="#F59E0B"/>
+  <path d="M93 130 Q97 150 100 160 Q103 150 107 130" fill="#EF4444"/>
+  <path d="M97 130 Q99 145 100 152 Q101 145 103 130" fill="#FBBF24"/>
+  <!-- Stars -->
+  <circle cx="45" cy="60" r="3" fill="#FFD700"/>
+  <circle cx="155" cy="50" r="4" fill="#FFD700"/>
+  <circle cx="40" cy="130" r="2" fill="#FFD700"/>
+  <circle cx="160" cy="120" r="3" fill="#FFD700"/>
+  <!-- Stripes on body -->
+  <line x1="80" y1="100" x2="120" y2="100" stroke="#EDE9FE" stroke-width="2"/>
+  <line x1="80" y1="110" x2="120" y2="110" stroke="#EDE9FE" stroke-width="2"/>
+</svg>

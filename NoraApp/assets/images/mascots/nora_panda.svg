@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#ECFDF5"/>
+  <!-- Body -->
+  <ellipse cx="100" cy="115" rx="45" ry="42" fill="#FFF"/>
+  <!-- Head -->
+  <circle cx="100" cy="80" r="42" fill="#FFF"/>
+  <!-- Ears -->
+  <circle cx="62" cy="50" r="15" fill="#1E293B"/>
+  <circle cx="138" cy="50" r="15" fill="#1E293B"/>
+  <circle cx="62" cy="50" r="8" fill="#374151"/>
+  <circle cx="138" cy="50" r="8" fill="#374151"/>
+  <!-- Eye patches -->
+  <ellipse cx="78" cy="80" rx="16" ry="14" fill="#1E293B" transform="rotate(-10 78 80)"/>
+  <ellipse cx="122" cy="80" rx="16" ry="14" fill="#1E293B" transform="rotate(10 122 80)"/>
+  <!-- Eyes -->
+  <circle cx="78" cy="80" r="7" fill="#FFF"/>
+  <circle cx="122" cy="80" r="7" fill="#FFF"/>
+  <circle cx="80" cy="79" r="4" fill="#1E293B"/>
+  <circle cx="124" cy="79" r="4" fill="#1E293B"/>
+  <circle cx="82" cy="77" r="2" fill="#FFF"/>
+  <circle cx="126" cy="77" r="2" fill="#FFF"/>
+  <!-- Nose -->
+  <ellipse cx="100" cy="92" rx="6" ry="4" fill="#1E293B"/>
+  <!-- Mouth -->
+  <path d="M100 96 Q94 104 88 98" stroke="#1E293B" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M100 96 Q106 104 112 98" stroke="#1E293B" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Belly patch -->
+  <ellipse cx="100" cy="118" rx="28" ry="25" fill="#F0FDF4"/>
+  <!-- Arms -->
+  <ellipse cx="55" cy="115" rx="12" ry="18" fill="#1E293B" transform="rotate(15 55 115)"/>
+  <ellipse cx="145" cy="115" rx="12" ry="18" fill="#1E293B" transform="rotate(-15 145 115)"/>
+  <!-- Feet -->
+  <ellipse cx="78" cy="152" rx="14" ry="10" fill="#1E293B"/>
+  <ellipse cx="122" cy="152" rx="14" ry="10" fill="#1E293B"/>
+  <!-- Bamboo -->
+  <rect x="145" y="40" width="5" height="80" rx="2" fill="#22C55E"/>
+  <path d="M150 50 L165 40 L160 55" fill="#22C55E"/>
+  <path d="M150 70 L165 60 L160 75" fill="#22C55E"/>
+  <path d="M150 90 L165 80 L160 95" fill="#22C55E"/>
+  <!-- Blush -->
+  <circle cx="65" cy="92" r="6" fill="#FCA5A5" opacity="0.5"/>
+  <circle cx="135" cy="92" r="6" fill="#FCA5A5" opacity="0.5"/>
+</svg>

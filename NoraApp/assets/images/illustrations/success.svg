@@ -1,0 +1,8 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
+  <rect width="400" height="300" fill="#0D1117"/>
+  <circle cx="200" cy="120" r="60" fill="#1C1F24"/>
+  <circle cx="200" cy="120" r="40" fill="#2233FF" opacity="0.2"/>
+  <path d="M180 120 L195 135 L220 105" stroke="#2233FF" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="200" y="220" text-anchor="middle" fill="#2233FF" font-family="Inter" font-size="18" font-weight="600">Session Complete!</text>
+  <text x="200" y="245" text-anchor="middle" fill="#8B949E" font-family="Inter" font-size="12">Great focus work</text>
+</svg>

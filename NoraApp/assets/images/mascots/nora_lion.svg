@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#FEF9C3"/>
+  <!-- Mane -->
+  <circle cx="100" cy="85" r="52" fill="#F59E0B"/>
+  <!-- Mane spikes -->
+  <circle cx="60" cy="60" r="14" fill="#D97706"/>
+  <circle cx="100" cy="42" r="14" fill="#D97706"/>
+  <circle cx="140" cy="60" r="14" fill="#D97706"/>
+  <circle cx="50" cy="85" r="12" fill="#D97706"/>
+  <circle cx="150" cy="85" r="12" fill="#D97706"/>
+  <circle cx="55" cy="110" r="10" fill="#D97706"/>
+  <circle cx="145" cy="110" r="10" fill="#D97706"/>
+  <!-- Face -->
+  <circle cx="100" cy="85" r="38" fill="#FBBF24"/>
+  <!-- Eyes -->
+  <circle cx="85" cy="78" r="7" fill="#1E293B"/>
+  <circle cx="115" cy="78" r="7" fill="#1E293B"/>
+  <circle cx="87" cy="76" r="3" fill="#FFF"/>
+  <circle cx="117" cy="76" r="3" fill="#FFF"/>
+  <!-- Nose -->
+  <ellipse cx="100" cy="92" rx="7" ry="5" fill="#D97706"/>
+  <!-- Mouth -->
+  <path d="M100 97 Q93 106 86 100" stroke="#92400E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M100 97 Q107 106 114 100" stroke="#92400E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Whisker dots -->
+  <circle cx="70" cy="90" r="2" fill="#D97706"/>
+  <circle cx="65" cy="98" r="2" fill="#D97706"/>
+  <circle cx="130" cy="90" r="2" fill="#D97706"/>
+  <circle cx="135" cy="98" r="2" fill="#D97706"/>
+  <!-- Body -->
+  <ellipse cx="100" cy="135" rx="35" ry="30" fill="#FBBF24"/>
+  <!-- Belly -->
+  <ellipse cx="100" cy="140" rx="22" ry="20" fill="#FEF9C3"/>
+  <!-- Crown -->
+  <polygon points="82,45 88,30 95,42 100,25 105,42 112,30 118,45" fill="#FFD700"/>
+  <circle cx="88" cy="32" r="3" fill="#EF4444"/>
+  <circle cx="100" cy="25" r="3" fill="#3B82F6"/>
+  <circle cx="112" cy="32" r="3" fill="#22C55E"/>
+  <!-- Paws -->
+  <ellipse cx="75" cy="160" rx="12" ry="8" fill="#FBBF24"/>
+  <ellipse cx="125" cy="160" rx="12" ry="8" fill="#FBBF24"/>
+  <!-- Tail -->
+  <path d="M135 145 Q160 130 165 110 Q168 100 162 95" stroke="#F59E0B" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="162" cy="93" r="6" fill="#D97706"/>
+</svg>

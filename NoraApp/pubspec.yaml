@@ -1,0 +1,39 @@
+name: nora_app
+description: AI-Powered Focus & Productivity App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.1
+  http: ^1.1.0
+  percent_indicator: ^4.2.3
+  fl_chart: ^1.2.0
+  google_fonts: ^8.2.1
+  flutter_svg: ^2.0.10+1
+  lottie: ^3.1.0
+  flutter_secure_storage: ^9.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/mascots/
+    - assets/images/illustrations/
+    - assets/images/achievements/
+    - assets/images/icons/
+    - assets/images/moods/
+    - assets/animations/
+
+  fonts:
+    - family: PermanentMarker
+      fonts:
+        - asset: assets/fonts/PermanentMarker-Regular.ttf

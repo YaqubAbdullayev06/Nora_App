@@ -1,0 +1,33 @@
+{
+  "name": "SystemAgent",
+  "version": "1.0.0",
+  "max_command_timeout": 30,
+  "allowed_directories": [],
+  "blocked_commands": [
+    "rm -rf /",
+    "format",
+    "del /s /q C:\\*",
+    "shutdown",
+    "reboot"
+  ],
+  "features": {
+    "command_execution": true,
+    "file_operations": true,
+    "system_info": true,
+    "search": true,
+    "history": true,
+    "social_media": true,
+    "focus_mode": true
+  },
+  "social_media_allowlist": [
+    "x",
+    "linkedin",
+    "youtube"
+  ],
+  "require_social_media_approval": true,
+  "logging": {
+    "enabled": true,
+    "file": "agent.log",
+    "level": "INFO"
+  }
+}
