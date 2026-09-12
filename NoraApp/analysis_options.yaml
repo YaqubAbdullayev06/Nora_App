@@ -1,38 +1,62 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
-#
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
-
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+linter:
+  rules:
+    # Avoid unnecessary imports
+    unnecessary_import: true
+    # Prefer const constructors
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    # Prefer final fields
+    prefer_final_fields: true
+    prefer_final_locals: true
+    # Avoid print in production
+    avoid_print: false  # Allow for now; enable in CI
+    # Use key in widget constructors
+    use_key_in_widget_constructors: true
+    # Prefer single quotes
+    prefer_single_quotes: true
+    # Sort child properties last
+    sort_child_properties_last: true
+    # Use super parameters
+    use_super_parameters: true
+    # Avoid unnecessary string interpolation
+    unnecessary_string_interpolations: true
+    # Prefer trailing commas for formatting
+    trailing_commas: true  # May require dartfmt
+    # Prefer null aware operators
+    prefer_if_null_operators: true
+    # Use rethrow
+    use_rethrow_when_possible: true
+    # Prefer contains
+    prefer_contains: true
+    # Avoid unnecessary late
+    unnecessary_lambdas: true
+    # Prefer for loops
+    prefer_for_elements_to_map_fromIterable: true
+    # Prefer is empty/is not empty
+    prefer_is_empty: true
+    prefer_is_not_empty: true
+    # Avoid unnecessary string concatenation
+    unnecessary_string_concatenations: true
+    # Prefer general types
+    prefer_typing_uninitialized_variables: true
+    # Use colons for super parameters
+    use_colons_for_super_const: true
+
 analyzer:
+  errors:
+    missing_return: error
+    dead_code: warning
+    unused_import: warning
+    unused_local_variable: warning
   exclude:
-    - build/**
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "build/**"
     - android/**
     - ios/**
     - web/**
     - windows/**
     - macos/**
     - linux/**
-
-linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
-  rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
-
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options

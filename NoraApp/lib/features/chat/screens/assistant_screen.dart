@@ -178,17 +178,39 @@ class _AssistantScreenState extends State<AssistantScreen> {
         case 'show_recommendations':
           await _showRecommendations();
           break;
+        case 'analyze_usage':
+          // Analyze usage is triggered after scan — same as show_recommendations
+          await _showRecommendations();
+          break;
         case 'block_apps':
           final packages = action.data['packages'];
           if (packages is List && packages.isNotEmpty) {
+            final packageList = packages.cast<String>();
+            // Filter out emergency packages (safety net — backend also validates)
+            const emergencyPackages = {
+              'com.android.phone', 'com.android.dialer',
+              'com.apple.mobilephone', 'com.google.android.apps.maps',
+            };
+            final safePackages = packageList
+                .where((p) => !emergencyPackages.contains(p))
+                .toList();
+            if (safePackages.isEmpty) {
+              setState(() {
+                _messages.add(ChatMessage(
+                  role: 'assistant',
+                  content: 'Those are essential apps (phone, maps, etc.) that I can\'t block.',
+                ));
+              });
+              break;
+            }
             // SAFETY: Ask user confirmation before blocking
             final confirmed = await _confirmDestructiveAction(
               title: 'Block Apps',
-              description: 'Block ${packages.length} apps during focus sessions?',
-              packages: packages.cast<String>(),
+              description: 'Block ${safePackages.length} app(s) during focus sessions?',
+              packages: safePackages,
             );
             if (confirmed) {
-              await _blockApps(packages.cast<String>());
+              await _blockApps(safePackages);
             } else {
               setState(() {
                 _messages.add(ChatMessage(
@@ -202,14 +224,15 @@ class _AssistantScreenState extends State<AssistantScreen> {
         case 'unblock_apps':
           final packages = action.data['packages'];
           if (packages is List && packages.isNotEmpty) {
+            final packageList = packages.cast<String>();
             // SAFETY: Ask user confirmation before unblocking
             final confirmed = await _confirmDestructiveAction(
               title: 'Unblock Apps',
-              description: 'Unblock ${packages.length} apps? These will be accessible again.',
-              packages: packages.cast<String>(),
+              description: 'Unblock ${packageList.length} app(s)? These will be accessible again.',
+              packages: packageList,
             );
             if (confirmed) {
-              await _unblockApps(packages.cast<String>());
+              await _unblockApps(packageList);
             } else {
               setState(() {
                 _messages.add(ChatMessage(
@@ -221,8 +244,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
           }
           break;
         case 'start_focus':
-          final minutes = action.data['minutes'] ?? 25;
-          _startFocusSession(minutes);
+          final rawMinutes = action.data['minutes'];
+          final minutes = rawMinutes is int ? rawMinutes : int.tryParse('$rawMinutes') ?? 25;
+          _startFocusSession(minutes.clamp(1, 120));
           break;
       }
     }

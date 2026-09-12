@@ -291,6 +291,7 @@ class _FeedScreenState extends State<FeedScreen> {
   String _getFeedTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'Fun Stuff';
       case AgeGroup.kid:
         return 'Your Feed';
@@ -304,6 +305,7 @@ class _FeedScreenState extends State<FeedScreen> {
   String _getFeedSubtitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'Things to watch and play!';
       case AgeGroup.kid:
         return 'Activities picked just for you';
@@ -317,6 +319,7 @@ class _FeedScreenState extends State<FeedScreen> {
   String _getEmptyTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'Nothing here yet!';
       case AgeGroup.kid:
         return 'All caught up!';
@@ -330,6 +333,7 @@ class _FeedScreenState extends State<FeedScreen> {
   String _getEmptySubtitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'Check back later for new fun!';
       case AgeGroup.kid:
         return 'More quests coming soon!';
@@ -343,6 +347,7 @@ class _FeedScreenState extends State<FeedScreen> {
   List<String> _getCategoriesForAgeGroup(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return ['All', 'Colors', 'Animals', 'Puzzles', 'Music'];
       case AgeGroup.kid:
         return ['All', 'Math', 'Language', 'Science', 'Games'];

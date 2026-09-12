@@ -10,6 +10,7 @@ passlib==1.7.4
 bcrypt==4.1.2
 python-multipart==0.0.6
 httpx==0.25.2
+diskcache==5.6.3
 
 # ─── LLM Providers (Free Stack) ───
 # Groq free tier API (replaces openai — same interface, $0 cost)

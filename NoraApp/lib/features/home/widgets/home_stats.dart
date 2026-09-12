@@ -24,7 +24,7 @@ class HomeStats extends StatelessWidget {
         ),
         const SizedBox(height: DesignTokens.spacing12),
         SizedBox(
-          height: 120,
+          height: 130,
           child: ListView(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
@@ -79,6 +79,8 @@ class HomeStats extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Stars';
+      case AgeGroup.child:
+        return 'Stars';
       case AgeGroup.kid:
         return 'Points';
       case AgeGroup.teen:
@@ -91,6 +93,8 @@ class HomeStats extends StatelessWidget {
   String _getStreakLabel(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Days';
+      case AgeGroup.child:
         return 'Days';
       case AgeGroup.kid:
         return 'Streak';
@@ -105,6 +109,8 @@ class HomeStats extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Play Time';
+      case AgeGroup.child:
+        return 'Play Time';
       case AgeGroup.kid:
         return 'Focus Time';
       case AgeGroup.teen:
@@ -117,6 +123,8 @@ class HomeStats extends StatelessWidget {
   String _getSessionsLabel(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Plays';
+      case AgeGroup.child:
         return 'Plays';
       case AgeGroup.kid:
         return 'Quests';

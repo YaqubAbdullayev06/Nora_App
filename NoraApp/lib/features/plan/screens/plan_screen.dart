@@ -5,6 +5,8 @@ import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../models/models.dart';
 import '../../../providers/app_provider.dart';
+import '../../../services/haptic_service.dart';
+import '../../../services/task_decomposer.dart';
 import '../../../widgets/nora_components.dart';
 
 class PlanScreen extends StatefulWidget {
@@ -200,8 +202,20 @@ class _PlanScreenState extends State<PlanScreen> {
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    suffixIcon: _taskControllers[index].text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(
+                              Icons.auto_fix_high,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            onPressed: () => _decomposeTask(index),
+                            tooltip: "AI Decompose",
+                          )
+                        : null,
                   ),
                   textCapitalization: TextCapitalization.sentences,
+                  onChanged: (_) => setState(() {}),
                 ),
               ],
             ),
@@ -241,6 +255,231 @@ class _PlanScreenState extends State<PlanScreen> {
     // Clear controllers
     for (final c in _taskControllers) {
       c.clear();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // AI TASK DECOMPOSITION
+  // ═══════════════════════════════════════════════════════════════
+
+  void _decomposeTask(int index) async {
+    final text = _taskControllers[index].text.trim();
+    if (text.isEmpty) return;
+
+    HapticService.success();
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    final decomposer = TaskDecomposer();
+    final result = await decomposer.decompose(text);
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // dismiss loading
+
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not decompose task. Try again or enter subtasks manually.',
+            style: TextStyle(fontFamily: DesignTokens.fontFamilyPrimary),
+          ),
+          backgroundColor: DesignTokens.danger,
+        ),
+      );
+      return;
+    }
+
+    // Show decomposition result
+    _showDecompositionDialog(result, index);
+  }
+
+  void _showDecompositionDialog(DecomposedTask result, int taskIndex) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: DesignTokens.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radius16),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.auto_fix_high, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              "AI Subtasks",
+              style: TextStyle(
+                color: DesignTokens.textPrimary,
+                fontFamily: DesignTokens.fontFamilyDisplay,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tip
+              if (result.tip.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: DesignTokens.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline,
+                          size: 16, color: DesignTokens.accent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          result.tip,
+                          style: TextStyle(
+                            color: DesignTokens.textMuted,
+                            fontSize: DesignTokens.fontSizeCaption,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+              // Subtasks list
+              ...result.subtasks.map((subtask) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: subtask.priority == 1
+                                ? DesignTokens.danger.withValues(alpha: 0.15)
+                                : subtask.priority == 2
+                                    ? DesignTokens.warning.withValues(alpha: 0.15)
+                                    : DesignTokens.success.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              "${subtask.estimatedMinutes}m",
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: subtask.priority == 1
+                                    ? DesignTokens.danger
+                                    : subtask.priority == 2
+                                        ? DesignTokens.warning
+                                        : DesignTokens.success,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                subtask.title,
+                                style: TextStyle(
+                                  color: DesignTokens.textPrimary,
+                                  fontSize: DesignTokens.fontSizeBody,
+                                  fontFamily: DesignTokens.fontFamilyPrimary,
+                                ),
+                              ),
+                              if (subtask.description.isNotEmpty)
+                                Text(
+                                  subtask.description,
+                                  style: TextStyle(
+                                    color: DesignTokens.textMuted,
+                                    fontSize: DesignTokens.fontSizeCaption,
+                                    fontFamily: DesignTokens.fontFamilyPrimary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+              // Total time
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: DesignTokens.surfaceRaised,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.timer_outlined,
+                        size: 14, color: DesignTokens.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Total: ${result.totalEstimatedMinutes} minutes",
+                      style: TextStyle(
+                        color: DesignTokens.textMuted,
+                        fontSize: DesignTokens.fontSizeCaption,
+                        fontFamily: DesignTokens.fontFamilyPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              "Cancel",
+              style: TextStyle(color: DesignTokens.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _applyDecomposition(result, taskIndex);
+            },
+            child: Text(
+              "Apply",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyDecomposition(DecomposedTask result, int taskIndex) {
+    HapticService.timerStarted();
+
+    // Fill the current task slot with the first subtask
+    if (result.subtasks.isNotEmpty) {
+      _taskControllers[taskIndex].text = result.subtasks.first.title;
+    }
+
+    // Fill additional slots with remaining subtasks (if available)
+    for (int i = 1;
+        i < result.subtasks.length && i < _taskControllers.length;
+        i++) {
+      _taskControllers[i].text = result.subtasks[i].title;
     }
   }
 
@@ -400,6 +639,11 @@ class _PlanScreenState extends State<PlanScreen> {
 
     switch (ageGroup) {
       case AgeGroup.baby:
+        message = 'Great Job!';
+        subtitle = 'You completed all your activities!';
+        icon = Icons.star_rounded;
+        break;
+      case AgeGroup.child:
         message = 'Great Job!';
         subtitle = 'You completed all your activities!';
         icon = Icons.star_rounded;
@@ -596,6 +840,10 @@ class _PlanScreenState extends State<PlanScreen> {
 
     switch (ageGroup) {
       case AgeGroup.baby:
+        hint = 'What was your favorite part today?';
+        maxLines = 2;
+        break;
+      case AgeGroup.child:
         hint = 'What was your favorite part today?';
         maxLines = 2;
         break;

@@ -46,3 +46,12 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Environment secrets
+.env
+backend/.env
+.env.local
+.cache/
+
+# Flutter SDK (installed separately, don't commit)
+flutter/

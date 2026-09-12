@@ -51,6 +51,8 @@ class HomeMotivation extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return "You're doing great! Every little bit counts!";
+      case AgeGroup.child:
+        return "You're doing great! Every little bit counts!";
       case AgeGroup.kid:
         return "Keep going! You're on a streak!";
       case AgeGroup.teen:

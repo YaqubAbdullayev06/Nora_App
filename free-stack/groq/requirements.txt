@@ -1,6 +1,0 @@
-# Groq API - Free Tier
-# Sign up at: https://console.groq.com
-# No credit card required
-
-groq>=0.4.0
-python-dotenv>=1.0.0

@@ -7,7 +7,12 @@
 /// The parent controls blocklists, schedules, and content. The child uses
 /// pre-authored, human-reviewed content only — no free-form AI generation.
 enum AgeGroup {
-  /// Children & Toddlers (1-6) — PARENT-MANAGED MODE
+  /// Babies & Toddlers (0-2) — PARENT-MANAGED MODE
+  /// No LLM chat. Parent controls everything. Baby uses pre-authored content.
+  /// Large buttons, bright colors, voice-first, minimal text.
+  baby,
+
+  /// Children & Toddlers (2-6) — PARENT-MANAGED MODE
   /// No LLM chat. Parent controls everything. Child uses pre-authored content.
   /// Big buttons, bright colors, voice-first, minimal text.
   child,
@@ -35,6 +40,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Display name for the age group.
   String get displayName {
     switch (this) {
+      case AgeGroup.baby:
+        return 'Baby (Parent-Managed)';
       case AgeGroup.child:
         return 'Child (Parent-Managed)';
       case AgeGroup.kid:
@@ -49,8 +56,10 @@ extension AgeGroupExtension on AgeGroup {
   /// Age range description.
   String get ageRange {
     switch (this) {
+      case AgeGroup.baby:
+        return '0-2 years';
       case AgeGroup.child:
-        return '1-6 years';
+        return '2-6 years';
       case AgeGroup.kid:
         return '6-12 years';
       case AgeGroup.teen:
@@ -63,6 +72,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Nora's persona name for this age group.
   String get personaName {
     switch (this) {
+      case AgeGroup.baby:
+        return 'Nora Tiny';
       case AgeGroup.child:
         return 'Nora Little';
       case AgeGroup.kid:
@@ -77,6 +88,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Description of Nora's role for this age group.
   String get personaDescription {
     switch (this) {
+      case AgeGroup.baby:
+        return 'Parent-managed early learning';
       case AgeGroup.child:
         return 'Parent-managed learning companion';
       case AgeGroup.kid:
@@ -91,6 +104,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Greeting style for this age group.
   String get greetingStyle {
     switch (this) {
+      case AgeGroup.baby:
+        return 'simple';  // "Hi! 🌟"
       case AgeGroup.child:
         return 'simple';  // "Hi! 🌟"
       case AgeGroup.kid:
@@ -105,6 +120,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Maximum focus session duration in minutes for this age group.
   int get maxFocusMinutes {
     switch (this) {
+      case AgeGroup.baby:
+        return 2;   // Very short attention span
       case AgeGroup.child:
         return 5;   // Very short attention span
       case AgeGroup.kid:
@@ -119,6 +136,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Default focus session duration in minutes for this age group.
   int get defaultFocusMinutes {
     switch (this) {
+      case AgeGroup.baby:
+        return 2;
       case AgeGroup.child:
         return 3;
       case AgeGroup.kid:
@@ -133,6 +152,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Screen time daily limit in minutes (0 = no limit).
   int get screenTimeLimitMinutes {
     switch (this) {
+      case AgeGroup.baby:
+        return 15;   // 15 min max
       case AgeGroup.child:
         return 30;   // 30 min max
       case AgeGroup.kid:
@@ -146,7 +167,7 @@ extension AgeGroupExtension on AgeGroup {
 
   /// Whether this age group requires parental controls.
   bool get requiresParentalControl {
-    return this == AgeGroup.child || this == AgeGroup.kid;
+    return this == AgeGroup.baby || this == AgeGroup.child || this == AgeGroup.kid;
   }
 
   /// Whether this age group has social features.
@@ -157,6 +178,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Content complexity level (1-5).
   int get contentComplexity {
     switch (this) {
+      case AgeGroup.baby:
+        return 1;
       case AgeGroup.child:
         return 1;
       case AgeGroup.kid:
@@ -171,6 +194,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Points multiplier for focus sessions.
   double get pointsMultiplier {
     switch (this) {
+      case AgeGroup.baby:
+        return 3.0;   // Extra encouragement
       case AgeGroup.child:
         return 2.0;   // Extra encouragement
       case AgeGroup.kid:
@@ -185,6 +210,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Break duration in minutes after a focus session (short break).
   int get breakMinutes {
     switch (this) {
+      case AgeGroup.baby:
+        return 2;
       case AgeGroup.child:
         return 2;
       case AgeGroup.kid:
@@ -199,6 +226,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Long break duration in minutes (after completing a full Pomodoro cycle).
   int get longBreakMinutes {
     switch (this) {
+      case AgeGroup.baby:
+        return 5;
       case AgeGroup.child:
         return 5;
       case AgeGroup.kid:
@@ -213,6 +242,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Number of focus sessions before a long break.
   int get pomodoroSessionsPerCycle {
     switch (this) {
+      case AgeGroup.baby:
+        return 1;
       case AgeGroup.child:
         return 2;
       case AgeGroup.kid:
@@ -231,6 +262,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Maximum number of daily tasks allowed.
   int get maxDailyTasks {
     switch (this) {
+      case AgeGroup.baby:
+        return 1;
       case AgeGroup.child:
         return 2;
       case AgeGroup.kid:
@@ -245,6 +278,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Title shown on the planning screen.
   String get planTitle {
     switch (this) {
+      case AgeGroup.baby:
+        return "Baby's Day!";
       case AgeGroup.child:
         return "Today's Fun!";
       case AgeGroup.kid:
@@ -259,6 +294,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Subtitle/prompt shown during morning planning.
   String get planSubtitle {
     switch (this) {
+      case AgeGroup.baby:
+        return 'Pick fun activities!';
       case AgeGroup.child:
         return 'Pick your fun activities!';
       case AgeGroup.kid:
@@ -273,6 +310,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Label for the evening reflection section.
   String get reflectionLabel {
     switch (this) {
+      case AgeGroup.baby:
+        return "Baby's Day!";
       case AgeGroup.child:
         return 'How was your day?';
       case AgeGroup.kid:
@@ -287,6 +326,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Points awarded per completed task.
   int get pointsPerTask {
     switch (this) {
+      case AgeGroup.baby:
+        return 25;
       case AgeGroup.child:
         return 20;
       case AgeGroup.kid:
@@ -301,6 +342,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Mascot SVG asset for the planning screen.
   String get planMascotAsset {
     switch (this) {
+      case AgeGroup.baby:
+        return 'assets/images/mascots/baby_star.svg';
       case AgeGroup.child:
         return 'assets/images/mascots/baby_star.svg';
       case AgeGroup.kid:
@@ -315,6 +358,8 @@ extension AgeGroupExtension on AgeGroup {
   /// Icon asset for task input (baby/kid use visual icons).
   String get defaultTaskIcon {
     switch (this) {
+      case AgeGroup.baby:
+        return 'assets/images/icons/star.svg';
       case AgeGroup.child:
         return 'assets/images/icons/star.svg';
       case AgeGroup.kid:
@@ -330,6 +375,7 @@ extension AgeGroupExtension on AgeGroup {
 /// Determines AgeGroup from a birth date.
 AgeGroup ageGroupFromBirthDate(DateTime birthDate) {
   final age = DateTime.now().difference(birthDate).inDays ~/ 365;
+  if (age < 2) return AgeGroup.baby;
   if (age < 6) return AgeGroup.child;
   if (age < 12) return AgeGroup.kid;
   if (age < 18) return AgeGroup.teen;
@@ -338,6 +384,7 @@ AgeGroup ageGroupFromBirthDate(DateTime birthDate) {
 
 /// Determines AgeGroup from a raw age number.
 AgeGroup ageGroupFromAge(int age) {
+  if (age < 2) return AgeGroup.baby;
   if (age < 6) return AgeGroup.child;
   if (age < 12) return AgeGroup.kid;
   if (age < 18) return AgeGroup.teen;

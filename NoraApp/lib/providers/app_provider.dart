@@ -9,8 +9,19 @@ import '../services/api_service.dart';
 import '../services/focus_protection_service.dart';
 import '../services/usage_tracker_service.dart';
 
-/// AppProvider - Central state management
-/// Manages: persona, auth, timer, focus data, content, achievements
+/// AppProvider - Central state management (DEPRECATED).
+///
+/// **Prefer using the domain-specific providers directly:**
+/// - [AuthProvider] → authentication, user profile
+/// - [PersonaProvider] → age group, persona theme, screen time
+/// - [TimerProvider] → timer, breaks, pomodoro
+/// - [FocusProvider] → scores, sessions, streaks, achievements
+/// - [PlanProvider] → daily plans, tasks
+/// - [WeeklyReviewProvider] → weekly reflections and goals
+/// - [AgentProvider] → AI agent capabilities
+///
+/// This class is kept for backward compatibility during migration.
+/// It is a thin coordinator that exposes all domain state in one place.
 class AppProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
   final FocusProtectionService _focusProtection = FocusProtectionService();
@@ -56,6 +67,15 @@ class AppProvider extends ChangeNotifier {
 
   Future<FocusProtectionStatus> disableFocusProtection() {
     return _focusProtection.disableBlocking();
+  }
+
+  // ─── Feed State ───
+  List<ContentItem> _feedContent = [];
+
+  List<ContentItem> get feedContent => _feedContent;
+
+  void claimContentReward(ContentItem item) {
+    notifyListeners();
   }
 
   Future<Map<String, dynamic>> getAgentCapabilities() {
@@ -174,12 +194,11 @@ class AppProvider extends ChangeNotifier {
   bool get isBreakPhase => _isBreakPhase;
   int get completedSessionsInCycle => _completedSessionsInCycle;
 
-  /// Whether the current break is a long break (after completing a full cycle).
   bool get isLongBreak =>
       _completedSessionsInCycle > 0 &&
-      _completedSessionsInCycle % _persona.ageGroup.pomodoroSessionsPerCycle == 0;
+      _completedSessionsInCycle % _persona.ageGroup.pomodoroSessionsPerCycle ==
+          0;
 
-  /// Duration of the current break in seconds.
   int get breakDurationSeconds =>
       (isLongBreak
               ? _persona.ageGroup.longBreakMinutes
@@ -237,26 +256,22 @@ class AppProvider extends ChangeNotifier {
   WeeklyReview? get currentWeeklyReview => _currentWeeklyReview;
   List<WeeklyReview> get weeklyReviewHistory => _weeklyReviewHistory;
 
-  /// Get the current week's start date (Monday).
   DateTime get _currentWeekStart {
     final now = DateTime.now();
     return now.subtract(Duration(days: now.weekday - 1));
   }
 
-  /// Get the current week's end date (Sunday).
   DateTime get _currentWeekEnd {
     final start = _currentWeekStart;
     return start.add(const Duration(days: 6, hours: 23, minutes: 59));
   }
 
-  /// Get or create the current weekly review.
   WeeklyReview getOrCreateCurrentWeeklyReview() {
     if (_currentWeeklyReview != null &&
         _currentWeeklyReview!.weekStart == _currentWeekStart) {
       return _currentWeeklyReview!;
     }
 
-    // Create new weekly review for this week
     _currentWeeklyReview = WeeklyReview(
       id: 'review_${_currentWeekStart.millisecondsSinceEpoch}',
       weekStart: _currentWeekStart,
@@ -264,14 +279,20 @@ class AppProvider extends ChangeNotifier {
       reflections: [],
       goals: WeeklyReview.getDefaultGoals(_ageGroup),
       totalFocusMinutes: weeklyFocusMinutes.fold(0, (a, b) => a + b),
-      totalSessions: _sessions.where((s) =>
-          s.startTime.isAfter(_currentWeekStart) &&
-          s.startTime.isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
-          s.completed).length,
-      totalPointsEarned: _sessions.where((s) =>
-          s.startTime.isAfter(_currentWeekStart) &&
-          s.startTime.isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
-          s.completed).fold(0, (a, b) => a + b.pointsEarned),
+      totalSessions: _sessions
+          .where((s) =>
+              s.startTime.isAfter(_currentWeekStart) &&
+              s.startTime
+                  .isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
+              s.completed)
+          .length,
+      totalPointsEarned: _sessions
+          .where((s) =>
+              s.startTime.isAfter(_currentWeekStart) &&
+              s.startTime
+                  .isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
+              s.completed)
+          .fold(0, (a, b) => a + b.pointsEarned),
       streakDays: computedStreakDays,
       createdAt: DateTime.now(),
     );
@@ -279,7 +300,6 @@ class AppProvider extends ChangeNotifier {
     return _currentWeeklyReview!;
   }
 
-  /// Set the mood for the current weekly review.
   void setWeeklyMood(WeeklyMood mood) {
     final review = getOrCreateCurrentWeeklyReview();
     _currentWeeklyReview = WeeklyReview(
@@ -299,7 +319,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Add a reflection to the current weekly review.
   void addWeeklyReflection(String question, String answer) {
     final review = getOrCreateCurrentWeeklyReview();
     final reflection = WeeklyReflection(
@@ -325,7 +344,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Update a goal's progress in the current weekly review.
   void updateWeeklyGoalProgress(String goalId, int completedMinutes) {
     final review = getOrCreateCurrentWeeklyReview();
     final updatedGoals = review.goals.map((goal) {
@@ -355,7 +373,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Add a new custom goal to the current weekly review.
   void addWeeklyGoal(String title, int targetMinutes) {
     final review = getOrCreateCurrentWeeklyReview();
     final newGoal = WeeklyGoal(
@@ -381,7 +398,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Remove a goal from the current weekly review.
   void removeWeeklyGoal(String goalId) {
     final review = getOrCreateCurrentWeeklyReview();
     _currentWeeklyReview = WeeklyReview(
@@ -401,7 +417,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Set AI insight for the current weekly review.
   void setWeeklyAiInsight(String insight) {
     final review = getOrCreateCurrentWeeklyReview();
     _currentWeeklyReview = WeeklyReview(
@@ -421,7 +436,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Save the current weekly review to history.
   void saveWeeklyReview() {
     if (_currentWeeklyReview != null) {
       _weeklyReviewHistory.add(_currentWeeklyReview!);
@@ -430,7 +444,6 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  /// Get weekly review data for a specific past week.
   WeeklyReview? getWeeklyReviewForWeek(DateTime weekStart) {
     try {
       return _weeklyReviewHistory.firstWhere(
@@ -443,10 +456,8 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Weekly Data ───
 
-  /// Returns focus minutes for each of the last 7 days (Mon–Sun).
   List<int> get weeklyFocusMinutes {
     final now = DateTime.now();
-    // Start of this week (Monday)
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final today = DateTime(now.year, now.month, now.day);
 
@@ -466,7 +477,46 @@ class AppProvider extends ChangeNotifier {
     return minutes;
   }
 
-  /// Compute streak days from actual session history.
+  /// Returns the most used app for each day of the current week.
+  /// Each entry contains [appName], [minutes], and [category].
+  List<WeeklyAppUsage> get weeklyAppUsage {
+    final now = DateTime.now();
+
+    // Mock data for demo — in production this would come from UsageTrackerService
+    final mockApps = [
+      {'name': 'Instagram', 'category': 'social_media', 'iconPath': 'assets/images/apps/instagram.svg'},
+      {'name': 'YouTube', 'category': 'entertainment', 'iconPath': 'assets/images/apps/youtube.svg'},
+      {'name': 'WhatsApp', 'category': 'messaging', 'iconPath': 'assets/images/apps/whatsapp.svg'},
+      {'name': 'Chrome', 'category': 'productivity', 'iconPath': 'assets/images/apps/chrome.svg'},
+      {'name': 'TikTok', 'category': 'social_media', 'iconPath': 'assets/images/apps/tiktok.svg'},
+      {'name': 'Spotify', 'category': 'entertainment', 'iconPath': 'assets/images/apps/spotify.svg'},
+      {'name': 'Telegram', 'category': 'messaging', 'iconPath': 'assets/images/apps/telegram.svg'},
+    ];
+
+    final nowDay = now.weekday - 1; // 0=Mon, 6=Sun
+    final List<WeeklyAppUsage> result = [];
+
+    for (var i = 0; i < 7; i++) {
+      if (i > nowDay) {
+        // Future days — no data
+        result.add(WeeklyAppUsage(dayIndex: i, appName: '', minutes: 0, category: '', iconPath: ''));
+      } else {
+        // Pseudo-random but deterministic based on day + session count
+        final seed = (i * 7 + _sessions.length) % mockApps.length;
+        final app = mockApps[seed];
+        final baseMinutes = 30 + ((i * 13 + _sessions.length * 3) % 120);
+        result.add(WeeklyAppUsage(
+          dayIndex: i,
+          appName: app['name']!,
+          minutes: i == nowDay ? (baseMinutes * 0.6).toInt() : baseMinutes,
+          category: app['category']!,
+          iconPath: app['iconPath']!,
+        ));
+      }
+    }
+    return result;
+  }
+
   int get computedStreakDays {
     if (_sessions.isEmpty) return 0;
 
@@ -474,19 +524,19 @@ class AppProvider extends ChangeNotifier {
     final today = DateTime(now.year, now.month, now.day);
     final completedDates = _sessions
         .where((s) => s.completed)
-        .map((s) => DateTime(s.startTime.year, s.startTime.month, s.startTime.day))
+        .map((s) =>
+            DateTime(s.startTime.year, s.startTime.month, s.startTime.day))
         .toSet()
       ..removeWhere((d) => d.isAfter(today));
 
     if (completedDates.isEmpty) return 0;
 
-    // Check if today or yesterday has a session to start the streak
     final yesterday = today.subtract(const Duration(days: 1));
-    if (!completedDates.contains(today) && !completedDates.contains(yesterday)) {
+    if (!completedDates.contains(today) &&
+        !completedDates.contains(yesterday)) {
       return 0;
     }
 
-    // Count consecutive days backwards
     int streak = 0;
     DateTime checkDate = completedDates.contains(today) ? today : yesterday;
     while (completedDates.contains(checkDate)) {
@@ -499,20 +549,15 @@ class AppProvider extends ChangeNotifier {
   // ─── Initialization ───
 
   Future<void> init() async {
-    // Set default timer based on age group
     _totalTimerSeconds = _persona.ageGroup.defaultFocusMinutes * 60;
     _timerSeconds = _totalTimerSeconds;
 
-    // Fetch real screen time from device
     await refreshScreenTime();
-
-    // Start periodic refresh every 5 minutes
     _startScreenTimeRefresh();
 
     notifyListeners();
   }
 
-  /// Fetch real screen time from Android's UsageStatsManager.
   Future<void> refreshScreenTime() async {
     try {
       final todayUsage = await _usageTracker.getTodayUsage();
@@ -525,7 +570,6 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  /// Start periodic refresh of screen time data.
   void _startScreenTimeRefresh() {
     _screenTimeRefreshTimer?.cancel();
     _screenTimeRefreshTimer = Timer.periodic(
@@ -534,28 +578,15 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  /// Switch persona based on age group selection.
   void setAgeGroup(AgeGroup group) {
     _ageGroup = group;
     _persona = PersonaTheme.forAgeGroup(group);
     DesignTokens.init(_persona);
-    // Reset timer to age-appropriate default
     if (!_isTimerRunning) {
       _totalTimerSeconds = group.defaultFocusMinutes * 60;
       _timerSeconds = _totalTimerSeconds;
     }
     notifyListeners();
-  }
-
-  void _loadMockData() {
-    _focusScore = 0;
-    _totalFocusMinutes = 0;
-    _streakDays = 0;
-    _sessionsCompleted = 0;
-    _achievements = [];
-    _screenTimeTodayMinutes = 0;
-    _sessions = [];
-
   }
 
   // ─── Auth Actions ───
@@ -568,7 +599,6 @@ class AppProvider extends ChangeNotifier {
     try {
       final data = await _api.login(email: email, password: password);
       _currentUser = User.fromJson(data['user']);
-      // Set persona from user's age group
       setAgeGroup(_currentUser!.ageGroup);
       _isLoading = false;
       notifyListeners();
@@ -594,7 +624,6 @@ class AppProvider extends ChangeNotifier {
         password: password,
       );
       _currentUser = User.fromJson(data['user']);
-      // Override with selected age group
       setAgeGroup(ageGroup);
       _currentUser = _currentUser!.copyWith(ageGroup: ageGroup);
       _isLoading = false;
@@ -623,7 +652,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Lock the app without logging the user out or discarding their session.
   void lockApp() {
     if (_isAppLocked) return;
     pauseTimer();
@@ -631,7 +659,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Release the in-app lock after the user confirms access.
   void unlockApp() {
     if (!_isAppLocked) return;
     _isAppLocked = false;
@@ -643,7 +670,6 @@ class AppProvider extends ChangeNotifier {
   void setTimerDuration(int minutes) {
     _totalTimerSeconds = minutes * 60;
     _timerSeconds = _totalTimerSeconds;
-    // Reset break phase and cycle when manually changing duration
     if (_isBreakPhase) {
       _isBreakPhase = false;
       _completedSessionsInCycle = 0;
@@ -686,13 +712,13 @@ class AppProvider extends ChangeNotifier {
     _isTimerRunning = false;
     unawaited(_focusProtection.disableBlocking());
     final minutes = _totalTimerSeconds ~/ 60;
-    final points = (minutes * 10 * _persona.ageGroup.pointsMultiplier).toInt();
+    final points =
+        (minutes * 10 * _persona.ageGroup.pointsMultiplier).toInt();
     _focusScore += points;
     _totalFocusMinutes += minutes;
     _sessionsCompleted++;
     _completedSessionsInCycle++;
 
-    // Record the session
     final now = DateTime.now();
     _sessions.add(FocusSession(
       id: 'session_${now.millisecondsSinceEpoch}',
@@ -703,16 +729,10 @@ class AppProvider extends ChangeNotifier {
       completed: true,
     ));
 
-    // Recompute streak from actual session history
     _streakDays = computedStreakDays;
-
-    // Auto-earn achievements based on real data
     _checkAchievements();
-
-    // Vibrate on phase change
     _vibrate();
 
-    // Transition to break phase
     _isBreakPhase = true;
     _timerSeconds = breakDurationSeconds;
     _totalTimerSeconds = breakDurationSeconds;
@@ -720,18 +740,15 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Complete the current break and return to focus phase.
   void completeBreak() {
     _timer?.cancel();
     _isTimerRunning = false;
     _isBreakPhase = false;
 
-    // If cycle complete (after long break), reset session counter
     if (isLongBreak) {
       _completedSessionsInCycle = 0;
     }
 
-    // Reset to focus duration
     _timerSeconds = _persona.ageGroup.defaultFocusMinutes * 60;
     _totalTimerSeconds = _timerSeconds;
 
@@ -739,12 +756,10 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Skip the current break.
   void skipBreak() {
     completeBreak();
   }
 
-  /// Start the break timer (auto-countdown).
   void startBreakTimer() {
     if (_isTimerRunning || !_isBreakPhase) return;
     _isTimerRunning = true;
@@ -759,16 +774,12 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Vibrate on phase change.
   void _vibrate() {
     try {
       HapticFeedback.mediumImpact();
-    } catch (_) {
-      // Haptic feedback may not be available on all platforms
-    }
+    } catch (_) {}
   }
 
-  /// Public method to complete the timer (for skip/complete actions).
   void completeTimer() {
     _timerComplete();
   }
@@ -777,11 +788,11 @@ class AppProvider extends ChangeNotifier {
 
   void addFocusTime(int minutes) {
     _totalFocusMinutes += minutes;
-    final points = (minutes * 10 * _persona.ageGroup.pointsMultiplier).toInt();
+    final points =
+        (minutes * 10 * _persona.ageGroup.pointsMultiplier).toInt();
     _focusScore += points;
     _sessionsCompleted++;
 
-    // Record the session
     final now = DateTime.now();
     _sessions.add(FocusSession(
       id: 'session_${now.millisecondsSinceEpoch}',
@@ -809,7 +820,6 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  /// Auto-earn achievements based on real session data.
   void _checkAchievements() {
     if (_sessionsCompleted >= 1 && !_achievements.contains('First Focus')) {
       _achievements.add('First Focus');
@@ -831,7 +841,6 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  /// Update user profile details
   void updateProfile({required String name}) {
     if (_currentUser != null) {
       _currentUser = _currentUser!.copyWith(name: name);
@@ -849,19 +858,17 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Daily Planning Actions ───
 
-  /// Load today's plan from local state (mock).
   void loadTodayPlan() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Check if we already have a plan for today
     if (_todayPlan != null &&
-        DateTime(_todayPlan!.date.year, _todayPlan!.date.month, _todayPlan!.date.day)
+        DateTime(_todayPlan!.date.year, _todayPlan!.date.month,
+                _todayPlan!.date.day)
             .isAtSameMomentAs(today)) {
-      return; // Already loaded
+      return;
     }
 
-    // Create a mock plan for today
     _todayPlan = DailyPlan(
       id: 'plan_${today.millisecondsSinceEpoch}',
       userId: _currentUser?.id ?? '1',
@@ -874,7 +881,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Create a daily plan with the given task titles.
   void createDailyPlan(List<String> taskTitles) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -903,7 +909,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Toggle a task's completed state.
   void toggleTask(String taskId) {
     if (_todayPlan == null) return;
 
@@ -918,7 +923,6 @@ class AppProvider extends ChangeNotifier {
       return task;
     }).toList();
 
-    // Calculate points earned
     final pointsPerTask = _ageGroup.pointsPerTask;
     final newPointsEarned =
         updatedTasks.where((t) => t.completed).length * pointsPerTask;
@@ -930,7 +934,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Submit evening reflection.
   void submitReflection(String note) {
     if (_todayPlan == null) return;
 
@@ -939,12 +942,10 @@ class AppProvider extends ChangeNotifier {
       reflectionNote: note,
     );
 
-    // Add to history
     _planHistory = [_todayPlan!, ..._planHistory];
     notifyListeners();
   }
 
-  /// Load mock plan history for the last 7 days.
   void loadPlanHistory() {
     final now = DateTime.now();
     final history = <DailyPlan>[];
@@ -952,7 +953,7 @@ class AppProvider extends ChangeNotifier {
     for (var i = 1; i <= 7; i++) {
       final date = now.subtract(Duration(days: i));
       final dayOnly = DateTime(date.year, date.month, date.day);
-      final completedCount = (i % 3) + 1; // 1-3 tasks completed
+      final completedCount = (i % 3) + 1;
       final totalTasks = 3;
       final points = completedCount * _ageGroup.pointsPerTask;
 
@@ -963,7 +964,8 @@ class AppProvider extends ChangeNotifier {
           title: _getMockTaskTitle(index),
           priority: index + 1,
           completed: isCompleted,
-          completedAt: isCompleted ? dayOnly.add(const Duration(hours: 12)) : null,
+          completedAt:
+              isCompleted ? dayOnly.add(const Duration(hours: 12)) : null,
         );
       });
 
@@ -973,7 +975,7 @@ class AppProvider extends ChangeNotifier {
         date: dayOnly,
         tasks: tasks,
         morningPlanned: true,
-        eveningReflected: i % 2 == 0, // Reflected every other day
+        eveningReflected: i % 2 == 0,
         pointsEarned: points,
       ));
     }
@@ -985,6 +987,8 @@ class AppProvider extends ChangeNotifier {
   String _getMockTaskTitle(int index) {
     switch (_ageGroup) {
       case AgeGroup.baby:
+        return ['Color time', 'Story time', 'Play time'][index % 3];
+      case AgeGroup.child:
         return ['Color time', 'Story time', 'Play time'][index % 3];
       case AgeGroup.kid:
         return ['Math homework', 'Read a chapter', 'Practice guitar'][index % 3];

@@ -100,6 +100,10 @@ class FocusProtectionStatus {
 enum FocusPlatform { android, ios, web, unknown }
 
 class FocusProtectionService {
+  static final FocusProtectionService _instance = FocusProtectionService._internal();
+  factory FocusProtectionService() => _instance;
+  FocusProtectionService._internal();
+
   static const _channel = MethodChannel('com.nora.nora_app/focus_protection');
 
   /// Get current platform and authorization status.

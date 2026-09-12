@@ -88,8 +88,8 @@ class StatsScreen extends StatelessWidget {
 
   Widget _buildWeeklyChart(AppProvider provider, PersonaTheme persona) {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final data = provider.weeklyFocusMinutes;
-    final maxVal = data.reduce((a, b) => a > b ? a : b).toDouble();
+    final appUsage = provider.weeklyAppUsage;
+    final maxMinutes = appUsage.map((e) => e.minutes).reduce((a, b) => a > b ? a : b).toDouble();
 
     return NoraCard(
       child: Column(
@@ -102,11 +102,11 @@ class StatsScreen extends StatelessWidget {
           ),
           const SizedBox(height: DesignTokens.spacing16),
           SizedBox(
-            height: 160,
-            child: maxVal == 0
+            height: 180,
+            child: maxMinutes == 0
                 ? Center(
                     child: Text(
-                      'No focus sessions this week yet',
+                      'No app usage data this week yet',
                       style: TextStyle(
                         color: DesignTokens.textMuted,
                         fontSize: DesignTokens.fontSizeCaption,
@@ -117,31 +117,78 @@ class StatsScreen extends StatelessWidget {
                 : Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: List.generate(7, (index) {
-                      final height = (data[index] / maxVal) * 120;
+                      final usage = appUsage[index];
+                      final height = usage.minutes > 0
+                          ? (usage.minutes / maxMinutes) * 100
+                          : 0.0;
                       final isToday = index == DateTime.now().weekday - 1;
+                      final hasData = usage.minutes > 0;
                       return Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // Value label
-                              Text(
-                                '${data[index]}',
-                                style: TextStyle(
-                                  color: isToday ? persona.primary : DesignTokens.textMuted,
-                                  fontSize: 10,
-                                  fontWeight: isToday ? DesignTokens.fontWeightSemiBold : DesignTokens.fontWeightRegular,
-                                  fontFamily: DesignTokens.fontFamilyPrimary,
+                              // App icon + name + time
+                              if (hasData) ...[
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: SvgPicture.asset(
+                                    usage.iconPath,
+                                    fit: BoxFit.contain,
+                                    placeholderBuilder: (context) => Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: BoxDecoration(
+                                        color: DesignTokens.border,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  usage.appName,
+                                  style: TextStyle(
+                                    color: isToday ? persona.primary : DesignTokens.textMuted,
+                                    fontSize: 8,
+                                    fontWeight: isToday ? DesignTokens.fontWeightSemiBold : DesignTokens.fontWeightRegular,
+                                    fontFamily: DesignTokens.fontFamilyPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                                Text(
+                                  usage.displayTime,
+                                  style: TextStyle(
+                                    color: isToday ? persona.primary : DesignTokens.textMuted,
+                                    fontSize: 9,
+                                    fontWeight: DesignTokens.fontWeightBold,
+                                    fontFamily: DesignTokens.fontFamilyPrimary,
+                                  ),
+                                ),
+                              ] else ...[
+                                const SizedBox(height: 32),
+                              ],
                               const SizedBox(height: DesignTokens.spacing4),
                               // Bar
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 300),
                                 height: height,
                                 decoration: BoxDecoration(
-                                  color: isToday ? persona.primary : DesignTokens.border,
+                                  gradient: hasData
+                                      ? LinearGradient(
+                                          colors: [
+                                            persona.primary,
+                                            persona.primary.withValues(alpha: 0.6),
+                                          ],
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                        )
+                                      : null,
+                                  color: hasData ? null : DesignTokens.border.withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(DesignTokens.radius4),
                                 ),
                               ),
@@ -480,6 +527,8 @@ class StatsScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'See all the fun things you did!';
+      case AgeGroup.child:
+        return 'See all the fun things you did!';
       case AgeGroup.kid:
         return 'Check out your weekly progress';
       case AgeGroup.teen:
@@ -494,6 +543,7 @@ class StatsScreen extends StatelessWidget {
   String _getStatsTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby: return 'My Progress';
+      case AgeGroup.child: return 'My Progress';
       case AgeGroup.kid: return 'Your Stats';
       case AgeGroup.teen: return 'Analytics';
       case AgeGroup.adult: return 'Statistics';
@@ -503,6 +553,7 @@ class StatsScreen extends StatelessWidget {
   String _getStatsSubtitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby: return 'Look how much you\'ve done!';
+      case AgeGroup.child: return 'Look how much you\'ve done!';
       case AgeGroup.kid: return 'Track your adventure!';
       case AgeGroup.teen: return 'Your learning journey';
       case AgeGroup.adult: return 'Your productivity overview';
@@ -512,6 +563,7 @@ class StatsScreen extends StatelessWidget {
   String _getChartTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby: return 'This Week';
+      case AgeGroup.child: return 'This Week';
       case AgeGroup.kid: return 'Weekly Quest';
       case AgeGroup.teen: return 'Weekly Focus';
       case AgeGroup.adult: return 'Weekly Overview';
@@ -521,6 +573,7 @@ class StatsScreen extends StatelessWidget {
   String _getDetailedTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby: return 'Fun Facts';
+      case AgeGroup.child: return 'Fun Facts';
       case AgeGroup.kid: return 'Stats Breakdown';
       case AgeGroup.teen: return 'Detailed Stats';
       case AgeGroup.adult: return 'Detailed Metrics';
@@ -530,6 +583,7 @@ class StatsScreen extends StatelessWidget {
   String _getAchievementsTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby: return 'My Badges';
+      case AgeGroup.child: return 'My Badges';
       case AgeGroup.kid: return 'Achievements';
       case AgeGroup.teen: return 'Badges Earned';
       case AgeGroup.adult: return 'Achievements';
@@ -557,6 +611,7 @@ class StatsScreen extends StatelessWidget {
   String _getScoreLabel(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby: return 'Stars';
+      case AgeGroup.child: return 'Stars';
       case AgeGroup.kid: return 'Points';
       case AgeGroup.teen: return 'XP';
       case AgeGroup.adult: return 'Score';

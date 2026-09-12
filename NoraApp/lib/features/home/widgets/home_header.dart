@@ -67,6 +67,8 @@ class HomeHeader extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Hi there, little one!';
+      case AgeGroup.child:
+        return 'Hi there, little one!';
       case AgeGroup.kid:
         return 'Hey, adventurer!';
       case AgeGroup.teen:

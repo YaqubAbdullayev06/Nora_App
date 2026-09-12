@@ -210,7 +210,7 @@ class UsageStatsSummary {
       productivityMinutes: map['productivityMinutes'] ?? 0,
       appCount: map['appCount'] ?? 0,
       topApps: (map['apps'] as List<dynamic>? ?? [])
-          .map((a) => AppUsageEntry.fromMap(a))
+          .map((a) => AppUsageEntry.fromMap(Map<String, dynamic>.from(a as Map)))
           .toList(),
     );
   }

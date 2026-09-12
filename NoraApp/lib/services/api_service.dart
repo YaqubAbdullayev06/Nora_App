@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/config/env_config.dart';
 import '../models/models.dart';
 import 'auth_storage.dart';
 
@@ -9,14 +10,15 @@ import 'auth_storage.dart';
 /// SECURITY: Tokens are stored in FlutterSecureStorage (keychain/encrypted),
 /// never in plaintext SharedPreferences. Access tokens auto-refresh on 401.
 class ApiService {
-  static const String baseUrl = 'http://192.168.0.101:8000';
+  static final ApiService _instance = ApiService._internal();
+  factory ApiService() => _instance;
+  ApiService._internal();
+
+  late final String baseUrl = EnvConfig.instance.backendUrl;
   String? _token;
   String? _refreshToken;
-  final AuthStorage _authStorage;
+  final AuthStorage _authStorage = AuthStorage();
   bool _isRefreshing = false;
-
-  ApiService({AuthStorage? authStorage})
-      : _authStorage = authStorage ?? AuthStorage();
 
   /// Initialize from secure storage on app start.
   Future<void> init() async {
@@ -428,6 +430,16 @@ class ApiService {
       'age_group': ageGroup,
       'context': context ?? {},
       'conversation_history': conversationHistory ?? [],
+    });
+  }
+
+  Future<Map<String, dynamic>> decomposeTask(
+    String task, {
+    String ageGroup = 'adult',
+  }) async {
+    return _postJson('/ai/decompose-task', {
+      'task': task,
+      'age_group': ageGroup,
     });
   }
 }

@@ -451,24 +451,28 @@ class WeeklyReview {
   });
 
   /// Get age-appropriate reflection prompts.
-  static List<String> getReflectionPrompts(dynamic ageGroup) {
-    // Import is not needed here; we'll use the enum name
-    final ageGroupName = ageGroup.toString().split('.').last;
-    switch (ageGroupName) {
-      case 'baby':
+  static List<String> getReflectionPrompts(AgeGroup ageGroup) {
+    switch (ageGroup) {
+      case AgeGroup.baby:
         return [
           'What made you happy this week?',
           'What was your favorite thing to learn?',
           'What do you want to learn next week?',
         ];
-      case 'kid':
+      case AgeGroup.child:
+        return [
+          'What made you smile this week?',
+          'What was fun to learn about?',
+          'What do you want to try next week?',
+        ];
+      case AgeGroup.kid:
         return [
           'What was the coolest thing you learned this week?',
           'What was challenging and how did you handle it?',
           'What are you most proud of this week?',
           'What do you want to get better at next week?',
         ];
-      case 'teen':
+      case AgeGroup.teen:
         return [
           'What went well this week with your focus?',
           'What distracted you the most?',
@@ -476,8 +480,7 @@ class WeeklyReview {
           'What would you do differently next week?',
           'What habit do you want to build or break?',
         ];
-      case 'adult':
-      default:
+      case AgeGroup.adult:
         return [
           'What were your biggest wins this week?',
           'What tasks did you procrastinate on?',
@@ -490,13 +493,12 @@ class WeeklyReview {
   }
 
   /// Get default weekly goals based on age group.
-  static List<WeeklyGoal> getDefaultGoals(dynamic ageGroup) {
+  static List<WeeklyGoal> getDefaultGoals(AgeGroup ageGroup) {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final ageGroupName = ageGroup.toString().split('.').last;
 
-    switch (ageGroupName) {
-      case 'baby':
+    switch (ageGroup) {
+      case AgeGroup.baby:
         return [
           WeeklyGoal(
             id: 'goal_1',
@@ -511,7 +513,22 @@ class WeeklyReview {
             createdAt: startOfWeek,
           ),
         ];
-      case 'kid':
+      case AgeGroup.child:
+        return [
+          WeeklyGoal(
+            id: 'goal_1',
+            title: 'Fun Learning',
+            targetMinutes: 20,
+            createdAt: startOfWeek,
+          ),
+          WeeklyGoal(
+            id: 'goal_2',
+            title: 'Creative Play',
+            targetMinutes: 25,
+            createdAt: startOfWeek,
+          ),
+        ];
+      case AgeGroup.kid:
         return [
           WeeklyGoal(
             id: 'goal_1',
@@ -532,7 +549,7 @@ class WeeklyReview {
             createdAt: startOfWeek,
           ),
         ];
-      case 'teen':
+      case AgeGroup.teen:
         return [
           WeeklyGoal(
             id: 'goal_1',
@@ -553,8 +570,7 @@ class WeeklyReview {
             createdAt: startOfWeek,
           ),
         ];
-      case 'adult':
-      default:
+      case AgeGroup.adult:
         return [
           WeeklyGoal(
             id: 'goal_1',
@@ -785,4 +801,29 @@ class DailyPlan {
   bool get allCompleted => tasks.isNotEmpty && tasks.every((t) => t.completed);
   double get progress =>
       tasks.isEmpty ? 0.0 : completedCount / tasks.length;
+}
+
+/// Weekly app usage entry — the most used app for a single day.
+class WeeklyAppUsage {
+  final int dayIndex; // 0=Mon, 6=Sun
+  final String appName;
+  final int minutes;
+  final String category;
+  final String iconPath;
+
+  const WeeklyAppUsage({
+    required this.dayIndex,
+    required this.appName,
+    required this.minutes,
+    required this.category,
+    required this.iconPath,
+  });
+
+  String get displayTime {
+    if (minutes == 0) return '';
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) return '${hours}h ${mins}m';
+    return '${mins}m';
+  }
 }

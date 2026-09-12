@@ -211,6 +211,8 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
     switch (ageGroup) {
       case AgeGroup.baby:
         return 'My Happy Week!';
+      case AgeGroup.child:
+        return 'My Happy Week!';
       case AgeGroup.kid:
         return 'Weekly Adventure Review';
       case AgeGroup.teen:
@@ -275,6 +277,8 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
     switch (ageGroup) {
       case AgeGroup.baby:
         return 'My Goals';
+      case AgeGroup.child:
+        return 'My Goals';
       case AgeGroup.kid:
         return 'Weekly Goals';
       case AgeGroup.teen:
@@ -288,6 +292,9 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
     String message;
     switch (ageGroup) {
       case AgeGroup.baby:
+        message = 'No goals yet! Tap + to add fun activities.';
+        break;
+      case AgeGroup.child:
         message = 'No goals yet! Tap + to add fun activities.';
         break;
       case AgeGroup.kid:
@@ -370,6 +377,8 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
   String _getAgeAdaptiveReflectionsTitle(AgeGroup ageGroup) {
     switch (ageGroup) {
       case AgeGroup.baby:
+        return 'Happy Thoughts';
+      case AgeGroup.child:
         return 'Happy Thoughts';
       case AgeGroup.kid:
         return 'Reflection Time';
@@ -473,6 +482,8 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
   String _getAgeAdaptiveSaveLabel(AgeGroup ageGroup) {
     switch (ageGroup) {
       case AgeGroup.baby:
+        return 'Save My Week!';
+      case AgeGroup.child:
         return 'Save My Week!';
       case AgeGroup.kid:
         return 'Save My Review!';
@@ -594,6 +605,8 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
   String _getAgeAdaptiveSaveMessage(AgeGroup ageGroup) {
     switch (ageGroup) {
       case AgeGroup.baby:
+        return 'Great job! Your happy week is saved!';
+      case AgeGroup.child:
         return 'Great job! Your happy week is saved!';
       case AgeGroup.kid:
         return 'Awesome review saved! Keep being amazing!';

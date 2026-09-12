@@ -1,0 +1,67 @@
+# ─── Secrets ───
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# ─── Python ───
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# ─── Dart/Flutter ───
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.lock
+!pubspec.lock
+
+# ─── IDE ───
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.swp
+*.swo
+.DS_Store
+
+# ─── Build artifacts ───
+msbuild_diag.txt
+*.log
+*.tmp
+*.temp
+.cache/
+
+# ─── Node (web/) ───
+node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
+
+# ─── OS ───
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ─── Database ───
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Firebase ───
+**/google-services.json
+**/GoogleService-Info.json

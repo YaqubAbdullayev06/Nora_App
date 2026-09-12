@@ -1,11 +1,16 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
+import '../../../core/router/slide_route.dart';
 import '../../../core/theme/persona_theme.dart';
 import '../../../providers/app_provider.dart';
+import '../../../services/flow_state_sounds.dart';
+import '../../../services/haptic_service.dart';
+import '../../../widgets/flow_state_sound_player.dart';
 import '../../../widgets/nora_components.dart';
 import 'break_screen.dart';
 
@@ -29,6 +34,10 @@ class _TimerScreenState extends State<TimerScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
+  // Flow-state sound player
+  bool _isSoundPlaying = false;
+  SoundType? _currentSound;
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +54,19 @@ class _TimerScreenState extends State<TimerScreen>
   void dispose() {
     _pulseController.dispose();
     super.dispose();
+  }
+
+  void _toggleSound(SoundType sound) {
+    HapticService.buttonPressed();
+    setState(() {
+      if (_isSoundPlaying && _currentSound == sound) {
+        _isSoundPlaying = false;
+        _currentSound = null;
+      } else {
+        _isSoundPlaying = true;
+        _currentSound = sound;
+      }
+    });
   }
 
   void _triggerInterrupter() {
@@ -74,8 +96,8 @@ class _TimerScreenState extends State<TimerScreen>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChangeNotifierProvider.value(
+                FadePageRoute(
+                  pageBuilder: (_, __, ___) => ChangeNotifierProvider.value(
                     value: provider,
                     child: const BreakScreen(),
                   ),
@@ -111,6 +133,18 @@ class _TimerScreenState extends State<TimerScreen>
                             const SizedBox(height: DesignTokens.spacing24),
                             _buildInterrupterButton(persona),
                           ],
+                          // Flow-State Sound Player
+                          const SizedBox(height: DesignTokens.spacing24),
+                          FlowStateSoundPlayer(
+                            persona: persona,
+                            isPlaying: _isSoundPlaying,
+                            currentSound: _currentSound,
+                            onPlay: () => _toggleSound(_currentSound ?? SoundType.brownNoise),
+                            onStop: () => setState(() {
+                              _isSoundPlaying = false;
+                              _currentSound = null;
+                            }),
+                          ),
                         ],
                       ),
                     ),
@@ -409,9 +443,15 @@ class _TimerScreenState extends State<TimerScreen>
         const SizedBox(width: DesignTokens.spacing24),
         // Play/Pause button
         GestureDetector(
-          onTap: provider.isTimerRunning
-              ? provider.pauseTimer
-              : provider.startTimer,
+          onTap: () {
+            if (provider.isTimerRunning) {
+              HapticService.timerPaused();
+              provider.pauseTimer();
+            } else {
+              HapticService.timerStarted();
+              provider.startTimer();
+            }
+          },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: 80,
@@ -548,6 +588,7 @@ class _TimerScreenState extends State<TimerScreen>
   String _getTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'Play Time';
       case AgeGroup.kid:
         return 'Focus Quest';
@@ -561,6 +602,7 @@ class _TimerScreenState extends State<TimerScreen>
   String _getSubtitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'Let\'s play and learn!';
       case AgeGroup.kid:
         return 'Complete your mission!';
@@ -574,6 +616,7 @@ class _TimerScreenState extends State<TimerScreen>
   String _getTimerLabel(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'minutes of play';
       case AgeGroup.kid:
         return 'minutes to focus';
@@ -587,6 +630,7 @@ class _TimerScreenState extends State<TimerScreen>
   List<int> _getDurationsForAgeGroup(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return [3, 5, 10];
       case AgeGroup.kid:
         return [10, 15, 20];
@@ -600,6 +644,7 @@ class _TimerScreenState extends State<TimerScreen>
   String _getInterrupterButtonLabel(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return 'Nora says hi!';
       case AgeGroup.kid:
         return 'Ask Nora for help';
@@ -613,6 +658,7 @@ class _TimerScreenState extends State<TimerScreen>
   List<String> _getInterrupterMessages(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+      case AgeGroup.child:
         return [
           'You\'re doing amazing! 🌟',
           'Time for a stretching break! 🧘',

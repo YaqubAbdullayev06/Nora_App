@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: nora-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # ─── Database (Render free PostgreSQL) ───
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nora-db
+          property: connectionString
+      # ─── JWT ───
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      # ─── LLM Providers (set these manually in Render dashboard) ───
+      - key: LLM_PROVIDER
+        value: auto
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: CLOUDFLARE_MODEL
+        value: "@cf/meta/llama-3.1-8b-instruct"
+      # Ollama not available on Render (no local process)
+      - key: OLLAMA_BASE_URL
+        value: ""
+      - key: OLLAMA_COLAB_URL
+        sync: false
+
+databases:
+  - name: nora-db
+    plan: free
+    databaseName: nora_db

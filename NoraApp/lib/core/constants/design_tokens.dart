@@ -34,9 +34,11 @@ class DesignTokens {
   static Color get surface => _current.surface;
   static Color get surfaceRaised => _current.surfaceRaised;
   static Color get textPrimary => _current.textPrimary;
+  static Color get textSecondary => _current.textSecondary;
   static Color get textMuted => _current.textMuted;
   static Color get border => _current.border;
   static Color get accent => _current.primary;
+  static Color get primary => _current.primary;
   static Color get accentLight => _current.primaryLight;
   static Color get accentSecondary => _current.secondary;
   static Color get accentSecondaryLight => _current.secondaryLight;
@@ -44,6 +46,7 @@ class DesignTokens {
   static Color get success => _current.success;
   static Color get warning => _current.warning;
   static Color get danger => _current.danger;
+  static Color get error => _current.danger;
 
   // ─────────────────────────────────────────────
   // SPACING (4px base grid — universal)

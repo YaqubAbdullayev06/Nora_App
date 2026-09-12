@@ -83,6 +83,8 @@ class HomeActions extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Your playful helper';
+      case AgeGroup.child:
+        return 'Your playful helper';
       case AgeGroup.kid:
         return 'Scan and block apps';
       case AgeGroup.teen:
@@ -95,6 +97,8 @@ class HomeActions extends StatelessWidget {
   String _getWeeklyReviewTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'My Happy Week';
+      case AgeGroup.child:
         return 'My Happy Week';
       case AgeGroup.kid:
         return 'Weekly Review';
@@ -109,6 +113,8 @@ class HomeActions extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'See your fun activities';
+      case AgeGroup.child:
+        return 'See your fun activities';
       case AgeGroup.kid:
         return 'Check your progress';
       case AgeGroup.teen:
@@ -121,6 +127,8 @@ class HomeActions extends StatelessWidget {
   String _getPlanSubtitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Fun things today!';
+      case AgeGroup.child:
         return 'Fun things today!';
       case AgeGroup.kid:
         return 'What\'s the mission?';

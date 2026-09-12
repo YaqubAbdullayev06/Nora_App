@@ -14,6 +14,10 @@ import '../models/app_info.dart';
 ///   name. Classification happens by category within the picker, not by scanning
 ///   all apps. AI advises on aggregate patterns rather than named apps.
 class AppScannerService {
+  static final AppScannerService _instance = AppScannerService._internal();
+  factory AppScannerService() => _instance;
+  AppScannerService._internal();
+
   static const _channel = MethodChannel('com.nora.nora_app/app_scanner');
 
   /// Check the current platform's scanning capabilities.
@@ -43,7 +47,7 @@ class AppScannerService {
       if (!success) return [];
 
       final apps = (result['apps'] as List<dynamic>? ?? [])
-          .map((app) => AppInfo.fromMap(Map<String, dynamic>.from(app)))
+          .map((app) => AppInfo.fromMap(Map<String, dynamic>.from(app as Map)))
           .toList();
       return apps;
     } on PlatformException catch (e) {
@@ -89,7 +93,7 @@ class AppScannerService {
 
       final app = result['app'];
       if (app == null) return null;
-      return AppInfo.fromMap(Map<String, dynamic>.from(app));
+      return AppInfo.fromMap(Map<String, dynamic>.from(app as Map));
     } on PlatformException catch (e) {
       debugPrint('AppScanner getAppDetails failed: ${e.message}');
       return null;

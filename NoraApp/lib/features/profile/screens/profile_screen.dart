@@ -781,6 +781,8 @@ class ProfileScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Stars';
+      case AgeGroup.child:
+        return 'Stars';
       case AgeGroup.kid:
         return 'Points';
       case AgeGroup.teen:
@@ -793,6 +795,8 @@ class ProfileScreen extends StatelessWidget {
   String _getStreakLabel(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Days';
+      case AgeGroup.child:
         return 'Days';
       case AgeGroup.kid:
         return 'Streak';
@@ -807,6 +811,8 @@ class ProfileScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Plays';
+      case AgeGroup.child:
+        return 'Plays';
       case AgeGroup.kid:
         return 'Quests';
       case AgeGroup.teen:
@@ -819,6 +825,8 @@ class ProfileScreen extends StatelessWidget {
   String _getSettingsTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Settings';
+      case AgeGroup.child:
         return 'Settings';
       case AgeGroup.kid:
         return 'Options';
@@ -833,6 +841,8 @@ class ProfileScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Ask a grown-up to help';
+      case AgeGroup.child:
+        return 'Ask a grown-up to help';
       case AgeGroup.kid:
         return 'Change your name or avatar';
       case AgeGroup.teen:
@@ -845,6 +855,8 @@ class ProfileScreen extends StatelessWidget {
   String _getNotificationSubtitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Fun reminders';
+      case AgeGroup.child:
         return 'Fun reminders';
       case AgeGroup.kid:
         return 'Alert me for quests';
@@ -859,6 +871,8 @@ class ProfileScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'More';
+      case AgeGroup.child:
+        return 'More';
       case AgeGroup.kid:
         return 'Account';
       case AgeGroup.teen:
@@ -871,6 +885,8 @@ class ProfileScreen extends StatelessWidget {
   String _getHelpTitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Help';
+      case AgeGroup.child:
         return 'Help';
       case AgeGroup.kid:
         return 'Get Help';
@@ -885,6 +901,8 @@ class ProfileScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Ask a grown-up';
+      case AgeGroup.child:
+        return 'Ask a grown-up';
       case AgeGroup.kid:
         return 'Chat with Nora';
       case AgeGroup.teen:
@@ -897,6 +915,8 @@ class ProfileScreen extends StatelessWidget {
   String _getLogoutLabel(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Bye-bye!';
+      case AgeGroup.child:
         return 'Bye-bye!';
       case AgeGroup.kid:
         return 'Log Out';
@@ -911,6 +931,8 @@ class ProfileScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Say bye-bye?';
+      case AgeGroup.child:
+        return 'Say bye-bye?';
       case AgeGroup.kid:
         return 'Log out?';
       case AgeGroup.teen:
@@ -923,6 +945,8 @@ class ProfileScreen extends StatelessWidget {
   String _getLogoutMessage(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 'Nora will miss you! See you soon!';
+      case AgeGroup.child:
         return 'Nora will miss you! See you soon!';
       case AgeGroup.kid:
         return 'Your progress will be saved. Come back soon!';
@@ -937,6 +961,8 @@ class ProfileScreen extends StatelessWidget {
     switch (group) {
       case AgeGroup.baby:
         return 'Bye!';
+      case AgeGroup.child:
+        return 'Bye!';
       case AgeGroup.kid:
         return 'Log Out';
       case AgeGroup.teen:
@@ -949,6 +975,12 @@ class ProfileScreen extends StatelessWidget {
   List<Map<String, String>> _getFeaturesForAgeGroup(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return [
+          {'label': 'Play', 'icon': 'sports_esports'},
+          {'label': 'Colors', 'icon': 'palette'},
+          {'label': 'Music', 'icon': 'music_note'},
+        ];
+      case AgeGroup.child:
         return [
           {'label': 'Play', 'icon': 'sports_esports'},
           {'label': 'Colors', 'icon': 'palette'},

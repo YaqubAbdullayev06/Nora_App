@@ -4,15 +4,17 @@ import '../models/app_info.dart';
 import 'usage_tracker_service.dart';
 import 'app_scanner_service.dart';
 import 'llm_service.dart';
-import 'api_service.dart';
 
 /// ProactiveAssistService — Background AI that monitors usage
 /// and generates smart suggestions, alerts, and insights.
 class ProactiveAssistService {
+  static final ProactiveAssistService _instance = ProactiveAssistService._internal();
+  factory ProactiveAssistService() => _instance;
+  ProactiveAssistService._internal();
+
   final UsageTrackerService _usageService = UsageTrackerService();
   final AppScannerService _scannerService = AppScannerService();
   final LlmService _llmService = LlmService();
-  final ApiService _apiService = ApiService();
 
   Timer? _monitorTimer;
   final List<AssistNotification> _notifications = [];

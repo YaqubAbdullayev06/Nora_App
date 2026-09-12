@@ -1,4 +1,4 @@
-from .ollama_client import OllamaClient
+from .ollama_client import OllamaCompat, ollama
 from .prompts import get_system_prompt
 
-__all__ = ["OllamaClient", "get_system_prompt"]
+__all__ = ["OllamaCompat", "ollama", "get_system_prompt"]

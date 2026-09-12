@@ -16,6 +16,7 @@ class PersonaTheme {
   final Color surface;
   final Color surfaceRaised;
   final Color textPrimary;
+  final Color textSecondary;
   final Color textMuted;
   final Color border;
   final Color success;
@@ -41,6 +42,7 @@ class PersonaTheme {
     required this.surface,
     required this.surfaceRaised,
     required this.textPrimary,
+    required this.textSecondary,
     required this.textMuted,
     required this.border,
     required this.success,
@@ -61,6 +63,8 @@ class PersonaTheme {
     switch (group) {
       case AgeGroup.baby:
         return babyTheme;
+      case AgeGroup.child:
+        return childTheme;
       case AgeGroup.kid:
         return kidTheme;
       case AgeGroup.teen:
@@ -71,8 +75,8 @@ class PersonaTheme {
   }
 
   // ─────────────────────────────────────────────
-  // BABY THEME (1-6)
-  // Warm, bright, nurturing — like a kindergarten
+  // BABY THEME (0-2)
+  // Warm, bright, nurturing — like a nursery
   // ─────────────────────────────────────────────
   static const babyTheme = PersonaTheme(
     ageGroup: AgeGroup.baby,
@@ -85,6 +89,38 @@ class PersonaTheme {
     surface: Color(0xFFFFFFFF), // White
     surfaceRaised: Color(0xFFFFF3E0),
     textPrimary: Color(0xFF4A4A4A), // Soft dark
+    textSecondary: Color(0xFF757575),
+    textMuted: Color(0xFF9E9E9E),
+    border: Color(0xFFE0E0E0),
+    success: Color(0xFF66BB6A), // Gentle green
+    warning: Color(0xFFFFCA28), // Soft yellow
+    danger: Color(0xFFEF5350), // Soft red
+    mascotEmoji: '🌟',
+    mascotName: 'Sunny',
+    tagline: 'Let\'s learn and play!',
+    fontFamily: 'Inter',
+    displayFontFamily: 'Inter',
+    borderRadius: 24,
+    isDark: false,
+    mascotAssetPath: 'assets/images/mascots/baby_star.svg',
+  );
+
+  // ─────────────────────────────────────────────
+  // CHILD THEME (2-6)
+  // Warm, bright, nurturing — like a kindergarten
+  // ─────────────────────────────────────────────
+  static const childTheme = PersonaTheme(
+    ageGroup: AgeGroup.child,
+    primary: Color(0xFFFF6B9D), // Warm pink
+    primaryLight: Color(0xFFFFB3D1),
+    secondary: Color(0xFFFFB347), // Sunny orange
+    secondaryLight: Color(0xFFFFE0B2),
+    accent: Color(0xFF7ED6DF), // Sky blue
+    background: Color(0xFFFFF8E1), // Warm cream
+    surface: Color(0xFFFFFFFF), // White
+    surfaceRaised: Color(0xFFFFF3E0),
+    textPrimary: Color(0xFF4A4A4A), // Soft dark
+    textSecondary: Color(0xFF757575),
     textMuted: Color(0xFF9E9E9E),
     border: Color(0xFFE0E0E0),
     success: Color(0xFF66BB6A), // Gentle green
@@ -115,6 +151,7 @@ class PersonaTheme {
     surface: Color(0xFFFFFFFF),
     surfaceRaised: Color(0xFFF3E5F5),
     textPrimary: Color(0xFF212121),
+    textSecondary: Color(0xFF616161),
     textMuted: Color(0xFF757575),
     border: Color(0xFFE0E0E0),
     success: Color(0xFF00C853), // Bright green
@@ -145,6 +182,7 @@ class PersonaTheme {
     surface: Color(0xFF1A1A2E),
     surfaceRaised: Color(0xFF16213E),
     textPrimary: Color(0xFFFFFFFF),
+    textSecondary: Color(0xFFD0D0D0),
     textMuted: Color(0xFFB0B0B0),
     border: Color(0xFF2A2A3E),
     success: Color(0xFF00E676),
@@ -175,6 +213,7 @@ class PersonaTheme {
     surface: Color(0xFF323b49),
     surfaceRaised: Color(0xFF252a38),
     textPrimary: Color(0xFFFFFFFF),
+    textSecondary: Color(0xFFB0BEC5),
     textMuted: Color(0xFF7789a3),
     border: Color(0xFF424f60),
     success: Color(0xFF00E676),

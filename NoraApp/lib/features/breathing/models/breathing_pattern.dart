@@ -124,6 +124,8 @@ class BreathingPattern {
     switch (group) {
       case AgeGroup.baby:
         return 'Belly Breathing';
+      case AgeGroup.child:
+        return 'Belly Breathing';
       case AgeGroup.kid:
         return 'Dragon Breaths';
       case AgeGroup.teen:
@@ -138,6 +140,8 @@ class BreathingPattern {
     switch (group) {
       case AgeGroup.baby:
         return 'Breathe with your tummy!';
+      case AgeGroup.child:
+        return 'Breathe with your tummy!';
       case AgeGroup.kid:
         return 'Breathe like a dragon!';
       case AgeGroup.teen:
@@ -151,6 +155,8 @@ class BreathingPattern {
   static int maxDurationMinutes(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
+        return 2;
+      case AgeGroup.child:
         return 2;
       case AgeGroup.kid:
         return 3;

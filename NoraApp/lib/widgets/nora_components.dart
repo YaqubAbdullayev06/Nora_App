@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/constants/design_tokens.dart';
 import '../core/theme/persona_theme.dart';
@@ -749,6 +751,12 @@ class _PlanTaskCardState extends State<PlanTaskCard>
         onTapDown: widget.interactive ? (_) => _controller.forward() : null,
         onTapUp: widget.interactive ? (_) {
           _controller.reverse();
+          // Haptic feedback on task toggle
+          if (!isCompleted) {
+            HapticFeedback.mediumImpact();
+          } else {
+            HapticFeedback.lightImpact();
+          }
           widget.onToggle?.call();
         } : null,
         onTapCancel: widget.interactive ? () => _controller.reverse() : null,

@@ -1,11 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/config/env_config.dart';
 
 /// LLM Service — connects Nora Flutter app to local Ollama LLM via backend.
 ///
 /// Flow: Flutter → Backend API → Ollama → Response
 class LlmService {
-  static const String baseUrl = 'http://192.168.0.101:8000';
+  static final LlmService _instance = LlmService._internal();
+  factory LlmService() => _instance;
+  LlmService._internal();
+
+  late final String baseUrl = EnvConfig.instance.backendUrl;
 
   /// Send a chat message to Nora AI and get a response.
   ///
@@ -108,7 +113,7 @@ class LlmService {
     }
   }
 
-  /// Check if Ollama backend is running.
+  /// Check if any LLM backend provider is running.
   Future<bool> isAvailable() async {
     try {
       final response = await http.get(
@@ -117,7 +122,15 @@ class LlmService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['ollama_running'] == true;
+        // Check both old and new field names for backward compatibility
+        if (data['llm_available'] == true) return true;
+        if (data['ollama_running'] == true) return true;
+        // Fallback: check if any provider is true
+        final providers = data['providers'];
+        if (providers is Map) {
+          return providers.values.any((v) => v == true);
+        }
+        return false;
       }
       return false;
     } catch (e) {

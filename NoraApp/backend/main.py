@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Text
@@ -12,20 +12,22 @@ import uvicorn
 import os
 import bcrypt
 from dotenv import load_dotenv
+
+# ─── Load .env BEFORE importing AI modules (they read env vars at import time) ───
+load_dotenv()
+
 from ai.ollama_client import ollama
 from ai.llm_provider import llm
 from ai.prompts import get_system_prompt, get_assistant_system_prompt, check_crisis, CRISIS_RESPONSE
 from services.agent_capabilities import agent_capabilities
 from services.app_classifier import app_classifier
 
-# ─── Load .env ───
-
-load_dotenv()
-
 # ─── Database Setup ───
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./nora.db")
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+# SQLite needs check_same_thread; PostgreSQL/MySQL do not
+_connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+engine = create_engine(DATABASE_URL, connect_args=_connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -300,7 +302,7 @@ def validate_actions(raw_actions: list[dict]) -> list[dict]:
     for raw in raw_actions:
         try:
             action = ValidatedAction(**raw)
-            validated.append(action.dict())
+            validated.append(action.model_dump())
         except Exception as e:
             # Invalid action — skip it, log it, do NOT execute it
             print(f"[ACTION VALIDATION FAILED] {raw} — {e}")
@@ -314,9 +316,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS: allow your Flutter app domains + localhost for dev
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -645,28 +649,73 @@ async def ai_command(request: AICommandRequest):
     except Exception as e:
         return {
             "response": f"I had trouble processing that. Error: {str(e)}",
-            "model": ollama.model,
+            "model": ollama.get_model_for_age_group(request.age_group),
             "actions": [],
         }
 
 
 def _parse_actions_from_response(response: str) -> list[dict]:
-    """Parse AI response for structured actions."""
+    """Parse AI response for structured actions.
+
+    Strategy:
+      1. Extract JSON objects from the response (LLM is prompted to output JSON actions).
+      2. Keep only objects that contain an "action" key with a valid action type.
+      3. If no JSON actions found, fall back to keyword matching for simple intents.
+    """
+    import json as _json
+
     actions = []
-    response_lower = response.lower()
 
-    # Detect action intents
-    if any(phrase in response_lower for phrase in ["block these apps", "i recommend blocking", "should block"]):
-        actions.append({"type": "suggest_block", "description": "AI recommends blocking some apps"})
+    # ── Pass 1: Extract JSON action blocks from the response ──
+    i = 0
+    while i < len(response):
+        brace = response.find('{', i)
+        if brace == -1:
+            break
 
-    if any(phrase in response_lower for phrase in ["start focus", "begin focus", "start a focus session"]):
-        actions.append({"type": "start_focus", "description": "Start a focus session"})
+        # Find matching closing brace (handles nested braces inside arrays)
+        depth = 0
+        j = brace
+        while j < len(response):
+            if response[j] == '{':
+                depth += 1
+            elif response[j] == '}':
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
 
-    if any(phrase in response_lower for phrase in ["scan your apps", "scan installed", "check your apps"]):
-        actions.append({"type": "scan_apps", "description": "Scan installed apps"})
+        if depth == 0:
+            candidate = response[brace:j + 1]
+            try:
+                parsed = _json.loads(candidate)
+                if isinstance(parsed, dict) and "action" in parsed:
+                    actions.append(parsed)
+            except _json.JSONDecodeError:
+                pass  # Not valid JSON — skip
+            i = j + 1
+        else:
+            i += 1
 
-    if any(phrase in response_lower for phrase in ["usage report", "screen time", "usage summary"]):
-        actions.append({"type": "show_usage", "description": "Show usage statistics"})
+    # ── Pass 2: Keyword fallback (only if no JSON actions found) ──
+    if not actions:
+        response_lower = response.lower()
+
+        if any(phrase in response_lower for phrase in ["scan your apps", "scan installed", "check your apps"]):
+            actions.append({"action": "scan_apps"})
+
+        if any(phrase in response_lower for phrase in ["start focus", "begin focus", "start a focus session"]):
+            actions.append({"action": "start_focus", "minutes": 25})
+
+        if any(phrase in response_lower for phrase in ["usage report", "screen time", "usage summary", "show usage"]):
+            actions.append({"action": "show_usage"})
+
+        if any(phrase in response_lower for phrase in ["show recommendation", "ai recommendation"]):
+            actions.append({"action": "show_recommendations"})
+
+        # NOTE: "block_apps" is NOT included in keyword fallback because we need
+        # the actual package names from the LLM. If the user asks to block apps
+        # and the LLM doesn't return JSON, it just gives a text suggestion.
 
     return actions
 
@@ -823,21 +872,61 @@ async def ai_chat(request: ChatRequest):
         return ChatResponse(response=response, model=model)
     except Exception as e:
         return ChatResponse(
-            response=f"I'm having trouble connecting to my brain right now. Please make sure Ollama is running (ollama serve). Error: {str(e)}",
+            response=f"I'm having trouble connecting to my brain right now. All LLM providers failed. Error: {str(e)}",
             model=model,
         )
 
 @app.get("/ai/health")
 async def ai_health():
-    """Check which LLM providers are available (Groq, Ollama local, Ollama Colab)."""
+    """Check which LLM providers are available (Groq, Gemini, Cloudflare, Ollama)."""
     provider_status = await llm.is_available()
+    any_available = any(provider_status.values())
     return {
         "providers": provider_status,
+        "ollama_running": any_available,  # backward compat: True if ANY provider works
+        "llm_available": any_available,
         "active_provider": llm.preferred_provider,
         "groq_model": llm.groq_model,
+        "gemini_model": llm.gemini_model,
+        "cloudflare_model": llm.cloudflare_model,
         "ollama_base_url": llm.ollama_base_url,
         "ollama_colab_url": llm.ollama_colab_url or "(not set)",
     }
+
+# ─── AI Task Decomposition ───
+
+class TaskDecompositionRequest(BaseModel):
+    task: str = Field(..., min_length=2, max_length=500, description="Task to decompose")
+    age_group: str = Field(default="adult", description="User age group")
+
+@app.post("/ai/decompose-task")
+async def decompose_task(request: TaskDecompositionRequest):
+    """
+    Decompose a broad task into Pomodoro-sized subtasks (15-25 min each).
+
+    Example: "Write quarterly report" -> 5 subtasks with priorities and time estimates.
+    """
+    from ai.task_decomposer import decompose_task as _decompose
+
+    result = await _decompose(
+        task=request.task,
+        age_group=request.age_group,
+    )
+
+    if result["success"]:
+        return {
+            "success": True,
+            "subtasks": result["data"].get("subtasks", []),
+            "original_task": result["data"].get("original_task", request.task),
+            "total_estimated_minutes": result["data"].get("total_estimated_minutes", 0),
+            "tip": result["data"].get("tip", ""),
+            "provider": result.get("provider", "unknown"),
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task decomposition failed: {result.get('error', 'unknown')}"
+        )
 
 # ─── Recommendations ───
 

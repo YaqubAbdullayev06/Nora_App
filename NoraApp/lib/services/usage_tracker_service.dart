@@ -5,6 +5,10 @@ import '../models/app_info.dart';
 /// UsageTrackerService — Flutter bridge to the Android UsageTracker.
 /// Tracks per-app usage time and provides usage analytics.
 class UsageTrackerService {
+  static final UsageTrackerService _instance = UsageTrackerService._internal();
+  factory UsageTrackerService() => _instance;
+  UsageTrackerService._internal();
+
   static const _channel = MethodChannel('com.nora.nora_app/usage_tracker');
 
   /// Get usage stats for the specified number of days back.
@@ -20,7 +24,7 @@ class UsageTrackerService {
       final success = result['success'] == true;
       if (!success) return null;
 
-      return UsageStatsSummary.fromMap(result);
+      return UsageStatsSummary.fromMap(Map<String, dynamic>.from(result));
     } on PlatformException catch (e) {
       debugPrint('UsageTracker getUsageStats failed: ${e.message}');
       return null;
@@ -37,7 +41,7 @@ class UsageTrackerService {
       final success = result['success'] == true;
       if (!success) return null;
 
-      return UsageStatsSummary.fromMap(result);
+      return UsageStatsSummary.fromMap(Map<String, dynamic>.from(result));
     } on PlatformException catch (e) {
       debugPrint('UsageTracker getTodayUsage failed: ${e.message}');
       return null;
@@ -54,7 +58,7 @@ class UsageTrackerService {
       );
       if (result == null) return {'success': false};
 
-      return Map<String, dynamic>.from(result);
+      return Map<String, dynamic>.from(result as Map);
     } on PlatformException catch (e) {
       debugPrint('UsageTracker getAppUsage failed: ${e.message}');
       return {'success': false, 'error': e.message};
