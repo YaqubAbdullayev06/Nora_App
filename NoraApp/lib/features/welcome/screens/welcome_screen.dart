@@ -301,38 +301,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             width: 80,
             height: 80,
             fit: BoxFit.contain,
-            placeholderBuilder: (context) => Text(
-              page.emoji ?? '🌟',
-              style: const TextStyle(fontSize: 64),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (page.emoji != null) {
-      return Container(
-        width: 140,
-        height: 140,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [persona.primary, persona.secondary],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: persona.primary.withValues(alpha: 0.4),
-              blurRadius: 40,
-              spreadRadius: 8,
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            page.emoji!,
-            style: const TextStyle(fontSize: 64),
           ),
         ),
       );
@@ -354,14 +322,12 @@ class _FeatureItem {
 class _PageData {
   final String title;
   final String subtitle;
-  final String? emoji;
   final String? assetPath;
   final List<_FeatureItem>? features;
 
   const _PageData({
     required this.title,
     required this.subtitle,
-    this.emoji,
     this.assetPath,
     this.features,
   });

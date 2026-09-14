@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../enums/age_group.dart';
 
 /// Age-specific persona themes for Nora.
@@ -22,14 +23,13 @@ class PersonaTheme {
   final Color success;
   final Color warning;
   final Color danger;
-  final String mascotEmoji;
   final String mascotName;
   final String tagline;
   final String fontFamily;
   final String displayFontFamily;
   final double borderRadius;
   final bool isDark;
-  final String? mascotAssetPath;
+  final String mascotAssetPath;
 
   const PersonaTheme({
     required this.ageGroup,
@@ -48,14 +48,13 @@ class PersonaTheme {
     required this.success,
     required this.warning,
     required this.danger,
-    required this.mascotEmoji,
     required this.mascotName,
     required this.tagline,
     required this.fontFamily,
     required this.displayFontFamily,
     required this.borderRadius,
     required this.isDark,
-    this.mascotAssetPath,
+    required this.mascotAssetPath,
   });
 
   /// Get the theme for a specific age group.
@@ -72,6 +71,19 @@ class PersonaTheme {
       case AgeGroup.adult:
         return adultTheme;
     }
+  }
+
+  /// Build a mascot widget using the SVG asset.
+  Widget buildMascotWidget({double size = 48, bool showGlow = false}) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: SvgPicture.asset(
+        mascotAssetPath,
+        width: size,
+        height: size,
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────
@@ -95,7 +107,6 @@ class PersonaTheme {
     success: Color(0xFF66BB6A), // Gentle green
     warning: Color(0xFFFFCA28), // Soft yellow
     danger: Color(0xFFEF5350), // Soft red
-    mascotEmoji: '🌟',
     mascotName: 'Sunny',
     tagline: 'Let\'s learn and play!',
     fontFamily: 'Inter',
@@ -126,7 +137,6 @@ class PersonaTheme {
     success: Color(0xFF66BB6A), // Gentle green
     warning: Color(0xFFFFCA28), // Soft yellow
     danger: Color(0xFFEF5350), // Soft red
-    mascotEmoji: '🌟',
     mascotName: 'Sunny',
     tagline: 'Let\'s learn and play!',
     fontFamily: 'Inter',
@@ -157,7 +167,6 @@ class PersonaTheme {
     success: Color(0xFF00C853), // Bright green
     warning: Color(0xFFFFD600), // Yellow
     danger: Color(0xFFFF1744), // Red
-    mascotEmoji: '🦊',
     mascotName: 'Foxy',
     tagline: 'Adventure awaits!',
     fontFamily: 'Inter',
@@ -188,7 +197,6 @@ class PersonaTheme {
     success: Color(0xFF00E676),
     warning: Color(0xFFFFD600),
     danger: Color(0xFFFF5252),
-    mascotEmoji: '⚡',
     mascotName: 'Spark',
     tagline: 'Level up your life!',
     fontFamily: 'Inter',
@@ -219,7 +227,6 @@ class PersonaTheme {
     success: Color(0xFF00E676),
     warning: Color(0xFFFFD600),
     danger: Color(0xFFd61d1e),
-    mascotEmoji: '🧠',
     mascotName: 'Nora',
     tagline: 'Focus. Learn. Grow.',
     fontFamily: 'Inter',

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../providers/app_provider.dart';
 import '../../../services/app_scanner_service.dart';
-import '../../../services/usage_tracker_service.dart';
+import '../../../services/screentime_service.dart';
 import '../../../services/api_service.dart';
 import '../../../models/app_info.dart';
 
@@ -20,7 +20,7 @@ class AppScanScreen extends StatefulWidget {
 class _AppScanScreenState extends State<AppScanScreen>
     with SingleTickerProviderStateMixin {
   final _scannerService = AppScannerService();
-  final _usageService = UsageTrackerService();
+  final _usageService = ScreenTimeService();
   final _apiService = ApiService();
 
   List<AppInfo> _allApps = [];
@@ -446,9 +446,12 @@ class _AppScanScreenState extends State<AppScanScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (cat != 'all')
-                      Text(
-                        _getCategoryEmoji(cat),
-                        style: const TextStyle(fontSize: 12),
+                      Icon(
+                        _getCategoryIcon(cat),
+                        size: 14,
+                        color: isSelected
+                            ? DesignTokens.accent
+                            : DesignTokens.textMuted,
                       ),
                     if (cat != 'all') const SizedBox(width: 4),
                     Text(
@@ -664,34 +667,34 @@ class _AppScanScreenState extends State<AppScanScreen>
     );
   }
 
-  String _getCategoryEmoji(String category) {
+  IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'social_media':
-        return '📱';
+        return Icons.chat_rounded;
       case 'entertainment':
-        return '🎬';
+        return Icons.movie_rounded;
       case 'games':
-        return '🎮';
+        return Icons.sports_esports_rounded;
       case 'productivity':
-        return '💼';
+        return Icons.work_rounded;
       case 'messaging':
-        return '💬';
+        return Icons.forum_rounded;
       case 'education':
-        return '📚';
+        return Icons.auto_stories_rounded;
       case 'news':
-        return '📰';
+        return Icons.article_rounded;
       case 'photography':
-        return '📷';
+        return Icons.camera_alt_rounded;
       case 'navigation':
-        return '🗺️';
+        return Icons.map_rounded;
       case 'finance':
-        return '💰';
+        return Icons.account_balance_rounded;
       case 'health':
-        return '🏥';
+        return Icons.local_hospital_rounded;
       case 'shopping':
-        return '🛒';
+        return Icons.shopping_cart_rounded;
       default:
-        return '📦';
+        return Icons.apps_rounded;
     }
   }
 
@@ -766,22 +769,23 @@ class _AppScanScreenState extends State<AppScanScreen>
             width: 44,
             height: 44,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _buildCategoryEmoji(app.category),
+            errorBuilder: (_, __, ___) => _buildCategoryIcon(app.category),
           ),
         );
       } catch (_) {
         // Fall through to emoji
       }
     }
-    // Fallback: category emoji
-    return _buildCategoryEmoji(app.category);
+    // Fallback: category icon
+    return _buildCategoryIcon(app.category);
   }
 
-  Widget _buildCategoryEmoji(String category) {
+  Widget _buildCategoryIcon(String category) {
     return Center(
-      child: Text(
-        _getCategoryEmoji(category),
-        style: const TextStyle(fontSize: 20),
+      child: Icon(
+        _getCategoryIcon(category),
+        size: 24,
+        color: _getCategoryColor(category),
       ),
     );
   }

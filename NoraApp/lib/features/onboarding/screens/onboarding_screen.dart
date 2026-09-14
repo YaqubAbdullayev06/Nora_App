@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/constants/design_tokens.dart';
@@ -7,13 +6,12 @@ import '../../../core/theme/persona_theme.dart';
 import '../../../providers/app_provider.dart';
 import '../../../widgets/nora_components.dart';
 
-/// Onboarding Screen — three-step personalization + account creation.
+/// Onboarding Screen — two-step: name + account creation.
 ///
-/// Step 0: Pick age group → sets Nora's persona
-/// Step 1: Enter name → personalizes greetings
-/// Step 2: Create account → email + password to save progress
+/// Step 0: Enter name → personalizes greetings
+/// Step 1: Create account → email + password to save progress
 ///
-/// Users arrive here from the Welcome screen (after learning what Nora is).
+/// Age group defaults to adult. Users can change persona later in Settings.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -23,8 +21,10 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen>
     with SingleTickerProviderStateMixin {
-  int _step = 0; // 0 = age, 1 = name, 2 = account
-  AgeGroup? _selectedGroup;
+  int _step = 0; // 0 = name, 1 = account
+
+  // Default to adult persona
+  AgeGroup _selectedGroup = AgeGroup.adult;
 
   // Step 1: name
   final _nameController = TextEditingController();
@@ -63,7 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _nextStep() {
-    if (_step < 2) {
+    if (_step < 1) {
       setState(() => _step++);
       _animController.reset();
       _animController.forward();
@@ -102,15 +102,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
 
-    // Set persona
-    provider.setAgeGroup(_selectedGroup!);
+    // Set persona (default adult)
+    provider.setAgeGroup(_selectedGroup);
 
     // Register
     final success = await provider.register(
       email,
       name,
       password,
-      ageGroup: _selectedGroup!,
+      ageGroup: _selectedGroup,
     );
 
     if (success && mounted) {
@@ -172,7 +172,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               child: Column(
                 children: [
                   _buildBottomButton(),
-                  if (_step == 2) ...[
+                  if (_step == 1) ...[
                     const SizedBox(height: DesignTokens.spacing16),
                     _buildSignInLink(),
                   ],
@@ -194,7 +194,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (i) {
+      children: List.generate(2, (i) {
         final isActive = i == _step;
         final isDone = i < _step;
         return Container(
@@ -219,146 +219,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget _buildCurrentStep() {
     switch (_step) {
       case 0:
-        return _buildAgeStep();
-      case 1:
         return _buildNameStep();
-      case 2:
+      case 1:
         return _buildAccountStep();
       default:
         return const SizedBox.shrink();
     }
   }
 
-  // ─── Step 0: Age Group Selection ───
-
-  Widget _buildAgeStep() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spacing20, vertical: DesignTokens.spacing12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildStepHeader(
-            emoji: '👤',
-            title: 'Who\'s using Nora?',
-            subtitle: 'This helps Nora adapt her personality and content.',
-          ),
-          const SizedBox(height: DesignTokens.spacing24),
-
-          ...AgeGroup.values.map((group) {
-            final theme = PersonaTheme.forAgeGroup(group);
-            final isSelected = _selectedGroup == group;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: DesignTokens.spacing12),
-              child: GestureDetector(
-                onTap: () {
-                  setState(() => _selectedGroup = group);
-                  context.read<AppProvider>().setAgeGroup(group);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  padding: const EdgeInsets.all(DesignTokens.spacing16),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? theme.primary.withValues(alpha: 0.15)
-                        : DesignTokens.surface,
-                    borderRadius:
-                        BorderRadius.circular(DesignTokens.radius20),
-                    border: Border.all(
-                      color: isSelected ? theme.primary : DesignTokens.border,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: theme.primary.withValues(alpha: 0.1),
-                          borderRadius:
-                              BorderRadius.circular(DesignTokens.radius14),
-                        ),
-                        child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(DesignTokens.radius14),
-                          child: theme.mascotAssetPath != null
-                              ? SvgPicture.asset(
-                                  theme.mascotAssetPath!,
-                                  fit: BoxFit.cover,
-                                  placeholderBuilder: (context) => Center(
-                                    child: Text(theme.mascotEmoji,
-                                        style: const TextStyle(fontSize: 26)),
-                                  ),
-                                )
-                              : Center(
-                                  child: Text(theme.mascotEmoji,
-                                      style: const TextStyle(fontSize: 26)),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: DesignTokens.spacing14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              group.displayName,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? theme.primary
-                                    : DesignTokens.textPrimary,
-                                fontSize: DesignTokens.fontSizeBody,
-                                fontWeight: DesignTokens.fontWeightSemiBold,
-                                fontFamily: DesignTokens.fontFamilyPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              group.ageRange,
-                              style: TextStyle(
-                                color: DesignTokens.textMuted,
-                                fontSize: DesignTokens.fontSizeCaption,
-                                fontFamily: DesignTokens.fontFamilyPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              theme.tagline,
-                              style: TextStyle(
-                                color: DesignTokens.textMuted,
-                                fontSize: DesignTokens.fontSizeCaption,
-                                fontStyle: FontStyle.italic,
-                                fontFamily: DesignTokens.fontFamilyPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isSelected)
-                        Icon(Icons.check_circle_rounded,
-                            color: theme.primary, size: 24)
-                      else
-                        Icon(Icons.radio_button_unchecked,
-                            color: DesignTokens.textMuted, size: 24),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: DesignTokens.spacing12),
-        ],
-      ),
-    );
-  }
-
-  // ─── Step 1: Name Input ───
+  // ─── Step 0: Name Input ───
 
   Widget _buildNameStep() {
-    final theme = _selectedGroup != null
-        ? PersonaTheme.forAgeGroup(_selectedGroup!)
-        : PersonaTheme.adultTheme;
+    final theme = PersonaTheme.forAgeGroup(_selectedGroup);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
@@ -370,7 +242,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           NoraMascot(size: 100, showGlow: true, personaOverride: theme),
           const SizedBox(height: DesignTokens.spacing24),
           _buildStepHeader(
-            emoji: null,
             title: 'What should Nora call you?',
             subtitle: 'Your name will appear in greetings and throughout the app.',
           ),
@@ -408,7 +279,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         children: [
           const SizedBox(height: DesignTokens.spacing16),
           _buildStepHeader(
-            emoji: '🔐',
+            icon: Icons.lock_outline_rounded,
             title: 'Create your account',
             subtitle: 'Save your progress and access Nora on any device.',
           ),
@@ -467,9 +338,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     void Function(String)? onSubmitted,
     TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
-    final theme = _selectedGroup != null
-        ? PersonaTheme.forAgeGroup(_selectedGroup!)
-        : PersonaTheme.adultTheme;
+    final theme = PersonaTheme.forAgeGroup(_selectedGroup);
 
     return TextField(
       controller: controller,
@@ -519,14 +388,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildStepHeader({
-    String? emoji,
+    IconData? icon,
     required String title,
     required String subtitle,
   }) {
     return Column(
       children: [
-        if (emoji != null) ...[
-          Text(emoji, style: const TextStyle(fontSize: 40)),
+        if (icon != null) ...[
+          Icon(icon, size: 48, color: DesignTokens.accent),
           const SizedBox(height: DesignTokens.spacing12),
         ],
         Text(
@@ -554,24 +423,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildBottomButton() {
-    final theme = _selectedGroup != null
-        ? PersonaTheme.forAgeGroup(_selectedGroup!)
-        : PersonaTheme.adultTheme;
+    final theme = PersonaTheme.forAgeGroup(_selectedGroup);
 
     String label;
     VoidCallback? onPressed;
 
     switch (_step) {
       case 0:
-        final isEnabled = _selectedGroup != null;
-        label = isEnabled ? 'Continue' : 'Select an age group';
-        onPressed = isEnabled ? _nextStep : null;
-        break;
-      case 1:
         label = 'Continue';
         onPressed = _nextStep;
         break;
-      case 2:
+      case 1:
         label = 'Create Account & Start';
         onPressed = _finish;
         break;

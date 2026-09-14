@@ -12,6 +12,11 @@ import '../../../services/flow_state_sounds.dart';
 import '../../../services/haptic_service.dart';
 import '../../../widgets/flow_state_sound_player.dart';
 import '../../../widgets/nora_components.dart';
+import '../../breathing/models/breathing_pattern.dart';
+import '../../breathing/providers/breathing_provider.dart';
+import '../../breathing/widgets/animated_breathing_guide.dart'
+    hide AnimatedBuilder;
+import '../../breathing/widgets/breathing_pattern_card.dart';
 import 'break_screen.dart';
 
 /// Timer Screen — Pomodoro with AI "interrupter" feature.
@@ -37,6 +42,13 @@ class _TimerScreenState extends State<TimerScreen>
   // Flow-state sound player
   bool _isSoundPlaying = false;
   SoundType? _currentSound;
+
+  // Tab selector: 0 = Focus, 1 = Breathe
+  int _selectedTab = 0;
+
+  // Breathing state
+  BreathingPattern? _selectedBreathPattern;
+  int _selectedBreathDuration = 3;
 
   @override
   void initState() {
@@ -113,42 +125,11 @@ class _TimerScreenState extends State<TimerScreen>
             child: Column(
               children: [
                 _buildHeader(persona, provider),
+                _buildTabSelector(persona),
                 Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(DesignTokens.spacing24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildPhaseIndicator(persona, provider),
-                          const SizedBox(height: DesignTokens.spacing16),
-                          _buildTimerRing(provider, progress, persona),
-                          const SizedBox(height: DesignTokens.spacing24),
-                          _buildSessionDots(provider, persona),
-                          const SizedBox(height: DesignTokens.spacing24),
-                          _buildDurationSelector(provider, persona),
-                          const SizedBox(height: DesignTokens.spacing24),
-                          _buildControls(provider, persona),
-                          if (persona.ageGroup != AgeGroup.baby) ...[
-                            const SizedBox(height: DesignTokens.spacing24),
-                            _buildInterrupterButton(persona),
-                          ],
-                          // Flow-State Sound Player
-                          const SizedBox(height: DesignTokens.spacing24),
-                          FlowStateSoundPlayer(
-                            persona: persona,
-                            isPlaying: _isSoundPlaying,
-                            currentSound: _currentSound,
-                            onPlay: () => _toggleSound(_currentSound ?? SoundType.brownNoise),
-                            onStop: () => setState(() {
-                              _isSoundPlaying = false;
-                              _currentSound = null;
-                            }),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  child: _selectedTab == 0
+                      ? _buildFocusTab(provider, persona, progress)
+                      : _buildBreatheTab(persona),
                 ),
                 // AI Interrupter overlay
                 if (_showInterrupter) _buildInterrupterOverlay(persona),
@@ -250,6 +231,467 @@ class _TimerScreenState extends State<TimerScreen>
               fontWeight: DesignTokens.fontWeightMedium,
               fontFamily: DesignTokens.fontFamilyPrimary,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // TAB SELECTOR
+  // ═══════════════════════════════════════════════
+
+  Widget _buildTabSelector(PersonaTheme persona) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spacing24, vertical: DesignTokens.spacing8),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: DesignTokens.surface,
+          borderRadius: BorderRadius.circular(DesignTokens.radius16),
+          border: Border.all(color: DesignTokens.border, width: 1),
+        ),
+        child: Row(
+          children: [
+            _buildTab(0, Icons.center_focus_strong_rounded, 'Focus', persona),
+            _buildTab(1, Icons.air_rounded, 'Breathe', persona),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTab(int index, IconData icon, String label, PersonaTheme persona) {
+    final isSelected = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? persona.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(DesignTokens.radius12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.white : DesignTokens.textMuted,
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : DesignTokens.textMuted,
+                  fontSize: DesignTokens.fontSizeCaption,
+                  fontWeight:
+                      isSelected ? DesignTokens.fontWeightSemiBold : FontWeight.normal,
+                  fontFamily: DesignTokens.fontFamilyPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // FOCUS TAB CONTENT
+  // ═══════════════════════════════════════════════
+
+  Widget _buildFocusTab(
+      AppProvider provider, PersonaTheme persona, double progress) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(DesignTokens.spacing24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildPhaseIndicator(persona, provider),
+            const SizedBox(height: DesignTokens.spacing16),
+            _buildTimerRing(provider, progress, persona),
+            const SizedBox(height: DesignTokens.spacing24),
+            _buildSessionDots(provider, persona),
+            const SizedBox(height: DesignTokens.spacing24),
+            _buildDurationSelector(provider, persona),
+            const SizedBox(height: DesignTokens.spacing24),
+            _buildControls(provider, persona),
+            if (persona.ageGroup != AgeGroup.baby) ...[
+              const SizedBox(height: DesignTokens.spacing24),
+              _buildInterrupterButton(persona),
+            ],
+            // Flow-State Sound Player
+            const SizedBox(height: DesignTokens.spacing24),
+            FlowStateSoundPlayer(
+              persona: persona,
+              isPlaying: _isSoundPlaying,
+              currentSound: _currentSound,
+              onPlay: () =>
+                  _toggleSound(_currentSound ?? SoundType.brownNoise),
+              onStop: () => setState(() {
+                _isSoundPlaying = false;
+                _currentSound = null;
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // BREATHE TAB CONTENT
+  // ═══════════════════════════════════════════════
+
+  Widget _buildBreatheTab(PersonaTheme persona) {
+    return Consumer<BreathingProvider>(
+      builder: (context, breathingProvider, _) {
+        return breathingProvider.isSessionActive
+            ? _buildBreatheSessionView(breathingProvider, persona)
+            : _buildBreatheSelectionView(breathingProvider, persona);
+      },
+    );
+  }
+
+  Widget _buildBreatheSelectionView(
+      BreathingProvider breathingProvider, PersonaTheme persona) {
+    final patterns = BreathingPattern.forAgeGroup(persona.ageGroup);
+    final maxDuration =
+        BreathingPattern.maxDurationMinutes(persona.ageGroup);
+    final stats = breathingProvider.stats;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(DesignTokens.spacing24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats summary
+          NoraCard(
+            backgroundColor: persona.primary.withValues(alpha: 0.08),
+            border: Border.all(
+              color: persona.primary.withValues(alpha: 0.2),
+              width: 1,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildBreatheStatItem(
+                    '${stats.totalSessions}', 'Sessions', Icons.repeat_rounded, persona.primary),
+                _buildBreatheStatItem(
+                    '${stats.totalMinutes}', 'Minutes', Icons.schedule_rounded, persona.secondary),
+                _buildBreatheStatItem(
+                    '${stats.currentStreak}', 'Streak', Icons.local_fire_department_rounded, DesignTokens.warning),
+                _buildBreatheStatItem(
+                    '${stats.pointsEarned}', 'Points', Icons.star_rounded, DesignTokens.accent),
+              ],
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spacing24),
+          // Pattern list
+          Text(
+            'Choose a Pattern',
+            style: TextStyle(
+              color: DesignTokens.textPrimary,
+              fontSize: DesignTokens.fontSizeH3,
+              fontWeight: DesignTokens.fontWeightSemiBold,
+              fontFamily: DesignTokens.fontFamilyDisplay,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spacing12),
+          ...patterns.map((pattern) => Padding(
+                padding: const EdgeInsets.only(bottom: DesignTokens.spacing12),
+                child: BreathingPatternCard(
+                  pattern: pattern,
+                  isSelected: _selectedBreathPattern?.id == pattern.id,
+                  onTap: () => setState(() {
+                    _selectedBreathPattern = pattern;
+                    _selectedBreathDuration = pattern.defaultDurationMinutes
+                        .clamp(1, maxDuration);
+                  }),
+                ),
+              )),
+          if (_selectedBreathPattern != null) ...[
+            const SizedBox(height: DesignTokens.spacing16),
+            _buildBreatheDurationSelector(maxDuration, persona),
+            const SizedBox(height: DesignTokens.spacing20),
+            NoraButton(
+              label: 'Start Breathing',
+              icon: Icons.play_arrow_rounded,
+              expanded: true,
+              onPressed: () {
+                breathingProvider.startSession(
+                  _selectedBreathPattern!,
+                  _selectedBreathDuration,
+                );
+              },
+              height: 48,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreatheSessionView(
+      BreathingProvider provider, PersonaTheme persona) {
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(horizontal: DesignTokens.spacing24),
+      child: Column(
+        children: [
+          const SizedBox(height: DesignTokens.spacing20),
+          // Top bar: pattern name + close
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  provider.selectedPattern?.name ?? '',
+                  style: TextStyle(
+                    color: DesignTokens.textPrimary,
+                    fontSize: DesignTokens.fontSizeH3,
+                    fontWeight: DesignTokens.fontWeightSemiBold,
+                    fontFamily: DesignTokens.fontFamilyDisplay,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _showBreatheStopDialog(provider),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: DesignTokens.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: DesignTokens.border),
+                  ),
+                  child: Icon(Icons.close_rounded,
+                      color: DesignTokens.textMuted, size: 20),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DesignTokens.spacing16),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: provider.sessionProgress,
+              backgroundColor: DesignTokens.border,
+              valueColor: AlwaysStoppedAnimation<Color>(persona.primary),
+              minHeight: 4,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spacing12),
+          // Elapsed time
+          Text(
+            provider.elapsedDisplay,
+            style: TextStyle(
+              color: DesignTokens.textMuted,
+              fontSize: DesignTokens.fontSizeCaption,
+              fontFamily: DesignTokens.fontFamilyPrimary,
+            ),
+          ),
+          const Spacer(),
+          // Animated breathing guide
+          AnimatedBreathingGuide(
+            mascotAssetPath: persona.mascotAssetPath ??
+                'assets/images/mascots/adult_brain.svg',
+            color: provider.selectedPattern?.color ?? persona.primary,
+            phase: provider.currentPhase,
+            phaseProgress: provider.phaseProgress,
+            isActive: provider.isSessionActive && !provider.isPaused,
+          ),
+          const Spacer(),
+          // Phase countdown
+          if (provider.currentPhase != null) ...[
+            Text(
+              '${provider.phaseCountdown}',
+              style: TextStyle(
+                color: DesignTokens.textPrimary,
+                fontSize: 48,
+                fontWeight: DesignTokens.fontWeightBold,
+                fontFamily: DesignTokens.fontFamilyDisplay,
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spacing8),
+          ],
+          // Points earned
+          if (provider.sessionPointsEarned > 0)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: DesignTokens.success.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star_rounded,
+                      color: DesignTokens.success, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '+${provider.sessionPointsEarned} pts',
+                    style: TextStyle(
+                      color: DesignTokens.success,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: DesignTokens.spacing24),
+          // Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildTimerIconButton(
+                onTap: provider.isPaused
+                    ? provider.resumeSession
+                    : provider.pauseSession,
+                icon: provider.isPaused
+                    ? Icons.play_arrow_rounded
+                    : Icons.pause_rounded,
+                color: DesignTokens.textMuted,
+              ),
+              const SizedBox(width: DesignTokens.spacing24),
+              _buildTimerIconButton(
+                onTap: () => _showBreatheStopDialog(provider),
+                icon: Icons.stop_rounded,
+                color: DesignTokens.danger,
+              ),
+            ],
+          ),
+          const SizedBox(height: DesignTokens.spacing24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreatheStatItem(
+      String value, String label, IconData icon, Color color) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: DesignTokens.textPrimary,
+            fontSize: DesignTokens.fontSizeBody,
+            fontWeight: DesignTokens.fontWeightBold,
+            fontFamily: DesignTokens.fontFamilyPrimary,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: DesignTokens.textMuted,
+            fontSize: 10,
+            fontFamily: DesignTokens.fontFamilyPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBreatheDurationSelector(int maxDuration, PersonaTheme persona) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Duration',
+          style: TextStyle(
+            color: DesignTokens.textMuted,
+            fontSize: DesignTokens.fontSizeCaption,
+            fontWeight: DesignTokens.fontWeightMedium,
+            fontFamily: DesignTokens.fontFamilyPrimary,
+          ),
+        ),
+        const SizedBox(height: DesignTokens.spacing8),
+        Row(
+          children: List.generate(maxDuration, (index) {
+            final minutes = index + 1;
+            final isSelected = _selectedBreathDuration == minutes;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () =>
+                    setState(() => _selectedBreathDuration = minutes),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: EdgeInsets.only(
+                    right: index < maxDuration - 1 ? 8 : 0,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? persona.primary.withValues(alpha: 0.15)
+                        : DesignTokens.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color:
+                          isSelected ? persona.primary : DesignTokens.border,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    '$minutes min',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isSelected
+                          ? persona.primary
+                          : DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                      fontWeight: DesignTokens.fontWeightMedium,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  void _showBreatheStopDialog(BreathingProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: DesignTokens.surfaceRaised,
+        title: Text(
+          'End Session?',
+          style: TextStyle(
+            color: DesignTokens.textPrimary,
+            fontFamily: DesignTokens.fontFamilyDisplay,
+          ),
+        ),
+        content: Text(
+          'You\'ve earned ${provider.sessionPointsEarned} points so far.',
+          style: TextStyle(
+            color: DesignTokens.textMuted,
+            fontFamily: DesignTokens.fontFamilyPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Continue',
+                style: TextStyle(color: DesignTokens.textMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              provider.stopSession();
+              Navigator.pop(ctx);
+            },
+            child: Text('End',
+                style: TextStyle(color: DesignTokens.danger)),
           ),
         ],
       ),
@@ -548,19 +990,10 @@ class _TimerScreenState extends State<TimerScreen>
             SizedBox(
               width: 32,
               height: 32,
-              child: persona.mascotAssetPath != null
-                  ? SvgPicture.asset(
-                      persona.mascotAssetPath!,
-                      fit: BoxFit.contain,
-                      placeholderBuilder: (context) => Center(
-                        child: Text(persona.mascotEmoji,
-                            style: const TextStyle(fontSize: 24)),
-                      ),
-                    )
-                  : Center(
-                      child: Text(persona.mascotEmoji,
-                          style: const TextStyle(fontSize: 24)),
-                    ),
+              child: SvgPicture.asset(
+                persona.mascotAssetPath,
+                fit: BoxFit.contain,
+              ),
             ),
             const SizedBox(width: DesignTokens.spacing12),
             Expanded(
@@ -660,31 +1093,31 @@ class _TimerScreenState extends State<TimerScreen>
       case AgeGroup.baby:
       case AgeGroup.child:
         return [
-          'You\'re doing amazing! 🌟',
-          'Time for a stretching break! 🧘',
-          'Let\'s sing a song! 🎵',
-          'Great job playing! 🎉',
+          'You\'re doing amazing!',
+          'Time for a stretching break!',
+          'Let\'s sing a song!',
+          'Great job playing!',
         ];
       case AgeGroup.kid:
         return [
-          'You\'re on fire! Keep going! 🔥',
-          'Try taking 3 deep breaths! 🌬️',
-          'What\'s your favorite subject? 📚',
-          'You\'re almost at your goal! 🎯',
+          'You\'re on fire! Keep going!',
+          'Try taking 3 deep breaths!',
+          'What\'s your favorite subject?',
+          'You\'re almost at your goal!',
         ];
       case AgeGroup.teen:
         return [
-          'Remember: progress, not perfection. 💪',
-          'Try the Pomodoro technique: 25/5! ⏰',
-          'Active recall: close your notes and test yourself! 🧠',
-          'You\'re building great habits! 📈',
+          'Remember: progress, not perfection.',
+          'Try the Pomodoro technique: 25/5!',
+          'Active recall: close your notes and test yourself!',
+          'You\'re building great habits!',
         ];
       case AgeGroup.adult:
         return [
-          'Check your posture. Sit up straight! 🧘',
-          'Have you hydrated recently? 💧',
-          'Review your top 3 priorities for today. 🎯',
-          'You\'re making excellent progress! 📊',
+          'Check your posture. Sit up straight!',
+          'Have you hydrated recently?',
+          'Review your top 3 priorities for today.',
+          'You\'re making excellent progress!',
         ];
     }
   }

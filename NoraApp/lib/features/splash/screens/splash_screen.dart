@@ -92,25 +92,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           ],
                         ),
                         child: ClipOval(
-                          child: persona.mascotAssetPath != null
-                              ? SvgPicture.asset(
-                                  persona.mascotAssetPath!,
-                                  width: 120,
-                                  height: 120,
-                                  fit: BoxFit.cover,
-                                  placeholderBuilder: (context) => Center(
-                                    child: Text(
-                                      persona.mascotEmoji,
-                                      style: const TextStyle(fontSize: 64),
-                                    ),
-                                  ),
-                                )
-                              : Center(
-                                  child: Text(
-                                    persona.mascotEmoji,
-                                    style: const TextStyle(fontSize: 64),
-                                  ),
-                                ),
+                          child: SvgPicture.asset(
+                            persona.mascotAssetPath,
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     );

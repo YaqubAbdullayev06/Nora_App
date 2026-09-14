@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../providers/app_provider.dart';
 import '../../../services/llm_service.dart';
 import '../../../services/app_scanner_service.dart';
-import '../../../services/usage_tracker_service.dart';
+import '../../../services/screentime_service.dart';
 import '../../../services/api_service.dart';
+import '../../../services/voice_command_service.dart';
 import '../../../models/app_info.dart';
 
 /// Digital Assistant Screen — AI-powered chat with device control.
@@ -22,12 +24,14 @@ class _AssistantScreenState extends State<AssistantScreen> {
   final _scrollController = ScrollController();
   final _llmService = LlmService();
   final _scannerService = AppScannerService();
-  final _usageService = UsageTrackerService();
+  final _usageService = ScreenTimeService();
   final _apiService = ApiService();
+  final _voiceService = VoiceCommandService();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   bool _isAvailable = false;
   bool _isScanning = false;
+  bool _isVoiceListening = false;
   Map<String, dynamic>? _lastScanResults;
   UsageStatsSummary? _lastUsageSummary;
 
@@ -37,6 +41,32 @@ class _AssistantScreenState extends State<AssistantScreen> {
   void initState() {
     super.initState();
     _checkBackend();
+    _initVoice();
+  }
+
+  void _initVoice() {
+    _voiceService.onListeningChanged = (listening) {
+      if (mounted) {
+        setState(() => _isVoiceListening = listening);
+      }
+    };
+    _voiceService.onRecognized = (text) {
+      if (mounted) {
+        _controller.text = text;
+        _sendMessage();
+      }
+    };
+    _voiceService.onError = (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: DesignTokens.warning,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    };
   }
 
   @override
@@ -50,6 +80,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   @override
   void dispose() {
+    _voiceService.dispose();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -61,13 +92,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
     setState(() {
       _messages.add(ChatMessage(
         role: 'assistant',
-        content: "Hey! I'm ${persona.mascotName} ${persona.mascotEmoji}\n\n"
+        content: "Hey! I'm ${persona.mascotName}\n\n"
             "I'm your AI digital assistant. I can:\n\n"
-            "📱 Scan all your apps\n"
-            "🚫 Block distracting apps\n"
-            "📊 Track your screen time\n"
-            "🎯 Start focus sessions\n"
-            "💡 Give you productivity insights\n\n"
+            "• Scan all your apps\n"
+            "• Block distracting apps\n"
+            "• Track your screen time\n"
+            "• Start focus sessions\n"
+            "• Give you productivity insights\n\n"
             'What would you like to do?',
       ));
     });
@@ -80,9 +111,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
-              'Ollama not running. Start it with: ollama serve'),
+              'AI is waking up... please try again in a moment.'),
           backgroundColor: DesignTokens.warning,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -358,7 +389,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       setState(() {
         _messages.add(ChatMessage(
           role: 'assistant',
-          content: "📱 **App Scan Complete**\n\n"
+          content: "**App Scan Complete**\n\n"
               "$summary\n\n"
               "Found $distractionCount distraction apps. "
               "AI recommends blocking $blockingCount apps.\n\n"
@@ -394,7 +425,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       }
 
       final buffer = StringBuffer();
-      buffer.writeln("📊 **Today's Usage Report**\n");
+      buffer.writeln("**Today's Usage Report**\n");
       buffer.writeln("Total screen time: ${todayUsage.totalScreenTimeDisplay}");
       buffer.writeln("Social media: ${todayUsage.socialMediaTimeDisplay}");
       buffer.writeln("Entertainment: ${todayUsage.entertainmentMinutes}m");
@@ -403,8 +434,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       buffer.writeln("\n**Top Apps:**");
 
       for (final app in todayUsage.topApps.take(8)) {
-        final emoji = _getCategoryEmoji(app.category);
-        buffer.writeln("$emoji ${app.appName}: ${app.usageDisplay}");
+        buffer.writeln("${app.appName}: ${app.usageDisplay}");
       }
 
       setState(() {
@@ -442,7 +472,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       setState(() {
         _messages.add(ChatMessage(
           role: 'assistant',
-          content: "No apps recommended for blocking right now. You're doing great! 🎉",
+          content: "No apps recommended for blocking right now. You're doing great!",
         ));
       });
       _scrollToBottom();
@@ -450,7 +480,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     }
 
     final buffer = StringBuffer();
-    buffer.writeln("🎯 **AI Blocking Recommendations**\n");
+    buffer.writeln("**AI Blocking Recommendations**\n");
 
     for (final rec in recommendations) {
       buffer.writeln(
@@ -519,7 +549,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       _messages.add(ChatMessage(
         role: 'assistant',
         content:
-            "🎯 Focus session started! $minutes minutes on the clock.\n\n"
+            "Focus session started! $minutes minutes on the clock.\n\n"
             "Distracting apps are now blocked. You've got this!",
       ));
     });
@@ -559,9 +589,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: persona.primary.withValues(alpha: 0.2),
-                  child: Text(
-                    persona.mascotEmoji,
-                    style: const TextStyle(fontSize: 16),
+                  child: SvgPicture.asset(
+                    persona.mascotAssetPath,
+                    width: 16,
+                    height: 16,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -800,7 +831,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(persona.mascotEmoji, style: const TextStyle(fontSize: 48)),
+          SvgPicture.asset(
+            persona.mascotAssetPath,
+            width: 48,
+            height: 48,
+          ),
           const SizedBox(height: 16),
           Text(
             'What can I help you with?',
@@ -839,8 +874,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: persona.primary.withValues(alpha: 0.2),
-                child: Text(persona.mascotEmoji,
-                    style: const TextStyle(fontSize: 12)),
+                child: SvgPicture.asset(
+                  persona.mascotAssetPath,
+                  width: 12,
+                  height: 12,
+                ),
               ),
               const SizedBox(width: 8),
             ],
@@ -920,14 +958,69 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     fontSize: DesignTokens.fontSizeBody,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Ask ${persona.mascotName} to do something...',
-                    hintStyle: TextStyle(color: DesignTokens.textMuted),
+                    hintText: _isVoiceListening
+                        ? 'Listening...'
+                        : 'Ask ${persona.mascotName} to do something...',
+                    hintStyle: TextStyle(
+                      color: _isVoiceListening
+                          ? DesignTokens.danger
+                          : DesignTokens.textMuted,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
+                    prefixIcon: _isVoiceListening
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  DesignTokens.danger,
+                                ),
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
                   onSubmitted: (_) => _sendMessage(),
                   textInputAction: TextInputAction.send,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Voice input button
+            GestureDetector(
+              onTap: _isLoading
+                  ? null
+                  : () {
+                      if (_isVoiceListening) {
+                        _voiceService.stopListening();
+                      } else {
+                        _voiceService.startListening();
+                      }
+                    },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _isVoiceListening
+                      ? DesignTokens.danger.withValues(alpha: 0.15)
+                      : DesignTokens.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _isVoiceListening
+                        ? DesignTokens.danger
+                        : DesignTokens.border,
+                  ),
+                ),
+                child: Icon(
+                  _isVoiceListening ? Icons.mic : Icons.mic_none_rounded,
+                  color: _isVoiceListening ? DesignTokens.danger : DesignTokens.textMuted,
+                  size: 20,
                 ),
               ),
             ),
@@ -965,22 +1058,22 @@ class _AssistantScreenState extends State<AssistantScreen> {
     );
   }
 
-  String _getCategoryEmoji(String category) {
+  IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'social_media':
-        return '📱';
+        return Icons.chat_rounded;
       case 'entertainment':
-        return '🎬';
+        return Icons.movie_rounded;
       case 'games':
-        return '🎮';
+        return Icons.sports_esports_rounded;
       case 'productivity':
-        return '💼';
+        return Icons.work_rounded;
       case 'messaging':
-        return '💬';
+        return Icons.forum_rounded;
       case 'education':
-        return '📚';
+        return Icons.auto_stories_rounded;
       default:
-        return '📦';
+        return Icons.apps_rounded;
     }
   }
 }

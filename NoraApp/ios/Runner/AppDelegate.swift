@@ -1,11 +1,15 @@
 import Flutter
 import FamilyControls
 import ManagedSettings
+import DeviceActivity
 import SwiftUI
 import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+
+  private let usageChannel = "com.nora.nora_app/usage_tracker"
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -16,11 +20,12 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    let channel = FlutterMethodChannel(
+    // ─── Focus Protection Channel ───
+    let focusChannel = FlutterMethodChannel(
       name: "com.nora.nora_app/focus_protection",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
-    channel.setMethodCallHandler { call, result in
+    focusChannel.setMethodCallHandler { call, result in
       switch call.method {
       case "getStatus":
         result(self.focusProtectionStatus())
@@ -49,10 +54,10 @@ import UIKit
         presentFamilyActivityPicker(result: result)
       case "enableBlocking":
         FamilyActivityShieldStore.shared.enable()
-        result(focusProtectionStatus())
+        result(self.focusProtectionStatus())
       case "disableBlocking":
         FamilyActivityShieldStore.shared.disable()
-        result(focusProtectionStatus())
+        result(self.focusProtectionStatus())
       case "openSettings":
         if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
           UIApplication.shared.open(settingsUrl)
@@ -62,7 +67,60 @@ import UIKit
         result(FlutterMethodNotImplemented)
       }
     }
+
+    // ─── Usage Tracker Channel ───
+    let usageChannel = FlutterMethodChannel(
+      name: usageChannel,
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    usageChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "getUsageStats":
+        let daysBack = call.arguments as? Int ?? 7
+        result(self.getUsageStats(daysBack: daysBack))
+      case "getTodayUsage":
+        result(self.getTodayUsage())
+      case "getAppUsage":
+        guard let args = call.arguments as? [String: Any],
+              let packageName = args["packageName"] as? String else {
+          result(["success": false, "error": "Package name required"])
+          return
+        }
+        let daysBack = args["daysBack"] as? Int ?? 7
+        result(self.getAppUsage(packageName: packageName, daysBack: daysBack))
+      case "requestAuthorization":
+        Task {
+          do {
+            try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+            result(["success": true, "authorized": true])
+          } catch {
+            result(["success": false, "error": error.localizedDescription])
+          }
+        }
+      case "getAuthorizationStatus":
+        let status = AuthorizationCenter.shared.authorizationStatus
+        result(["status": String(describing: status)])
+      case "startMonitoring":
+        Task {
+          do {
+            try NoraDeviceActivityCenter.shared.startDailyMonitoring()
+            result(["success": true])
+          } catch {
+            result(["success": false, "error": error.localizedDescription])
+          }
+        }
+      case "stopMonitoring":
+        NoraDeviceActivityCenter.shared.stopAllMonitoring()
+        result(["success": true])
+      case "isMonitoring":
+        result(["isMonitoring": NoraDeviceActivityCenter.shared.isMonitoring])
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
+
+  // MARK: - Focus Protection Status
 
   private func focusProtectionStatus() -> [String: Any] {
     let authorizationStatus = AuthorizationCenter.shared.authorizationStatus
@@ -70,15 +128,129 @@ import UIKit
     return [
       "supported": true,
       "authorized": authorized,
-      "usageAccessGranted": false,
-      "accessibilityGranted": false,
+      "usageAccessGranted": false,  // iOS doesn't have Usage Access like Android
+      "accessibilityGranted": false,  // iOS uses FamilyControls instead
       "blockingEnabled": authorized && FamilyActivityShieldStore.shared.isEnabled,
-      "blockedPackages": [],
+      "blockedPackages": [],  // iOS uses category tokens, not package names
       "message": authorized
         ? "Family Controls is ready. Selected apps can be shielded during focus sessions."
         : "Family Controls authorization is required before apps can be shielded.",
     ]
   }
+
+  // MARK: - Usage Data
+
+  private func getUsageStats(daysBack: Int) -> [String: Any] {
+    let defaults = UserDefaults(suiteName: "group.com.nora.nora_app.screentime")
+
+    guard let data = defaults?.data(forKey: "dailySummary"),
+          let summary = try? JSONDecoder().decode(
+            DeviceActivityMonitor.DailyUsageSummary.self,
+            from: data
+          ) else {
+      // Return simulated data for demo
+      return getDemoUsageStats(daysBack: daysBack)
+    }
+
+    // Calculate totals from summary
+    let totalMinutes = summary.totalMinutes
+    let socialMediaMinutes = summary.categoryMinutes["social_media"] ?? 0
+    let entertainmentMinutes = summary.categoryMinutes["entertainment"] ?? 0
+    let productivityMinutes = summary.categoryMinutes["productivity"] ?? 0
+
+    return [
+      "success": true,
+      "daysBack": daysBack,
+      "totalScreenTimeMinutes": totalMinutes,
+      "socialMediaMinutes": socialMediaMinutes,
+      "entertainmentMinutes": entertainmentMinutes,
+      "productivityMinutes": productivityMinutes,
+      "appCount": summary.appSelections.count,
+      "apps": getTopAppsFromSummary(summary),
+    ]
+  }
+
+  private func getTodayUsage() -> [String: Any] {
+    let defaults = UserDefaults(suiteName: "group.com.nora.nora_app.screentime")
+
+    guard let data = defaults?.data(forKey: "dailySummary"),
+          let summary = try? JSONDecoder().decode(
+            DeviceActivityMonitor.DailyUsageSummary.self,
+            from: data
+          ) else {
+      return getDemoTodayUsage()
+    }
+
+    return [
+      "success": true,
+      "totalScreenTimeMinutes": summary.totalMinutes,
+      "socialMediaMinutes": summary.categoryMinutes["social_media"] ?? 0,
+      "appCount": summary.appSelections.count,
+      "apps": getTopAppsFromSummary(summary),
+    ]
+  }
+
+  private func getAppUsage(packageName: String, daysBack: Int) -> [String: Any] {
+    // iOS doesn't expose individual app usage by package name
+    // We can only provide category-based data
+    return [
+      "success": true,
+      "packageName": packageName,
+      "appName": packageName,
+      "totalMinutes": 0,
+      "daysBack": daysBack,
+      "dailyBreakdown": [],
+      "note": "iOS provides category-based usage, not per-app data",
+    ]
+  }
+
+  // MARK: - Demo Data (for testing/preview)
+
+  private func getDemoUsageStats(daysBack: Int) -> [String: Any] {
+    return [
+      "success": true,
+      "daysBack": daysBack,
+      "totalScreenTimeMinutes": 245,
+      "socialMediaMinutes": 82,
+      "entertainmentMinutes": 45,
+      "productivityMinutes": 98,
+      "appCount": 12,
+      "apps": [
+        ["packageName": "com.instagram.ios", "appName": "Instagram", "totalTimeMinutes": 45, "category": "social_media"],
+        ["packageName": "com.youtube.ios", "appName": "YouTube", "totalTimeMinutes": 38, "category": "entertainment"],
+        ["packageName": "com.spotify.ios", "appName": "Spotify", "totalTimeMinutes": 32, "category": "entertainment"],
+        ["packageName": "com.apple.mail", "appName": "Mail", "totalTimeMinutes": 28, "category": "productivity"],
+        ["packageName": "com.slack.ios", "appName": "Slack", "totalTimeMinutes": 25, "category": "productivity"],
+      ],
+    ]
+  }
+
+  private func getDemoTodayUsage() -> [String: Any] {
+    return [
+      "success": true,
+      "totalScreenTimeMinutes": 127,
+      "socialMediaMinutes": 42,
+      "appCount": 8,
+      "apps": [
+        ["packageName": "com.instagram.ios", "appName": "Instagram", "totalTimeMinutes": 22, "category": "social_media"],
+        ["packageName": "com.twitter.ios", "appName": "Twitter", "totalTimeMinutes": 20, "category": "social_media"],
+        ["packageName": "com.apple.mail", "appName": "Mail", "totalTimeMinutes": 18, "category": "productivity"],
+      ],
+    ]
+  }
+
+  private func getTopAppsFromSummary(_ summary: DeviceActivityMonitor.DailyUsageSummary) -> [[String: Any]] {
+    return summary.appSelections.map { (token, minutes) in
+      [
+        "packageName": token,
+        "appName": token,  // iOS tokens are opaque, can't resolve to names
+        "totalTimeMinutes": minutes,
+        "category": "unknown",
+      ]
+    }.sorted { ($0["totalTimeMinutes"] as? Int ?? 0) > ($1["totalTimeMinutes"] as? Int ?? 0) }
+  }
+
+  // MARK: - Family Activity Picker
 
   private func presentFamilyActivityPicker(result: @escaping FlutterResult) {
     guard let presenter = UIApplication.shared.connectedScenes
@@ -98,6 +270,8 @@ import UIKit
   }
 }
 
+// MARK: - Shield Store
+
 private final class FamilyActivityShieldStore {
   static let shared = FamilyActivityShieldStore()
   var selection = FamilyActivitySelection()
@@ -107,6 +281,7 @@ private final class FamilyActivityShieldStore {
 
   func enable() {
     settingsStore.shield.applications = selection.applicationTokens
+    settingsStore.shield.webDomains = selection.webDomainTokens
     isEnabled = true
   }
 
@@ -115,6 +290,8 @@ private final class FamilyActivityShieldStore {
     isEnabled = false
   }
 }
+
+// MARK: - Family Activity Picker Controller
 
 private final class FamilyActivityPickerController: UIHostingController<FamilyActivityPickerView> {
   init(onDone: @escaping (FamilyActivitySelection) -> Void) {

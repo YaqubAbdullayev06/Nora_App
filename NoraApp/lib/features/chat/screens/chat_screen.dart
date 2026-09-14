@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../providers/app_provider.dart';
 import '../../../services/llm_service.dart';
 
-/// Chat Screen — talk to Nora AI.
-/// Uses Ollama local LLM with age-group personalities.
+/// Chat Screen — talk to Nora AI via cloud LLM (Groq/Gemini).
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -41,9 +41,9 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add(ChatMessage(
         role: 'assistant',
-        content: "Hi! I'm ${persona.mascotName} ${persona.mascotEmoji}\n\n"
+        content: "Hi! I'm ${persona.mascotName}\n\n"
             '${persona.tagline}\n\n'
-            'Ask me anything!',
+            'Ask me anything — I\'m powered by cloud AI.',
       ));
     });
   }
@@ -55,9 +55,9 @@ class _ChatScreenState extends State<ChatScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
-              'Ollama not running. Start it with: ollama serve'),
+              'AI is waking up... please try again in a moment.'),
           backgroundColor: DesignTokens.warning,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -93,7 +93,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.add(ChatMessage(
         role: 'assistant',
         content: response.error
-            ? '${response.response}\n\n(Nora runs on ${response.model})'
+            ? '${response.response}\n\n(Powered by ${response.model})'
             : response.response,
       ));
       _isLoading = false;
@@ -134,9 +134,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: persona.primary.withValues(alpha: 0.2),
-                  child: Text(
-                    persona.mascotEmoji,
-                    style: const TextStyle(fontSize: 16),
+                  child: SvgPicture.asset(
+                    persona.mascotAssetPath,
+                    width: 16,
+                    height: 16,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -152,7 +153,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     Text(
-                      _isAvailable ? 'Powered by Ollama' : 'Offline mode',
+                      _isAvailable ? 'Powered by cloud AI' : 'Connecting...',
                       style: TextStyle(
                         color: _isAvailable ? DesignTokens.success : DesignTokens.warning,
                         fontSize: 10,
@@ -179,8 +180,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(persona.mascotEmoji,
-                                style: const TextStyle(fontSize: 48)),
+                            SvgPicture.asset(
+                              persona.mascotAssetPath,
+                              width: 48,
+                              height: 48,
+                            ),
                             const SizedBox(height: 16),
                             Text(
                               'Ask me anything!',
@@ -256,8 +260,14 @@ class _ChatScreenState extends State<ChatScreen> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: persona.primary.withValues(alpha: 0.2),
-                child: Text(persona.mascotEmoji,
-                    style: const TextStyle(fontSize: 12)),
+                child: ClipOval(
+                  child: SvgPicture.asset(
+                    persona.mascotAssetPath,
+                    width: 28,
+                    height: 28,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
             ],

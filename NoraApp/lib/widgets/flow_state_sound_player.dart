@@ -119,13 +119,16 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
                       width: isSelected ? 2 : 1,
                     ),
                   ),
-                  child: Column(
+                    child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Sound icon/emoji
-                      Text(
-                        sound.emoji,
-                        style: const TextStyle(fontSize: 24),
+                      // Sound icon
+                      Icon(
+                        sound.icon,
+                        size: 24,
+                        color: isSelected
+                            ? widget.persona.primary
+                            : DesignTokens.textMuted,
                       ),
                       const SizedBox(height: DesignTokens.spacing4),
                       // Sound name

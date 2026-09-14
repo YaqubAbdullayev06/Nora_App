@@ -261,7 +261,11 @@ class _FeedScreenState extends State<FeedScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(persona.mascotEmoji, style: const TextStyle(fontSize: 64)),
+          SvgPicture.asset(
+            persona.mascotAssetPath,
+            width: 64,
+            height: 64,
+          ),
           const SizedBox(height: DesignTokens.spacing16),
           Text(
             _getEmptyTitle(persona.ageGroup),

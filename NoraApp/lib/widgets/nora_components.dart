@@ -573,23 +573,10 @@ class NoraMascot extends StatelessWidget {
             : null,
       ),
       child: ClipOval(
-        child: hasAsset
-            ? SvgPicture.asset(
-                persona.mascotAssetPath!,
-                fit: BoxFit.cover,
-                placeholderBuilder: (context) => Center(
-                  child: Text(
-                    persona.mascotEmoji,
-                    style: TextStyle(fontSize: size * 0.5),
-                  ),
-                ),
-              )
-            : Center(
-                child: Text(
-                  persona.mascotEmoji,
-                  style: TextStyle(fontSize: size * 0.5),
-                ),
-              ),
+        child: SvgPicture.asset(
+          persona.mascotAssetPath,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

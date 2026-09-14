@@ -17,6 +17,8 @@ dependencies:
   flutter_svg: ^2.0.10+1
   lottie: ^3.1.0
   flutter_secure_storage: ^9.0.0
+  flutter_local_notifications: ^17.2.4
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:
@@ -31,6 +33,7 @@ flutter:
     - assets/images/achievements/
     - assets/images/icons/
     - assets/images/moods/
+    - assets/images/apps/
     - assets/animations/
 
   fonts:

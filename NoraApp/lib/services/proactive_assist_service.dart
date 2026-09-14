@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/app_info.dart';
-import 'usage_tracker_service.dart';
+import 'screentime_service.dart';
 import 'app_scanner_service.dart';
 import 'llm_service.dart';
 
@@ -12,7 +13,7 @@ class ProactiveAssistService {
   factory ProactiveAssistService() => _instance;
   ProactiveAssistService._internal();
 
-  final UsageTrackerService _usageService = UsageTrackerService();
+  final ScreenTimeService _usageService = ScreenTimeService();
   final AppScannerService _scannerService = AppScannerService();
   final LlmService _llmService = LlmService();
 
@@ -267,16 +268,16 @@ class AssistNotification {
     required this.timestamp,
   });
 
-  String get typeEmoji {
+  IconData get typeIcon {
     switch (type) {
       case NotificationType.alert:
-        return '🚨';
+        return Icons.warning_rounded;
       case NotificationType.suggestion:
-        return '💡';
+        return Icons.lightbulb_rounded;
       case NotificationType.insight:
-        return '📊';
+        return Icons.analytics_rounded;
       case NotificationType.achievement:
-        return '🏆';
+        return Icons.emoji_events_rounded;
     }
   }
 }

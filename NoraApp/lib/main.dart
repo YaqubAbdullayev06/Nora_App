@@ -8,10 +8,10 @@ import 'features/welcome/screens/welcome_screen.dart';
 import 'features/onboarding/screens/onboarding_screen.dart';
 import 'features/splash/screens/splash_screen.dart';
 import 'features/home/screens/home_screen.dart';
-import 'features/breathing/screens/breathing_screen.dart';
-import 'features/breathing/providers/breathing_provider.dart';
 import 'features/timer/screens/timer_screen.dart';
+import 'features/breathing/providers/breathing_provider.dart';
 import 'features/stats/screens/stats_screen.dart';
+import 'features/stats/screens/screen_time_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
@@ -19,6 +19,7 @@ import 'features/chat/screens/chat_screen.dart';
 import 'features/chat/screens/assistant_screen.dart';
 import 'features/scan/screens/app_scan_screen.dart';
 import 'features/access/screens/app_lock_screen.dart';
+import 'features/access/screens/app_timer_limits_screen.dart';
 import 'features/weekly_review/screens/weekly_review_screen.dart';
 import 'features/plan/screens/plan_screen.dart';
 import 'providers/app_provider.dart';
@@ -30,6 +31,7 @@ import 'providers/plan_provider.dart';
 import 'providers/weekly_review_provider.dart';
 import 'providers/agent_provider.dart';
 import 'providers/focus_protection_provider.dart';
+import 'providers/app_timer_provider.dart';
 import 'services/api_service.dart';
 
 void main() async {
@@ -91,6 +93,8 @@ class NoraApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AgentProvider()),
         // Focus protection (standalone)
         ChangeNotifierProvider(create: (_) => FocusProtectionProvider()),
+        // App timer limits (standalone)
+        ChangeNotifierProvider(create: (_) => AppTimerProvider()..initialize()),
         // Legacy provider for backward compatibility
         ChangeNotifierProvider(create: (_) => AppProvider()..init()),
         ChangeNotifierProvider(create: (_) => BreathingProvider()),
@@ -144,7 +148,7 @@ class NoraApp extends StatelessWidget {
                   page = const MainScreen();
                   break;
                 case '/chat':
-                  page = const ChatScreen();
+                  page = const AssistantScreen();
                   break;
                 case '/assistant':
                   page = const AssistantScreen();
@@ -155,8 +159,14 @@ class NoraApp extends StatelessWidget {
                 case '/weekly-review':
                   page = const WeeklyReviewScreen();
                   break;
+                case '/app-timer-limits':
+                  page = const AppTimerLimitsScreen();
+                  break;
                 case '/timer':
                   page = const TimerScreen();
+                  break;
+                case '/screen-time':
+                  page = const ScreenTimeScreen();
                   break;
                 default:
                   return null;
@@ -191,16 +201,14 @@ class _MainScreenState extends State<MainScreen> {
     return _screenCache.putIfAbsent(index, () {
       switch (index) {
         case 0:
-          return HomeScreen(onPlanTap: () => setState(() => _currentIndex = 5));
+          return HomeScreen(onPlanTap: () => setState(() => _currentIndex = 4));
         case 1:
-          return const BreathingScreen();
-        case 2:
           return const TimerScreen();
-        case 3:
+        case 2:
           return const StatsScreen();
-        case 4:
+        case 3:
           return const ProfileScreen();
-        case 5:
+        case 4:
           return const PlanScreen();
         default:
           return const HomeScreen();
@@ -244,11 +252,10 @@ class _MainScreenState extends State<MainScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(0, Icons.home_rounded, 'Home'),
-                _buildNavItem(1, Icons.air_rounded, 'Breathe'),
-                _buildNavItem(2, Icons.timer_rounded, 'Timer'),
+                _buildNavItem(1, Icons.timer_rounded, 'Timer'),
                 _buildCenterButton(),
-                _buildNavItem(3, Icons.analytics_rounded, 'Stats'),
-                _buildNavItem(4, Icons.person_rounded, 'Profile'),
+                _buildNavItem(2, Icons.analytics_rounded, 'Stats'),
+                _buildNavItem(3, Icons.person_rounded, 'Profile'),
               ],
             ),
           ),
@@ -258,9 +265,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildCenterButton() {
-    final isSelected = _currentIndex == 5;
+    final isSelected = _currentIndex == 4;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = 5),
+      onTap: () => setState(() => _currentIndex = 4),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

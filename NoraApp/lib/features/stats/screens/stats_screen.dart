@@ -44,6 +44,8 @@ class StatsScreen extends StatelessWidget {
                     _buildInsights(provider, persona),
                   ],
                   const SizedBox(height: DesignTokens.spacing24),
+                  _buildScreenTimeButton(context, persona),
+                  const SizedBox(height: DesignTokens.spacing24),
                   _buildWeeklyReviewButton(context, persona),
                 ],
               ),
@@ -380,17 +382,12 @@ class StatsScreen extends StatelessWidget {
                 ? SvgPicture.asset(
                     assetPath,
                     fit: BoxFit.contain,
-                    placeholderBuilder: (context) => Center(
-                      child: Text(
-                        _getAchievementEmoji(achievement),
-                        style: const TextStyle(fontSize: 28),
-                      ),
-                    ),
                   )
                 : Center(
-                    child: Text(
-                      _getAchievementEmoji(achievement),
-                      style: const TextStyle(fontSize: 28),
+                    child: Icon(
+                      _getAchievementIcon(achievement),
+                      size: 28,
+                      color: DesignTokens.accent,
                     ),
                   ),
           ),
@@ -523,6 +520,75 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildScreenTimeButton(BuildContext context, PersonaTheme persona) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/screen-time'),
+      child: NoraCard(
+        backgroundColor: DesignTokens.success.withValues(alpha: 0.1),
+        border: Border.all(
+            color: DesignTokens.success.withValues(alpha: 0.3),
+            width: 1),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: DesignTokens.success,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.screen_lock_portrait_rounded,
+                  color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: DesignTokens.spacing16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Screen Time',
+                    style: TextStyle(
+                      color: DesignTokens.textPrimary,
+                      fontSize: DesignTokens.fontSizeBody,
+                      fontWeight: DesignTokens.fontWeightSemiBold,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _getScreenTimeSubtitle(persona.ageGroup),
+                    style: TextStyle(
+                      color: DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded,
+                color: DesignTokens.textMuted, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getScreenTimeSubtitle(AgeGroup group) {
+    switch (group) {
+      case AgeGroup.baby:
+        return 'See how long you\'ve been playing';
+      case AgeGroup.child:
+        return 'Check your device time';
+      case AgeGroup.kid:
+        return 'Track your daily screen usage';
+      case AgeGroup.teen:
+        return 'Monitor your screen habits';
+      case AgeGroup.adult:
+        return 'Get detailed usage insights';
+    }
+  }
+
   String _getWeeklyReviewSubtitle(AgeGroup group) {
     switch (group) {
       case AgeGroup.baby:
@@ -618,12 +684,12 @@ class StatsScreen extends StatelessWidget {
     }
   }
 
-  String _getAchievementEmoji(String achievement) {
+  IconData _getAchievementIcon(String achievement) {
     switch (achievement) {
-      case 'First Focus': return '⭐';
-      case '3-Day Streak': return '🔥';
-      case 'Early Bird': return '🌅';
-      default: return '🏆';
+      case 'First Focus': return Icons.star_rounded;
+      case '3-Day Streak': return Icons.local_fire_department_rounded;
+      case 'Early Bird': return Icons.wb_sunny_rounded;
+      default: return Icons.emoji_events_rounded;
     }
   }
 
@@ -656,25 +722,25 @@ class StatsScreen extends StatelessWidget {
     }
   }
 
-  List<Map<String, String>> _getInsightsForAgeGroup(AgeGroup group) {
+  List<Map<String, dynamic>> _getInsightsForAgeGroup(AgeGroup group) {
     switch (group) {
       case AgeGroup.kid:
         return [
-          {'emoji': '🎯', 'title': 'Consistency is key', 'description': 'You focused 3 days in a row!'},
-          {'emoji': '⏰', 'title': 'Best time', 'description': 'You focus best in the morning'},
-          {'emoji': '📈', 'title': 'Improving!', 'description': '15% more focus than last week'},
+          {'icon': Icons.gps_fixed_rounded, 'title': 'Consistency is key', 'description': 'You focused 3 days in a row!'},
+          {'icon': Icons.schedule_rounded, 'title': 'Best time', 'description': 'You focus best in the morning'},
+          {'icon': Icons.trending_up_rounded, 'title': 'Improving!', 'description': '15% more focus than last week'},
         ];
       case AgeGroup.teen:
         return [
-          {'emoji': '📊', 'title': 'Peak Performance', 'description': 'Your best focus sessions are 25-35 min'},
-          {'emoji': '🔄', 'title': 'Pattern Detected', 'description': 'You focus best on weekdays'},
-          {'emoji': '🎯', 'title': 'Recommendation', 'description': 'Try active recall for better retention'},
+          {'icon': Icons.analytics_rounded, 'title': 'Peak Performance', 'description': 'Your best focus sessions are 25-35 min'},
+          {'icon': Icons.sync_rounded, 'title': 'Pattern Detected', 'description': 'You focus best on weekdays'},
+          {'icon': Icons.gps_fixed_rounded, 'title': 'Recommendation', 'description': 'Try active recall for better retention'},
         ];
       case AgeGroup.adult:
         return [
-          {'emoji': '🧠', 'title': 'Deep Work', 'description': '45% of sessions in deep work mode'},
-          {'emoji': '📈', 'title': 'Trend', 'description': 'Focus time up 20% this month'},
-          {'emoji': '🎯', 'title': 'Suggestion', 'description': 'Consider morning sessions for peak performance'},
+          {'icon': Icons.psychology_rounded, 'title': 'Deep Work', 'description': '45% of sessions in deep work mode'},
+          {'icon': Icons.trending_up_rounded, 'title': 'Trend', 'description': 'Focus time up 20% this month'},
+          {'icon': Icons.gps_fixed_rounded, 'title': 'Suggestion', 'description': 'Consider morning sessions for peak performance'},
         ];
       default:
         return [];

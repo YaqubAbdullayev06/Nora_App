@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
@@ -108,7 +109,11 @@ class ProfileScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(persona.mascotEmoji, style: const TextStyle(fontSize: 32)),
+              SvgPicture.asset(
+                persona.mascotAssetPath,
+                width: 32,
+                height: 32,
+              ),
               const SizedBox(width: DesignTokens.spacing12),
               Expanded(
                 child: Column(
@@ -689,8 +694,11 @@ class ProfileScreen extends StatelessWidget {
                 final theme = PersonaTheme.forAgeGroup(group);
                 final isSelected = provider.ageGroup == group;
                 return ListTile(
-                  leading: Text(theme.mascotEmoji,
-                      style: const TextStyle(fontSize: 24)),
+                  leading: SvgPicture.asset(
+                    theme.mascotAssetPath,
+                    width: 24,
+                    height: 24,
+                  ),
                   title: Text(
                     '${group.displayName} (${theme.mascotName})',
                     style: TextStyle(

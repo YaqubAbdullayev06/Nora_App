@@ -4,6 +4,9 @@ import '../models/app_info.dart';
 
 /// UsageTrackerService — Flutter bridge to the Android UsageTracker.
 /// Tracks per-app usage time and provides usage analytics.
+///
+/// DEPRECATED: Use ScreenTimeService instead for cross-platform support.
+/// This class is kept for backward compatibility.
 class UsageTrackerService {
   static final UsageTrackerService _instance = UsageTrackerService._internal();
   factory UsageTrackerService() => _instance;

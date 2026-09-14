@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/focus_protection_service.dart';
 import '../services/usage_tracker_service.dart';
+import '../services/screentime_service.dart';
 
 /// AppProvider - Central state management (DEPRECATED).
 ///
@@ -25,7 +26,7 @@ import '../services/usage_tracker_service.dart';
 class AppProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
   final FocusProtectionService _focusProtection = FocusProtectionService();
-  final UsageTrackerService _usageTracker = UsageTrackerService();
+  final ScreenTimeService _screenTimeService = ScreenTimeService();
   Timer? _screenTimeRefreshTimer;
 
   // ─── Persona State ───
@@ -560,7 +561,7 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> refreshScreenTime() async {
     try {
-      final todayUsage = await _usageTracker.getTodayUsage();
+      final todayUsage = await _screenTimeService.getTodayUsage();
       if (todayUsage != null) {
         _screenTimeTodayMinutes = todayUsage.totalScreenTimeMinutes;
         notifyListeners();

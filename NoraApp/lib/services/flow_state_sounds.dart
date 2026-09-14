@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 
 /// FlowStateSoundGenerator — Procedural ambient sound generator for focus.
 ///
@@ -200,17 +201,17 @@ class FlowStateSoundGenerator {
 
 /// Available ambient sound types.
 enum SoundType {
-  whiteNoise("White Noise", "Static hiss — blocks distractions", "🌊"),
-  brownNoise("Brown Noise", "Deep rumble — best for deep focus", "🏔️"),
-  pinkNoise("Pink Noise", "Natural 1/f — balanced and calming", "🌿"),
-  rain("Rain", "Gentle rainfall — soothing and consistent", "🌧️"),
-  oceanWaves("Ocean Waves", "Slow waves — calming rhythm", "🌊"),
-  forest("Forest", "Birds and wind — natural ambience", "🌲"),
-  cafe("Café", "Background murmur — mild stimulation", "☕");
+  whiteNoise("White Noise", "Static hiss — blocks distractions", Icons.waves_rounded),
+  brownNoise("Brown Noise", "Deep rumble — best for deep focus", Icons.terrain_rounded),
+  pinkNoise("Pink Noise", "Natural 1/f — balanced and calming", Icons.eco_rounded),
+  rain("Rain", "Gentle rainfall — soothing and consistent", Icons.grain_rounded),
+  oceanWaves("Ocean Waves", "Slow waves — calming rhythm", Icons.waves_rounded),
+  forest("Forest", "Birds and wind — natural ambience", Icons.forest_rounded),
+  cafe("Café", "Background murmur — mild stimulation", Icons.coffee_rounded);
 
   final String name;
   final String description;
-  final String emoji;
+  final IconData icon;
 
-  const SoundType(this.name, this.description, this.emoji);
+  const SoundType(this.name, this.description, this.icon);
 }

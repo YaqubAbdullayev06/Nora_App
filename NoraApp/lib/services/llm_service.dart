@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/config/env_config.dart';
 
-/// LLM Service — connects Nora Flutter app to local Ollama LLM via backend.
+/// LLM Service — connects Nora Flutter app to cloud LLM via backend.
 ///
-/// Flow: Flutter → Backend API → Ollama → Response
+/// Backend handles provider fallback: Groq → Gemini → Cloudflare → Ollama
+/// Flutter only talks to the backend API.
 class LlmService {
   static final LlmService _instance = LlmService._internal();
   factory LlmService() => _instance;
@@ -52,7 +53,7 @@ class LlmService {
     } catch (e) {
       return LlmResponse(
         response:
-            'I can\'t reach my brain right now. Make sure Ollama is running.\n\nStart it with: ollama serve',
+            'I can\'t reach my brain right now. Please try again in a moment.',
         model: 'offline',
         error: true,
       );
@@ -105,7 +106,7 @@ class LlmService {
     } catch (e) {
       return AssistantResponse(
         response:
-            'I can\'t reach my brain right now. Make sure Ollama is running.',
+            'I can\'t reach my brain right now. Please try again in a moment.',
         model: 'offline',
         actions: [],
         error: true,

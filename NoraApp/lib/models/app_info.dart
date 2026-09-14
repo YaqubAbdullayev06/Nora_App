@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// AppInfo model — represents a scanned app on the device.
 class AppInfo {
   final String packageName;
@@ -134,38 +136,38 @@ class AppInfo {
   }
 
   /// Category icon.
-  String get categoryEmoji {
+  IconData get categoryIcon {
     switch (category) {
       case 'social_media':
-        return '📱';
+        return Icons.chat_rounded;
       case 'entertainment':
-        return '🎬';
+        return Icons.movie_rounded;
       case 'games':
-        return '🎮';
+        return Icons.sports_esports_rounded;
       case 'productivity':
-        return '💼';
+        return Icons.work_rounded;
       case 'messaging':
-        return '💬';
+        return Icons.forum_rounded;
       case 'education':
-        return '📚';
+        return Icons.auto_stories_rounded;
       case 'news':
-        return '📰';
+        return Icons.article_rounded;
       case 'photography':
-        return '📷';
+        return Icons.camera_alt_rounded;
       case 'navigation':
-        return '🗺️';
+        return Icons.map_rounded;
       case 'finance':
-        return '💰';
+        return Icons.account_balance_rounded;
       case 'health':
-        return '🏥';
+        return Icons.local_hospital_rounded;
       case 'shopping':
-        return '🛒';
+        return Icons.shopping_cart_rounded;
       case 'travel':
-        return '✈️';
+        return Icons.flight_rounded;
       case 'utilities':
-        return '🔧';
+        return Icons.build_rounded;
       default:
-        return '📦';
+        return Icons.apps_rounded;
     }
   }
 
