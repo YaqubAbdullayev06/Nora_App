@@ -132,6 +132,66 @@ class RecommendationModel(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     is_dismissed = Column(Boolean, default=False)
 
+
+class AccountabilityLockModel(Base):
+    __tablename__ = "accountability_locks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    pin_hash = Column(String(255), nullable=False)
+    guardian_name = Column(String(255), nullable=True)
+    lock_duration_days = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+
+
+class DailyHardCapModel(Base):
+    __tablename__ = "daily_hard_caps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    cap_minutes = Column(Integer, nullable=False)  # Total daily screen time limit
+    soft_warning_percent = Column(Integer, default=80)  # Show soft warning at 80%
+    hard_warning_percent = Column(Integer, default=90)  # Show hard warning at 90%
+    require_pin_to_override = Column(Boolean, default=False)  # Need PIN to bypass at 100%
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+
+    user = relationship("UserModel")
+
+
+class HabitModel(Base):
+    __tablename__ = "habits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    category = Column(String, default="general")  # exercise, reading, meditation, outdoor, custom
+    icon = Column(String, default="check_circle")  # Icon name
+    color = Column(String, default="#4CAF50")  # Hex color
+    screen_time_minutes = Column(Integer, default=15)  # Minutes earned per completion
+    target_per_day = Column(Integer, default=1)  # How many times per day
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("UserModel")
+
+
+class HabitCompletionModel(Base):
+    __tablename__ = "habit_completions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    habit_id = Column(Integer, ForeignKey("habits.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    completed_at = Column(DateTime, default=datetime.utcnow)
+    duration_minutes = Column(Integer, default=0)  # Optional: actual duration
+    screen_time_earned = Column(Integer, default=0)  # Minutes earned
+
+    habit = relationship("HabitModel")
+    user = relationship("UserModel")
+
+
 # ─── Pydantic Schemas ───
 
 class UserCreate(BaseModel):
@@ -248,6 +308,97 @@ class SocialPostRequest(BaseModel):
 class ClassifyAppsRequest(BaseModel):
     apps: list[dict]
     age_group: str = "adult"
+
+
+class AccountabilitySetupRequest(BaseModel):
+    pin: str
+    guardian_name: str
+    lock_duration_days: Optional[int] = None
+
+    @validator("pin")
+    def pin_must_be_4_to_6_digits(cls, v):
+        if not v.isdigit() or len(v) < 4 or len(v) > 6:
+            raise ValueError("PIN must be 4-6 digits")
+        return v
+
+
+class AccountabilityVerifyRequest(BaseModel):
+    pin: str
+
+
+class AccountabilityStatusResponse(BaseModel):
+    is_active: bool
+    guardian_name: Optional[str]
+    created_at: Optional[datetime]
+    expires_at: Optional[datetime]
+    is_expired: bool
+
+
+class HardCapSetupRequest(BaseModel):
+    cap_minutes: int
+    soft_warning_percent: int = 80
+    hard_warning_percent: int = 90
+    require_pin_to_override: bool = False
+
+    @validator("cap_minutes")
+    def cap_must_be_reasonable(cls, v):
+        if v < 30 or v > 720:  # 30 min to 12 hours
+            raise ValueError("Cap must be between 30 and 720 minutes")
+        return v
+
+
+class HardCapStatusResponse(BaseModel):
+    is_active: bool
+    cap_minutes: Optional[int]
+    soft_warning_percent: int
+    hard_warning_percent: int
+    require_pin_to_override: bool
+    today_usage_minutes: Optional[int]
+    created_at: Optional[datetime]
+
+
+class HabitCreateRequest(BaseModel):
+    name: str
+    category: str = "general"
+    icon: str = "check_circle"
+    color: str = "#4CAF50"
+    screen_time_minutes: int = 15
+    target_per_day: int = 1
+
+    @validator("screen_time_minutes")
+    def screen_time_must_be_reasonable(cls, v):
+        if v < 5 or v > 120:  # 5 min to 2 hours
+            raise ValueError("Screen time earned must be between 5 and 120 minutes")
+        return v
+
+
+class HabitResponse(BaseModel):
+    id: int
+    name: str
+    category: str
+    icon: str
+    color: str
+    screen_time_minutes: int
+    target_per_day: int
+    is_active: bool
+    completions_today: int = 0
+    created_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class HabitCompleteRequest(BaseModel):
+    habit_id: int
+    duration_minutes: int = 0
+
+
+class HabitStatsResponse(BaseModel):
+    total_habits: int
+    active_habits: int
+    today_completions: int
+    today_screen_time_earned: int
+    week_screen_time_earned: int
 
 
 class AnalyzeUsageRequest(BaseModel):
@@ -455,6 +606,398 @@ def refresh_token(refresh_req: dict, db: Session = Depends(get_db)):
 @app.get("/auth/me", response_model=UserResponse)
 def get_me(current_user: UserModel = Depends(get_current_user)):
     return UserResponse.from_orm(current_user)
+
+
+# ─── Accountability Lock ───
+
+@app.post("/accountability/setup")
+def setup_accountability_lock(
+    request: AccountabilitySetupRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Guardian sets a PIN lock on the user's account."""
+    existing = db.query(AccountabilityLockModel).filter(
+        AccountabilityLockModel.user_id == current_user.id,
+        AccountabilityLockModel.is_active == True,
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="An active lock already exists. Unlink it first.")
+
+    pin_hash = hash_password(request.pin)
+    expires_at = None
+    if request.lock_duration_days is not None and request.lock_duration_days > 0:
+        expires_at = datetime.utcnow() + timedelta(days=request.lock_duration_days)
+
+    lock = AccountabilityLockModel(
+        user_id=current_user.id,
+        pin_hash=pin_hash,
+        guardian_name=request.guardian_name,
+        lock_duration_days=request.lock_duration_days,
+        expires_at=expires_at,
+    )
+    db.add(lock)
+    db.commit()
+    db.refresh(lock)
+
+    return {
+        "success": True,
+        "lock": AccountabilityStatusResponse(
+            is_active=True,
+            guardian_name=lock.guardian_name,
+            created_at=lock.created_at,
+            expires_at=lock.expires_at,
+            is_expired=False,
+        ).model_dump(),
+    }
+
+
+@app.post("/accountability/verify")
+def verify_accountability_pin(
+    request: AccountabilityVerifyRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """User submits PIN to verify accountability lock."""
+    lock = db.query(AccountabilityLockModel).filter(
+        AccountabilityLockModel.user_id == current_user.id,
+        AccountabilityLockModel.is_active == True,
+    ).first()
+
+    if not lock:
+        raise HTTPException(status_code=404, detail="No active lock found")
+
+    if lock.expires_at and datetime.utcnow() > lock.expires_at:
+        lock.is_active = False
+        db.commit()
+        raise HTTPException(status_code=404, detail="Lock has expired")
+
+    if not verify_password(request.pin, lock.pin_hash):
+        raise HTTPException(status_code=401, detail="Incorrect PIN")
+
+    return {"success": True, "verified": True}
+
+
+@app.get("/accountability/status")
+def get_accountability_status(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Check if an accountability lock is active."""
+    lock = db.query(AccountabilityLockModel).filter(
+        AccountabilityLockModel.user_id == current_user.id,
+        AccountabilityLockModel.is_active == True,
+    ).first()
+
+    if not lock:
+        return AccountabilityStatusResponse(
+            is_active=False, guardian_name=None,
+            created_at=None, expires_at=None, is_expired=False,
+        ).model_dump()
+
+    is_expired = lock.expires_at is not None and datetime.utcnow() > lock.expires_at
+    if is_expired:
+        lock.is_active = False
+        db.commit()
+
+    return AccountabilityStatusResponse(
+        is_active=not is_expired,
+        guardian_name=lock.guardian_name,
+        created_at=lock.created_at,
+        expires_at=lock.expires_at,
+        is_expired=is_expired,
+    ).model_dump()
+
+
+@app.post("/accountability/unlink")
+def unlink_accountability_lock(
+    request: AccountabilityVerifyRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Guardian removes the lock (requires PIN)."""
+    lock = db.query(AccountabilityLockModel).filter(
+        AccountabilityLockModel.user_id == current_user.id,
+        AccountabilityLockModel.is_active == True,
+    ).first()
+
+    if not lock:
+        raise HTTPException(status_code=404, detail="No active lock found")
+
+    if not verify_password(request.pin, lock.pin_hash):
+        raise HTTPException(status_code=401, detail="Incorrect PIN")
+
+    lock.is_active = False
+    db.commit()
+
+    return {"success": True, "unlinked": True}
+
+
+# ─── Daily Hard Cap ───
+
+@app.post("/hardcap/setup")
+def setup_hard_cap(
+    request: HardCapSetupRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """User sets a daily total screen time hard cap."""
+    existing = db.query(DailyHardCapModel).filter(
+        DailyHardCapModel.user_id == current_user.id,
+        DailyHardCapModel.is_active == True,
+    ).first()
+
+    if existing:
+        # Update existing cap
+        existing.cap_minutes = request.cap_minutes
+        existing.soft_warning_percent = request.soft_warning_percent
+        existing.hard_warning_percent = request.hard_warning_percent
+        existing.require_pin_to_override = request.require_pin_to_override
+        db.commit()
+        db.refresh(existing)
+        cap = existing
+    else:
+        cap = DailyHardCapModel(
+            user_id=current_user.id,
+            cap_minutes=request.cap_minutes,
+            soft_warning_percent=request.soft_warning_percent,
+            hard_warning_percent=request.hard_warning_percent,
+            require_pin_to_override=request.require_pin_to_override,
+        )
+        db.add(cap)
+        db.commit()
+        db.refresh(cap)
+
+    return {
+        "success": True,
+        "cap": HardCapStatusResponse(
+            is_active=True,
+            cap_minutes=cap.cap_minutes,
+            soft_warning_percent=cap.soft_warning_percent,
+            hard_warning_percent=cap.hard_warning_percent,
+            require_pin_to_override=cap.require_pin_to_override,
+            today_usage_minutes=None,
+            created_at=cap.created_at,
+        ).model_dump(),
+    }
+
+
+@app.get("/hardcap/status")
+def get_hard_cap_status(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Check if a hard cap is active."""
+    cap = db.query(DailyHardCapModel).filter(
+        DailyHardCapModel.user_id == current_user.id,
+        DailyHardCapModel.is_active == True,
+    ).first()
+
+    if not cap:
+        return HardCapStatusResponse(
+            is_active=False, cap_minutes=None,
+            soft_warning_percent=80, hard_warning_percent=90,
+            require_pin_to_override=False, today_usage_minutes=None,
+            created_at=None,
+        ).model_dump()
+
+    return HardCapStatusResponse(
+        is_active=True,
+        cap_minutes=cap.cap_minutes,
+        soft_warning_percent=cap.soft_warning_percent,
+        hard_warning_percent=cap.hard_warning_percent,
+        require_pin_to_override=cap.require_pin_to_override,
+        today_usage_minutes=None,
+        created_at=cap.created_at,
+    ).model_dump()
+
+
+@app.post("/hardcap/deactivate")
+def deactivate_hard_cap(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Deactivate the user's hard cap."""
+    cap = db.query(DailyHardCapModel).filter(
+        DailyHardCapModel.user_id == current_user.id,
+        DailyHardCapModel.is_active == True,
+    ).first()
+
+    if not cap:
+        raise HTTPException(status_code=404, detail="No active hard cap found")
+
+    cap.is_active = False
+    db.commit()
+
+    return {"success": True, "deactivated": True}
+
+
+# ─── Habits ───
+
+@app.post("/habits")
+def create_habit(
+    request: HabitCreateRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new habit."""
+    habit = HabitModel(
+        user_id=current_user.id,
+        name=request.name,
+        category=request.category,
+        icon=request.icon,
+        color=request.color,
+        screen_time_minutes=request.screen_time_minutes,
+        target_per_day=request.target_per_day,
+    )
+    db.add(habit)
+    db.commit()
+    db.refresh(habit)
+    return {"success": True, "habit_id": habit.id}
+
+
+@app.get("/habits")
+def list_habits(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List user's habits with today's completion count."""
+    habits = db.query(HabitModel).filter(
+        HabitModel.user_id == current_user.id,
+        HabitModel.is_active == True,
+    ).all()
+
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    result = []
+    for habit in habits:
+        completions_today = db.query(HabitCompletionModel).filter(
+            HabitCompletionModel.habit_id == habit.id,
+            HabitCompletionModel.user_id == current_user.id,
+            HabitCompletionModel.completed_at >= today_start,
+        ).count()
+        result.append({
+            "id": habit.id,
+            "name": habit.name,
+            "category": habit.category,
+            "icon": habit.icon,
+            "color": habit.color,
+            "screen_time_minutes": habit.screen_time_minutes,
+            "target_per_day": habit.target_per_day,
+            "is_active": habit.is_active,
+            "completions_today": completions_today,
+            "created_at": habit.created_at,
+        })
+    return {"success": True, "habits": result}
+
+
+@app.post("/habits/complete")
+def complete_habit(
+    request: HabitCompleteRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Log habit completion and earn screen time."""
+    habit = db.query(HabitModel).filter(
+        HabitModel.id == request.habit_id,
+        HabitModel.user_id == current_user.id,
+        HabitModel.is_active == True,
+    ).first()
+
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+
+    # Check daily limit
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_completions = db.query(HabitCompletionModel).filter(
+        HabitCompletionModel.habit_id == habit.id,
+        HabitCompletionModel.user_id == current_user.id,
+        HabitCompletionModel.completed_at >= today_start,
+    ).count()
+
+    if today_completions >= habit.target_per_day:
+        raise HTTPException(status_code=400, detail="Daily target already reached")
+
+    # Create completion
+    completion = HabitCompletionModel(
+        habit_id=habit.id,
+        user_id=current_user.id,
+        duration_minutes=request.duration_minutes,
+        screen_time_earned=habit.screen_time_minutes,
+    )
+    db.add(completion)
+    db.commit()
+
+    return {
+        "success": True,
+        "screen_time_earned": habit.screen_time_minutes,
+        "completions_today": today_completions + 1,
+        "target_per_day": habit.target_per_day,
+    }
+
+
+@app.delete("/habits/{habit_id}")
+def delete_habit(
+    habit_id: int,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Deactivate a habit."""
+    habit = db.query(HabitModel).filter(
+        HabitModel.id == habit_id,
+        HabitModel.user_id == current_user.id,
+    ).first()
+
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+
+    habit.is_active = False
+    db.commit()
+
+    return {"success": True, "deactivated": True}
+
+
+@app.get("/habits/stats")
+def get_habit_stats(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get habit completion statistics."""
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=7)
+
+    total_habits = db.query(HabitModel).filter(
+        HabitModel.user_id == current_user.id,
+    ).count()
+
+    active_habits = db.query(HabitModel).filter(
+        HabitModel.user_id == current_user.id,
+        HabitModel.is_active == True,
+    ).count()
+
+    today_completions = db.query(HabitCompletionModel).filter(
+        HabitCompletionModel.user_id == current_user.id,
+        HabitCompletionModel.completed_at >= today_start,
+    ).count()
+
+    today_screen_time = db.query(func.sum(HabitCompletionModel.screen_time_earned)).filter(
+        HabitCompletionModel.user_id == current_user.id,
+        HabitCompletionModel.completed_at >= today_start,
+    ).scalar() or 0
+
+    week_screen_time = db.query(func.sum(HabitCompletionModel.screen_time_earned)).filter(
+        HabitCompletionModel.user_id == current_user.id,
+        HabitCompletionModel.completed_at >= week_start,
+    ).scalar() or 0
+
+    return {
+        "success": True,
+        "total_habits": total_habits,
+        "active_habits": active_habits,
+        "today_completions": today_completions,
+        "today_screen_time_earned": today_screen_time,
+        "week_screen_time_earned": week_screen_time,
+    }
 
 
 # ─── Safe Agent Capabilities ───
