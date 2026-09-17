@@ -38,6 +38,16 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
   }
 
   @override
+  void didUpdateWidget(FlowStateSoundPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentSound != oldWidget.currentSound) {
+      setState(() {
+        _selectedSound = widget.currentSound ?? _selectedSound;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,13 +91,15 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
 
         // Sound type selector (horizontal scroll)
         SizedBox(
-          height: 100,
-          child: ListView.builder(
+          height: 110,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(
               horizontal: DesignTokens.spacing16,
             ),
             itemCount: SoundType.values.length,
+            separatorBuilder: (_, __) =>
+                const SizedBox(width: DesignTokens.spacing10),
             itemBuilder: (context, index) {
               final sound = SoundType.values[index];
               final isSelected = _selectedSound == sound;
@@ -104,14 +116,15 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
                     widget.onPlay?.call();
                   }
                 },
-                child: Container(
-                  width: 90,
-                  margin: const EdgeInsets.only(right: DesignTokens.spacing12),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 88,
                   decoration: BoxDecoration(
                     color: isSelected
                         ? widget.persona.primary.withValues(alpha: 0.15)
                         : DesignTokens.surface,
-                    borderRadius: BorderRadius.circular(DesignTokens.radius12),
+                    borderRadius:
+                        BorderRadius.circular(DesignTokens.radius12),
                     border: Border.all(
                       color: isSelected
                           ? widget.persona.primary
@@ -119,18 +132,28 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
                       width: isSelected ? 2 : 1,
                     ),
                   ),
-                    child: Column(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // Sound icon
-                      Icon(
-                        sound.icon,
-                        size: 24,
-                        color: isSelected
-                            ? widget.persona.primary
-                            : DesignTokens.textMuted,
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? widget.persona.primary.withValues(alpha: 0.2)
+                              : Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          sound.icon,
+                          size: 22,
+                          color: isSelected
+                              ? widget.persona.primary
+                              : DesignTokens.textMuted,
+                        ),
                       ),
-                      const SizedBox(height: DesignTokens.spacing4),
+                      const SizedBox(height: DesignTokens.spacing8),
                       // Sound name
                       Text(
                         sound.name,
@@ -152,10 +175,14 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
                       if (isCurrentlyPlaying)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Icon(
-                            Icons.equalizer,
-                            size: 14,
-                            color: widget.persona.primary,
+                          child: SizedBox(
+                            width: 16,
+                            height: 12,
+                            child: Icon(
+                              Icons.equalizer,
+                              size: 14,
+                              color: widget.persona.primary,
+                            ),
                           ),
                         ),
                     ],
@@ -169,7 +196,12 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
         // Description and controls
         if (_selectedSound != null)
           Padding(
-            padding: const EdgeInsets.all(DesignTokens.spacing16),
+            padding: const EdgeInsets.fromLTRB(
+              DesignTokens.spacing16,
+              DesignTokens.spacing8,
+              DesignTokens.spacing16,
+              DesignTokens.spacing16,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -180,28 +212,26 @@ class _FlowStateSoundPlayerState extends State<FlowStateSoundPlayer> {
                     fontSize: DesignTokens.fontSizeCaption,
                     fontFamily: DesignTokens.fontFamilyPrimary,
                   ),
+                  textAlign: TextAlign.left,
                 ),
                 const SizedBox(height: DesignTokens.spacing12),
                 // Play/Stop button
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SoundToggleButton(
-                        isPlaying: widget.isPlaying &&
-                            widget.currentSound == _selectedSound,
-                        onPlay: () {
-                          HapticService.success();
-                          widget.onPlay?.call();
-                        },
-                        onStop: () {
-                          HapticService.buttonPressed();
-                          widget.onStop?.call();
-                        },
-                        persona: widget.persona,
-                        soundName: _selectedSound!.name,
-                      ),
-                    ),
-                  ],
+                SizedBox(
+                  width: double.infinity,
+                  child: _SoundToggleButton(
+                    isPlaying: widget.isPlaying &&
+                        widget.currentSound == _selectedSound,
+                    onPlay: () {
+                      HapticService.success();
+                      widget.onPlay?.call();
+                    },
+                    onStop: () {
+                      HapticService.buttonPressed();
+                      widget.onStop?.call();
+                    },
+                    persona: widget.persona,
+                    soundName: _selectedSound!.name,
+                  ),
                 ),
               ],
             ),
@@ -233,30 +263,43 @@ class _SoundToggleButton extends StatelessWidget {
       onTap: isPlaying ? onStop : onPlay,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spacing16,
-          vertical: DesignTokens.spacing12,
-        ),
+        height: 48,
         decoration: BoxDecoration(
           color: isPlaying ? DesignTokens.danger : persona.primary,
-          borderRadius: BorderRadius.circular(DesignTokens.radius8),
+          borderRadius: BorderRadius.circular(DesignTokens.radius12),
+          boxShadow: [
+            BoxShadow(
+              color: (isPlaying ? DesignTokens.danger : persona.primary)
+                  .withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
-              color: Colors.white,
-              size: 20,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: Icon(
+                isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                key: ValueKey(isPlaying),
+                color: Colors.white,
+                size: 22,
+              ),
             ),
             const SizedBox(width: DesignTokens.spacing8),
-            Text(
-              isPlaying ? "Stop" : "Play $soundName",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: DesignTokens.fontSizeBody,
-                fontWeight: DesignTokens.fontWeightSemiBold,
-                fontFamily: DesignTokens.fontFamilyPrimary,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: Text(
+                isPlaying ? "Stop $soundName" : "Play $soundName",
+                key: ValueKey(isPlaying),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: DesignTokens.fontSizeBody,
+                  fontWeight: DesignTokens.fontWeightSemiBold,
+                  fontFamily: DesignTokens.fontFamilyPrimary,
+                ),
               ),
             ),
           ],

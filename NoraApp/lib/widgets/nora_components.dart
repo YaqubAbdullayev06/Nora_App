@@ -783,7 +783,7 @@ class PlanTaskCard extends StatefulWidget {
 }
 
 class _PlanTaskCardState extends State<PlanTaskCard>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late AnimationController _checkController;

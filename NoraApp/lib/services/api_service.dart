@@ -593,4 +593,19 @@ class ApiService {
   Future<Map<String, dynamic>> getHabitStats() async {
     return _getJson('/habits/stats');
   }
+
+  // ─── AI Notification Text ───
+
+  /// Get AI-generated notification text from the backend LLM.
+  Future<Map<String, dynamic>> getNotificationText({
+    required String eventType,
+    String ageGroup = 'adult',
+    Map<String, dynamic>? context,
+  }) async {
+    return _postJson('/ai/notification-text', {
+      'event_type': eventType,
+      'age_group': ageGroup,
+      'context': context ?? {},
+    });
+  }
 }

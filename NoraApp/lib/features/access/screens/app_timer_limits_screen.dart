@@ -513,156 +513,170 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => Dialog(
           backgroundColor: DesignTokens.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(DesignTokens.radius16),
           ),
-          title: Text(
-            'Add App Limit',
-            style: TextStyle(
-              color: DesignTokens.textPrimary,
-              fontWeight: DesignTokens.fontWeightBold,
-              fontFamily: DesignTokens.fontFamilyDisplay,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Select an app to limit:',
-                style: TextStyle(
-                  color: DesignTokens.textMuted,
-                  fontSize: DesignTokens.fontSizeCaption,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spacing12),
-              // App selection
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: DesignTokens.background,
-                  borderRadius: BorderRadius.circular(DesignTokens.radius8),
-                  border: Border.all(color: DesignTokens.border),
-                ),
-                child: ListView.builder(
-                  itemCount: commonApps.length,
-                  itemBuilder: (context, index) {
-                    final app = commonApps[index];
-                    final isSelected = selectedPackage == app.$1;
-                    return ListTile(
-                      dense: true,
-                      selected: isSelected,
-                      selectedTileColor: DesignTokens.accent.withValues(alpha: 0.1),
-                      title: Text(
-                        app.$2,
-                        style: TextStyle(
-                          color: isSelected ? DesignTokens.accent : DesignTokens.textPrimary,
-                          fontSize: DesignTokens.fontSizeBodySmall,
-                          fontWeight: isSelected ? DesignTokens.fontWeightSemiBold : DesignTokens.fontWeightRegular,
-                          fontFamily: DesignTokens.fontFamilyPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        app.$1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add App Limit',
+                    style: TextStyle(
+                      color: DesignTokens.textPrimary,
+                      fontSize: DesignTokens.fontSizeH3,
+                      fontWeight: DesignTokens.fontWeightBold,
+                      fontFamily: DesignTokens.fontFamilyDisplay,
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spacing16),
+                  Text(
+                    'Select an app to limit:',
+                    style: TextStyle(
+                      color: DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spacing12),
+                  // App selection
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: DesignTokens.background,
+                      borderRadius: BorderRadius.circular(DesignTokens.radius8),
+                      border: Border.all(color: DesignTokens.border),
+                    ),
+                    child: ListView.builder(
+                      itemCount: commonApps.length,
+                      itemBuilder: (context, index) {
+                        final app = commonApps[index];
+                        final isSelected = selectedPackage == app.$1;
+                        return ListTile(
+                          dense: true,
+                          selected: isSelected,
+                          selectedTileColor: DesignTokens.accent.withValues(alpha: 0.1),
+                          title: Text(
+                            app.$2,
+                            style: TextStyle(
+                              color: isSelected ? DesignTokens.accent : DesignTokens.textPrimary,
+                              fontSize: DesignTokens.fontSizeBodySmall,
+                              fontWeight: isSelected ? DesignTokens.fontWeightSemiBold : DesignTokens.fontWeightRegular,
+                              fontFamily: DesignTokens.fontFamilyPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            app.$1,
+                            style: TextStyle(
+                              color: DesignTokens.textMuted,
+                              fontSize: DesignTokens.fontSizeTiny,
+                              fontFamily: DesignTokens.fontFamilyPrimary,
+                            ),
+                          ),
+                          onTap: () {
+                            setDialogState(() {
+                              selectedPackage = app.$1;
+                              selectedName = app.$2;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spacing16),
+                  // Minutes slider
+                  Text(
+                    'Daily limit: ${selectedMinutes} minutes',
+                    style: TextStyle(
+                      color: DesignTokens.textPrimary,
+                      fontSize: DesignTokens.fontSizeBody,
+                      fontWeight: DesignTokens.fontWeightSemiBold,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spacing8),
+                  Slider(
+                    value: selectedMinutes.toDouble(),
+                    min: 5,
+                    max: 240,
+                    divisions: 47,
+                    activeColor: DesignTokens.accent,
+                    inactiveColor: DesignTokens.border,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedMinutes = value.round();
+                      });
+                    },
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '5m',
                         style: TextStyle(
                           color: DesignTokens.textMuted,
                           fontSize: DesignTokens.fontSizeTiny,
                           fontFamily: DesignTokens.fontFamilyPrimary,
                         ),
                       ),
-                      onTap: () {
-                        setDialogState(() {
-                          selectedPackage = app.$1;
-                          selectedName = app.$2;
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spacing16),
-              // Minutes slider
-              Text(
-                'Daily limit: ${selectedMinutes} minutes',
-                style: TextStyle(
-                  color: DesignTokens.textPrimary,
-                  fontSize: DesignTokens.fontSizeBody,
-                  fontWeight: DesignTokens.fontWeightSemiBold,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spacing8),
-              Slider(
-                value: selectedMinutes.toDouble(),
-                min: 5,
-                max: 240,
-                divisions: 47,
-                activeColor: DesignTokens.accent,
-                inactiveColor: DesignTokens.border,
-                onChanged: (value) {
-                  setDialogState(() {
-                    selectedMinutes = value.round();
-                  });
-                },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '5m',
-                    style: TextStyle(
-                      color: DesignTokens.textMuted,
-                      fontSize: DesignTokens.fontSizeTiny,
-                      fontFamily: DesignTokens.fontFamilyPrimary,
-                    ),
+                      Text(
+                        '4h',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeTiny,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '4h',
-                    style: TextStyle(
-                      color: DesignTokens.textMuted,
-                      fontSize: DesignTokens.fontSizeTiny,
-                      fontFamily: DesignTokens.fontFamilyPrimary,
-                    ),
+                  const SizedBox(height: DesignTokens.spacing16),
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: DesignTokens.textMuted,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: DesignTokens.spacing8),
+                      TextButton(
+                        onPressed: selectedPackage.isEmpty
+                            ? null
+                            : () {
+                                context.read<AppTimerProvider>().setLimit(
+                                      selectedPackage,
+                                      selectedName,
+                                      selectedMinutes,
+                                    );
+                                Navigator.pop(context);
+                              },
+                        child: Text(
+                          'Add',
+                          style: TextStyle(
+                            color: DesignTokens.accent,
+                            fontWeight: DesignTokens.fontWeightBold,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: DesignTokens.textMuted,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: selectedPackage.isEmpty
-                  ? null
-                  : () {
-                      context.read<AppTimerProvider>().setLimit(
-                            selectedPackage,
-                            selectedName,
-                            selectedMinutes,
-                          );
-                      Navigator.pop(context);
-                    },
-              child: Text(
-                'Add',
-                style: TextStyle(
-                  color: DesignTokens.accent,
-                  fontWeight: DesignTokens.fontWeightBold,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -674,109 +688,123 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => Dialog(
           backgroundColor: DesignTokens.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(DesignTokens.radius16),
           ),
-          title: Text(
-            'Edit Limit',
-            style: TextStyle(
-              color: DesignTokens.textPrimary,
-              fontWeight: DesignTokens.fontWeightBold,
-              fontFamily: DesignTokens.fontFamilyDisplay,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                appName,
-                style: TextStyle(
-                  color: DesignTokens.accent,
-                  fontSize: DesignTokens.fontSizeBody,
-                  fontWeight: DesignTokens.fontWeightSemiBold,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spacing16),
-              Text(
-                'Daily limit: ${selectedMinutes} minutes',
-                style: TextStyle(
-                  color: DesignTokens.textPrimary,
-                  fontSize: DesignTokens.fontSizeBody,
-                  fontWeight: DesignTokens.fontWeightSemiBold,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spacing8),
-              Slider(
-                value: selectedMinutes.toDouble(),
-                min: 5,
-                max: 240,
-                divisions: 47,
-                activeColor: DesignTokens.accent,
-                inactiveColor: DesignTokens.border,
-                onChanged: (value) {
-                  setDialogState(() {
-                    selectedMinutes = value.round();
-                  });
-                },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '5m',
+                    'Edit Limit',
                     style: TextStyle(
-                      color: DesignTokens.textMuted,
-                      fontSize: DesignTokens.fontSizeTiny,
+                      color: DesignTokens.textPrimary,
+                      fontSize: DesignTokens.fontSizeH3,
+                      fontWeight: DesignTokens.fontWeightBold,
+                      fontFamily: DesignTokens.fontFamilyDisplay,
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spacing16),
+                  Text(
+                    appName,
+                    style: TextStyle(
+                      color: DesignTokens.accent,
+                      fontSize: DesignTokens.fontSizeBody,
+                      fontWeight: DesignTokens.fontWeightSemiBold,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
                   ),
+                  const SizedBox(height: DesignTokens.spacing16),
                   Text(
-                    '4h',
+                    'Daily limit: ${selectedMinutes} minutes',
                     style: TextStyle(
-                      color: DesignTokens.textMuted,
-                      fontSize: DesignTokens.fontSizeTiny,
+                      color: DesignTokens.textPrimary,
+                      fontSize: DesignTokens.fontSizeBody,
+                      fontWeight: DesignTokens.fontWeightSemiBold,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
+                  ),
+                  const SizedBox(height: DesignTokens.spacing8),
+                  Slider(
+                    value: selectedMinutes.toDouble(),
+                    min: 5,
+                    max: 240,
+                    divisions: 47,
+                    activeColor: DesignTokens.accent,
+                    inactiveColor: DesignTokens.border,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedMinutes = value.round();
+                      });
+                    },
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '5m',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeTiny,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                      Text(
+                        '4h',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeTiny,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: DesignTokens.spacing16),
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: DesignTokens.textMuted,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: DesignTokens.spacing8),
+                      TextButton(
+                        onPressed: () {
+                          context.read<AppTimerProvider>().setLimit(
+                                packageName,
+                                appName,
+                                selectedMinutes,
+                              );
+                          Navigator.pop(context);
+                        },
+                        child: Text(
+                          'Save',
+                          style: TextStyle(
+                            color: DesignTokens.accent,
+                            fontWeight: DesignTokens.fontWeightBold,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: DesignTokens.textMuted,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                context.read<AppTimerProvider>().setLimit(
-                      packageName,
-                      appName,
-                      selectedMinutes,
-                    );
-                Navigator.pop(context);
-              },
-              child: Text(
-                'Save',
-                style: TextStyle(
-                  color: DesignTokens.accent,
-                  fontWeight: DesignTokens.fontWeightBold,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -785,52 +813,71 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
   void _removeLimit(String packageName, String appName) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => Dialog(
         backgroundColor: DesignTokens.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DesignTokens.radius16),
         ),
-        title: Text(
-          'Remove Limit?',
-          style: TextStyle(
-            color: DesignTokens.textPrimary,
-            fontWeight: DesignTokens.fontWeightBold,
-            fontFamily: DesignTokens.fontFamilyDisplay,
-          ),
-        ),
-        content: Text(
-          'Remove the daily time limit for $appName?',
-          style: TextStyle(
-            color: DesignTokens.textMuted,
-            fontFamily: DesignTokens.fontFamilyPrimary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: DesignTokens.textMuted,
-                fontFamily: DesignTokens.fontFamilyPrimary,
-              ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Remove Limit?',
+                  style: TextStyle(
+                    color: DesignTokens.textPrimary,
+                    fontSize: DesignTokens.fontSizeH3,
+                    fontWeight: DesignTokens.fontWeightBold,
+                    fontFamily: DesignTokens.fontFamilyDisplay,
+                  ),
+                ),
+                const SizedBox(height: DesignTokens.spacing16),
+                Text(
+                  'Remove the daily time limit for $appName?',
+                  style: TextStyle(
+                    color: DesignTokens.textMuted,
+                    fontFamily: DesignTokens.fontFamilyPrimary,
+                  ),
+                ),
+                const SizedBox(height: DesignTokens.spacing20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: DesignTokens.spacing8),
+                    TextButton(
+                      onPressed: () {
+                        context.read<AppTimerProvider>().removeLimit(packageName);
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        'Remove',
+                        style: TextStyle(
+                          color: DesignTokens.danger,
+                          fontWeight: DesignTokens.fontWeightBold,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          TextButton(
-            onPressed: () {
-              context.read<AppTimerProvider>().removeLimit(packageName);
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Remove',
-              style: TextStyle(
-                color: DesignTokens.danger,
-                fontWeight: DesignTokens.fontWeightBold,
-                fontFamily: DesignTokens.fontFamilyPrimary,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -42,6 +42,9 @@ class ProactiveAssistService {
 
   /// Get today's smart summary for the home screen.
   Future<SmartSummary> getTodaySummary() async {
+    // Ensure ScreenTimeService is initialized before querying usage data.
+    await _usageService.initialize();
+
     final todayUsage = await _usageService.getTodayUsage();
     if (todayUsage == null) {
       return SmartSummary.empty();

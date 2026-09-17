@@ -169,6 +169,10 @@ class MainActivity : FlutterActivity() {
 						val stats = usageTracker.getTodayUsage()
 						result.success(stats)
 					}
+					"getWeeklyAppUsage" -> {
+						val stats = usageTracker.getWeeklyAppUsage()
+						result.success(stats)
+					}
 					"getAppUsage" -> {
 						val args = call.arguments as? Map<*, *>
 						val packageName = args?.get("packageName") as? String

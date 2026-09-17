@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/enums/age_group.dart';
 import '../models/models.dart';
 import '../services/focus_protection_service.dart';
+import '../services/notification_service.dart';
 import 'persona_provider.dart';
 
 /// Manages timer state, break phases, and pomodoro cycles.
@@ -78,6 +79,13 @@ class TimerProvider extends ChangeNotifier {
       }
     });
     notifyListeners();
+
+    // Send AI notification for focus start
+    NotificationService().showAlert(
+      type: NotificationType.focusStart,
+      ageGroup: _personaProvider.ageGroup.name,
+      context: {'duration': _totalTimerSeconds ~/ 60},
+    );
   }
 
   void pauseTimer() {
@@ -118,10 +126,24 @@ class TimerProvider extends ChangeNotifier {
 
     _vibrate();
 
+    // Send AI notification for focus end
+    NotificationService().showAlert(
+      type: NotificationType.focusEnd,
+      ageGroup: _personaProvider.ageGroup.name,
+      context: {'duration': minutes, 'points': points},
+    );
+
     // Transition to break phase
     _isBreakPhase = true;
     _timerSeconds = breakDurationSeconds;
     _totalTimerSeconds = breakDurationSeconds;
+
+    // Send AI notification for break start
+    NotificationService().showAlert(
+      type: NotificationType.focusBreak,
+      ageGroup: _personaProvider.ageGroup.name,
+      context: {'break_duration': breakDurationSeconds ~/ 60},
+    );
 
     notifyListeners();
   }
@@ -139,6 +161,14 @@ class TimerProvider extends ChangeNotifier {
     _totalTimerSeconds = _timerSeconds;
 
     _vibrate();
+
+    // Send AI notification for break end (ready for next session)
+    NotificationService().showAlert(
+      type: NotificationType.sessionComplete,
+      ageGroup: _personaProvider.ageGroup.name,
+      context: {'message': 'Break finished. Ready for the next focus session?'},
+    );
+
     notifyListeners();
   }
 

@@ -11,6 +11,8 @@ import '../../../providers/timer_provider.dart';
 import '../../../providers/pomodoro_provider.dart';
 import '../../../services/flow_state_sounds.dart';
 import '../../../services/haptic_service.dart';
+
+final FlowStateSoundService _soundService = FlowStateSoundService();
 import '../../../widgets/flow_state_sound_player.dart';
 import '../../../widgets/nora_components.dart';
 import '../widgets/breathe_tab.dart';
@@ -36,9 +38,7 @@ class _TimerScreenState extends State<TimerScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Flow-state sound player
-  bool _isSoundPlaying = false;
-  SoundType? _currentSound;
+  // Flow-state sound player (delegates to FlowStateSoundService)
 
   // Tab selector: 0 = Focus, 1 = Breathe
   int _selectedTab = 0;
@@ -57,21 +57,15 @@ class _TimerScreenState extends State<TimerScreen>
 
   @override
   void dispose() {
+    _soundService.stop();
     _pulseController.dispose();
     super.dispose();
   }
 
   void _toggleSound(SoundType sound) {
     HapticService.buttonPressed();
-    setState(() {
-      if (_isSoundPlaying && _currentSound == sound) {
-        _isSoundPlaying = false;
-        _currentSound = null;
-      } else {
-        _isSoundPlaying = true;
-        _currentSound = sound;
-      }
-    });
+    _soundService.play(sound);
+    setState(() {});
   }
 
   void _triggerInterrupter() {
@@ -248,7 +242,7 @@ class _TimerScreenState extends State<TimerScreen>
   }
 
   Widget _buildScreenTimeBadge(PersonaTheme persona) {
-    final provider = context.read<TimerProvider>();
+    final provider = context.read<PersonaProvider>();
     final exceeded = provider.isScreenTimeExceeded;
     final limit = persona.ageGroup.screenTimeLimitMinutes;
     final current = provider.screenTimeTodayMinutes;
@@ -376,14 +370,11 @@ class _TimerScreenState extends State<TimerScreen>
             const SizedBox(height: DesignTokens.spacing24),
             FlowStateSoundPlayer(
               persona: persona,
-              isPlaying: _isSoundPlaying,
-              currentSound: _currentSound,
+              isPlaying: _soundService.isPlaying,
+              currentSound: _soundService.currentSound,
               onPlay: () =>
-                  _toggleSound(_currentSound ?? SoundType.brownNoise),
-              onStop: () => setState(() {
-                _isSoundPlaying = false;
-                _currentSound = null;
-              }),
+                  _toggleSound(_soundService.currentSound ?? SoundType.brownNoise),
+              onStop: () => _soundService.stop(),
             ),
           ],
         ),

@@ -622,6 +622,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     onPressed: nameController.text.isEmpty
                         ? null
                         : () async {
+                            final navigator = Navigator.of(context);
                             final selectedCat = categories.firstWhere(
                                 (c) => c['key'] == selectedCategory);
                             final success = await context
@@ -634,8 +635,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
                                   color: selectedCat['color'] as String,
                                   screenTimeMinutes: screenTimeMinutes,
                                 );
-                            if (success && context.mounted) {
-                              Navigator.pop(context);
+                            if (success) {
+                              navigator.pop();
                             }
                           },
                   ),

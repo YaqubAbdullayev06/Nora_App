@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/app_info.dart';
+import '../models/models.dart';
 
 /// ScreenTimeService — Cross-platform screen time tracking.
 ///
@@ -168,6 +169,60 @@ class ScreenTimeService {
       debugPrint('[ScreenTimeService] getTodayUsage failed: ${e.message}');
       return null;
     }
+  }
+
+  /// Get per-day top app usage for the current week (Mon–Sun).
+  Future<List<WeeklyAppUsage>> getWeeklyAppUsage() async {
+    if (!isAvailable) return List.generate(7, (i) => WeeklyAppUsage(
+      dayIndex: i, appName: '', minutes: 0, category: '', iconPath: '',
+    ));
+
+    try {
+      final result = await _usageChannel.invokeMapMethod<String, dynamic>(
+        'getWeeklyAppUsage',
+      );
+      if (result == null || result['success'] != true) {
+        return List.generate(7, (i) => WeeklyAppUsage(
+          dayIndex: i, appName: '', minutes: 0, category: '', iconPath: '',
+        ));
+      }
+
+      final days = (result['days'] as List<dynamic>? ?? []);
+      return days.map((day) {
+        final map = Map<String, dynamic>.from(day as Map);
+        final appName = map['appName'] as String? ?? '';
+        final category = map['category'] as String? ?? '';
+        final iconPath = _iconPathForApp(appName, category);
+        return WeeklyAppUsage(
+          dayIndex: map['dayIndex'] as int? ?? 0,
+          appName: appName,
+          minutes: map['minutes'] as int? ?? 0,
+          category: category,
+          iconPath: iconPath,
+        );
+      }).toList();
+    } on PlatformException catch (e) {
+      debugPrint('[ScreenTimeService] getWeeklyAppUsage failed: ${e.message}');
+      return List.generate(7, (i) => WeeklyAppUsage(
+        dayIndex: i, appName: '', minutes: 0, category: '', iconPath: '',
+      ));
+    }
+  }
+
+  /// Maps app name / category to a local SVG icon path.
+  String _iconPathForApp(String appName, String category) {
+    final lower = appName.toLowerCase();
+    if (lower.contains('instagram')) return 'assets/images/apps/instagram.svg';
+    if (lower.contains('youtube')) return 'assets/images/apps/youtube.svg';
+    if (lower.contains('whatsapp')) return 'assets/images/apps/whatsapp.svg';
+    if (lower.contains('tiktok')) return 'assets/images/apps/tiktok.svg';
+    if (lower.contains('telegram')) return 'assets/images/apps/telegram.svg';
+    if (lower.contains('spotify')) return 'assets/images/apps/spotify.svg';
+    if (lower.contains('chrome') || lower.contains('safari') || lower.contains('browser')) {
+      return 'assets/images/apps/chrome.svg';
+    }
+    // Fallback: use a generic category-based icon
+    return '';
   }
 
   /// Get usage for a specific app (Android only — iOS returns null).

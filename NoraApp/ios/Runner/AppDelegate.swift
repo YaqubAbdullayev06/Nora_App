@@ -80,6 +80,8 @@ import UIKit
         result(self.getUsageStats(daysBack: daysBack))
       case "getTodayUsage":
         result(self.getTodayUsage())
+      case "getWeeklyAppUsage":
+        result(self.getWeeklyAppUsage())
       case "getAppUsage":
         guard let args = call.arguments as? [String: Any],
               let packageName = args["packageName"] as? String else {
@@ -187,6 +189,114 @@ import UIKit
       "socialMediaMinutes": summary.categoryMinutes["social_media"] ?? 0,
       "appCount": summary.appSelections.count,
       "apps": getTopAppsFromSummary(summary),
+    ]
+  }
+
+  private func getWeeklyAppUsage() -> [String: Any] {
+    let defaults = UserDefaults(suiteName: "group.com.nora.nora_app.screentime")
+
+    // Try to load raw usage records (kept for 7 days by DeviceActivityMonitor)
+    guard let recordsData = defaults?.data(forKey: "deviceUsage"),
+          let records = try? JSONDecoder().decode(
+            [DeviceActivityMonitor.UsageRecord].self,
+            from: recordsData
+          ) else {
+      // Fall back to demo data
+      return getDemoWeeklyAppUsage()
+    }
+
+    let calendar = Calendar.current
+    let now = Date()
+    let todayWeekday = calendar.component(.weekday, from: now)
+    // Convert to 0=Mon … 6=Sun
+    let todayIndex = (todayWeekday + 5) % 7
+
+    // Find Monday of this week
+    guard let monday = calendar.date(
+      byAdding: .day,
+      value: -(todayIndex),
+      to: calendar.startOfDay(for: now)
+    ) else {
+      return getDemoWeeklyAppUsage()
+    }
+
+    // Group records by day index
+    var dayBuckets: [[String: Int]] = Array(repeating: [:], count: 7)
+    for record in records {
+      guard record.timestamp >= monday else { continue }
+      let dayOfWeek = calendar.component(.weekday, from: record.timestamp)
+      let dayIndex = (dayOfWeek + 5) % 7
+      guard dayIndex <= todayIndex else { continue }
+      let minutes = Int(record.duration / 60)
+      dayBuckets[dayIndex][record.category, default: 0] += minutes
+    }
+
+    // Build result: for each day, pick the top category
+    var result: [[String: Any]] = []
+    for i in 0..<7 {
+      if i > todayIndex {
+        result.append(["dayIndex": i, "appName": "", "minutes": 0, "category": ""])
+        continue
+      }
+      let bucket = dayBuckets[i]
+      if bucket.isEmpty {
+        result.append(["dayIndex": i, "appName": "", "minutes": 0, "category": ""])
+        continue
+      }
+      // Find category with most minutes
+      if let top = bucket.max(by: { $0.value < $1.value }) {
+        result.append([
+          "dayIndex": i,
+          "appName": top.key.replacingOccurrences(of: "_", with: " ").capitalized,
+          "minutes": top.value,
+          "category": top.key,
+        ])
+      } else {
+        result.append(["dayIndex": i, "appName": "", "minutes": 0, "category": ""])
+      }
+    }
+
+    return [
+      "success": true,
+      "days": result,
+    ]
+  }
+
+  private func getDemoWeeklyAppUsage() -> [String: Any] {
+    let now = Date()
+    let calendar = Calendar.current
+    let todayWeekday = calendar.component(.weekday, from: now)
+    let todayIndex = (todayWeekday + 5) % 7
+
+    let demoApps: [(name: String, category: String)] = [
+      ("Instagram", "social_media"),
+      ("YouTube", "entertainment"),
+      ("WhatsApp", "messaging"),
+      ("Chrome", "productivity"),
+      ("TikTok", "social_media"),
+      ("Spotify", "entertainment"),
+      ("Telegram", "messaging"),
+    ]
+
+    var days: [[String: Any]] = []
+    for i in 0..<7 {
+      if i > todayIndex {
+        days.append(["dayIndex": i, "appName": "", "minutes": 0, "category": ""])
+      } else {
+        let app = demoApps[i % demoApps.count]
+        let minutes = 30 + (i * 13) % 120
+        days.append([
+          "dayIndex": i,
+          "appName": app.name,
+          "minutes": minutes,
+          "category": app.category,
+        ])
+      }
+    }
+
+    return [
+      "success": true,
+      "days": days,
     ]
   }
 

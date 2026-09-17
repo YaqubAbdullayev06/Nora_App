@@ -414,6 +414,12 @@ class AICommandRequest(BaseModel):
     conversation_history: list[dict] = []
 
 
+class NotificationTextRequest(BaseModel):
+    event_type: str
+    age_group: str = "adult"
+    context: dict = {}
+
+
 # ─── Structured Action Schemas (Pydantic) ───
 # Model output is UNTRUSTED. Every action must validate against these schemas.
 
@@ -1438,6 +1444,96 @@ async def ai_health():
         "ollama_base_url": llm.ollama_base_url,
         "ollama_colab_url": llm.ollama_colab_url or "(not set)",
     }
+
+
+# ─── AI Notification Text Generation ───
+
+NOTIFICATION_PROMPTS = {
+    "kid": """Generate a short, fun notification message for a kid (ages 6-12).
+Rules:
+- Use simple, encouraging language
+- Add a fun emoji
+- Keep it under 15 words
+- Be enthusiastic and positive
+- Never mention screen time limits negatively""",
+
+    "teen": """Generate a short, motivating notification message for a teenager (ages 12-18).
+Rules:
+- Sound like a supportive friend, not a parent
+- Use casual, modern language
+- Keep it under 20 words
+- Be real and authentic
+- Include one relevant emoji""",
+
+    "adult": """Generate a short, professional notification message for an adult (18+).
+Rules:
+- Be concise and actionable
+- Sound like a focused productivity partner
+- Keep it under 20 words
+- Use professional but warm tone
+- Optional: include one subtle emoji""",
+}
+
+@app.post("/ai/notification-text")
+async def generate_notification_text(request: NotificationTextRequest):
+    """
+    Generate AI-powered notification text for different app events.
+    Uses the LLM to create contextual, personalized alert messages.
+    Falls back to default texts if LLM is unavailable.
+    """
+    event_descriptions = {
+        "focus_start": "A focus/session timer is starting now",
+        "focus_end": "A focus/session timer has just ended",
+        "focus_break": "It's break time between focus sessions",
+        "habit_reminder": f"Remind about a habit: {request.context.get('habit_name', 'daily habit')}",
+        "hard_cap_warning": "User is approaching their daily screen time limit (80-90% used)",
+        "hard_cap_reached": "User has hit their daily screen time hard cap",
+        "accountability_alert": "Accountability lock check — remind user to stay on track",
+        "daily_motivation": "Send a daily morning motivation message to start the day",
+        "session_complete": "A focus session was completed successfully",
+        "custom": f"Custom notification: {request.context.get('message', 'Nora has an update')}",
+    }
+
+    event_desc = event_descriptions.get(request.event_type, request.event_type)
+    personality = NOTIFICATION_PROMPTS.get(request.age_group, NOTIFICATION_PROMPTS["adult"])
+
+    prompt = f"""{personality}
+
+EVENT: {event_desc}
+
+CONTEXT: {json.dumps(request.context) if request.context else 'None'}
+
+Generate ONLY the notification text. No quotes, no explanation. Just the message."""
+
+    try:
+        response = await ollama.chat(
+            [{"role": "user", "content": prompt}],
+            temperature=0.8,
+        )
+        # Clean up the response — remove quotes, extra whitespace
+        clean_text = response.strip().strip('"').strip("'").strip()
+        # Truncate if too long
+        if len(clean_text) > 100:
+            clean_text = clean_text[:97] + "..."
+        return {"text": clean_text, "event_type": request.event_type}
+    except Exception as e:
+        # LLM failed — return a sensible default
+        defaults = {
+            "focus_start": "Time to focus! Your session starts now.",
+            "focus_end": "Great work! Your focus session is complete.",
+            "focus_break": "Break time! Stretch and recharge.",
+            "habit_reminder": "Don't forget your daily habits!",
+            "hard_cap_warning": "Heads up — you're approaching your screen time limit.",
+            "hard_cap_reached": "You've reached your daily screen time cap.",
+            "accountability_alert": "Stay on track! You've got this.",
+            "daily_motivation": "Today is a new opportunity to focus and grow.",
+            "session_complete": "Session complete! Keep up the great work.",
+            "custom": "Nora has an update for you.",
+        }
+        return {
+            "text": defaults.get(request.event_type, "Nora has an update."),
+            "event_type": request.event_type,
+        }
 
 # ─── AI Task Decomposition ───
 

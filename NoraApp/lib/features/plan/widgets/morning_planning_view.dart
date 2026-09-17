@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
-import '../../../providers/plan_provider.dart';
+import '../../../providers/app_provider.dart';
 import '../../../services/haptic_service.dart';
 import '../../../services/task_decomposer.dart';
 import '../../../widgets/nora_components.dart';

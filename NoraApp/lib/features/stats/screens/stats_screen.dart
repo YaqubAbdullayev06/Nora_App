@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/theme/persona_theme.dart';
+import '../../../providers/app_provider.dart';
 import '../../../providers/persona_provider.dart';
 import '../../../providers/focus_provider.dart';
 import '../../../widgets/nora_components.dart';
@@ -19,8 +20,8 @@ class StatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<PersonaProvider, FocusProvider>(
-      builder: (context, personaProvider, focusProvider, _) {
+    return Consumer3<PersonaProvider, FocusProvider, AppProvider>(
+      builder: (context, personaProvider, focusProvider, appProvider, _) {
         final persona = personaProvider.persona;
 
         return Scaffold(
@@ -33,7 +34,7 @@ class StatsScreen extends StatelessWidget {
                 children: [
                   _buildHeader(persona),
                   const SizedBox(height: DesignTokens.spacing24),
-                  _buildWeeklyChart(focusProvider, persona),
+                  _buildWeeklyChart(appProvider, persona),
                   const SizedBox(height: DesignTokens.spacing24),
                   _buildDetailedStats(context, focusProvider, persona),
                   const SizedBox(height: DesignTokens.spacing24),
@@ -89,7 +90,7 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWeeklyChart(FocusProvider provider, PersonaTheme persona) {
+  Widget _buildWeeklyChart(AppProvider provider, PersonaTheme persona) {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final appUsage = provider.weeklyAppUsage;
     final maxMinutes = appUsage.map((e) => e.minutes).reduce((a, b) => a > b ? a : b).toDouble();
@@ -134,22 +135,25 @@ class StatsScreen extends StatelessWidget {
                             children: [
                               // App icon + name + time
                               if (hasData) ...[
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: SvgPicture.asset(
-                                    usage.iconPath,
-                                    fit: BoxFit.contain,
-                                    placeholderBuilder: (context) => Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: DesignTokens.border,
-                                        borderRadius: BorderRadius.circular(4),
+                                if (usage.iconPath.isNotEmpty)
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: SvgPicture.asset(
+                                      usage.iconPath,
+                                      fit: BoxFit.contain,
+                                      placeholderBuilder: (context) => Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: DesignTokens.border,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
+                                  )
+                                else
+                                  const SizedBox(width: 20, height: 20),
                                 const SizedBox(height: 2),
                                 Text(
                                   usage.appName,

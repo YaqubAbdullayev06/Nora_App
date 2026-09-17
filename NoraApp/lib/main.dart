@@ -43,6 +43,7 @@ import 'features/pomodoro/screens/pomodoro_setup_screen.dart';
 import 'features/habits/screens/habits_screen.dart';
 import 'services/api_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/notification_service.dart';
 import 'widgets/connectivity_banner.dart';
 
 void main() async {
@@ -54,6 +55,10 @@ void main() async {
 
   // Load auth tokens BEFORE runApp so providers can use them immediately
   await ApiService().init();
+
+  // Initialize notification service
+  await NotificationService().init();
+  await NotificationService().requestPermission();
 
   runApp(const NoraApp());
 }

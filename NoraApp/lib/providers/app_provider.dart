@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import '../core/enums/age_group.dart';
 import '../core/constants/design_tokens.dart';
 import '../core/theme/persona_theme.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/focus_protection_service.dart';
-import '../services/usage_tracker_service.dart';
 import '../services/screentime_service.dart';
 
 /// AppProvider - Central state management (DEPRECATED).
@@ -36,6 +34,11 @@ class AppProvider extends ChangeNotifier {
 
   AgeGroup get ageGroup => _ageGroup;
   PersonaTheme get persona => _persona;
+
+  // ─── Weekly App Usage (real data from ScreenTimeService) ───
+  List<WeeklyAppUsage> _weeklyAppUsage = List.generate(7, (i) => WeeklyAppUsage(
+    dayIndex: i, appName: '', minutes: 0, category: '', iconPath: '',
+  ));
 
   // ─── Auth State ───
   User? _currentUser;
@@ -448,43 +451,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Returns the most used app for each day of the current week.
   /// Each entry contains [appName], [minutes], and [category].
-  List<WeeklyAppUsage> get weeklyAppUsage {
-    final now = DateTime.now();
-
-    // Mock data for demo — in production this would come from UsageTrackerService
-    final mockApps = [
-      {'name': 'Instagram', 'category': 'social_media', 'iconPath': 'assets/images/apps/instagram.svg'},
-      {'name': 'YouTube', 'category': 'entertainment', 'iconPath': 'assets/images/apps/youtube.svg'},
-      {'name': 'WhatsApp', 'category': 'messaging', 'iconPath': 'assets/images/apps/whatsapp.svg'},
-      {'name': 'Chrome', 'category': 'productivity', 'iconPath': 'assets/images/apps/chrome.svg'},
-      {'name': 'TikTok', 'category': 'social_media', 'iconPath': 'assets/images/apps/tiktok.svg'},
-      {'name': 'Spotify', 'category': 'entertainment', 'iconPath': 'assets/images/apps/spotify.svg'},
-      {'name': 'Telegram', 'category': 'messaging', 'iconPath': 'assets/images/apps/telegram.svg'},
-    ];
-
-    final nowDay = now.weekday - 1; // 0=Mon, 6=Sun
-    final List<WeeklyAppUsage> result = [];
-
-    for (var i = 0; i < 7; i++) {
-      if (i > nowDay) {
-        // Future days — no data
-        result.add(WeeklyAppUsage(dayIndex: i, appName: '', minutes: 0, category: '', iconPath: ''));
-      } else {
-        // Pseudo-random but deterministic based on day + session count
-        final seed = (i * 7 + _sessions.length) % mockApps.length;
-        final app = mockApps[seed];
-        final baseMinutes = 30 + ((i * 13 + _sessions.length * 3) % 120);
-        result.add(WeeklyAppUsage(
-          dayIndex: i,
-          appName: app['name']!,
-          minutes: i == nowDay ? (baseMinutes * 0.6).toInt() : baseMinutes,
-          category: app['category']!,
-          iconPath: app['iconPath']!,
-        ));
-      }
-    }
-    return result;
-  }
+  /// Data is fetched from UsageTrackerService via ScreenTimeService.
+  List<WeeklyAppUsage> get weeklyAppUsage => _weeklyAppUsage;
 
   int get computedStreakDays {
     if (_sessions.isEmpty) return 0;
@@ -521,9 +489,6 @@ class AppProvider extends ChangeNotifier {
     if (_isInitialized) return;
     _isInitialized = true;
 
-    _totalTimerSeconds = _persona.ageGroup.defaultFocusMinutes * 60;
-    _timerSeconds = _totalTimerSeconds;
-
     await refreshScreenTime();
     _startScreenTimeRefresh();
 
@@ -535,8 +500,12 @@ class AppProvider extends ChangeNotifier {
       final todayUsage = await _screenTimeService.getTodayUsage();
       if (todayUsage != null) {
         _screenTimeTodayMinutes = todayUsage.totalScreenTimeMinutes;
-        notifyListeners();
       }
+
+      // Refresh weekly app usage data
+      _weeklyAppUsage = await _screenTimeService.getWeeklyAppUsage();
+
+      notifyListeners();
     } catch (e) {
       debugPrint('Failed to refresh screen time: $e');
     }
@@ -554,10 +523,6 @@ class AppProvider extends ChangeNotifier {
     _ageGroup = group;
     _persona = PersonaTheme.forAgeGroup(group);
     DesignTokens.init(_persona);
-    if (!_isTimerRunning) {
-      _totalTimerSeconds = group.defaultFocusMinutes * 60;
-      _timerSeconds = _totalTimerSeconds;
-    }
     notifyListeners();
   }
 
@@ -626,7 +591,6 @@ class AppProvider extends ChangeNotifier {
 
   void lockApp() {
     if (_isAppLocked) return;
-    pauseTimer();
     _isAppLocked = true;
     notifyListeners();
   }
@@ -635,125 +599,6 @@ class AppProvider extends ChangeNotifier {
     if (!_isAppLocked) return;
     _isAppLocked = false;
     notifyListeners();
-  }
-
-  // ─── Timer Actions ───
-
-  void setTimerDuration(int minutes) {
-    _totalTimerSeconds = minutes * 60;
-    _timerSeconds = _totalTimerSeconds;
-    if (_isBreakPhase) {
-      _isBreakPhase = false;
-      _completedSessionsInCycle = 0;
-    }
-    notifyListeners();
-  }
-
-  void startTimer() {
-    if (_isTimerRunning) return;
-    unawaited(_focusProtection.enableBlocking());
-    _isTimerRunning = true;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timerSeconds > 0) {
-        _timerSeconds--;
-        notifyListeners();
-      } else {
-        _timerComplete();
-      }
-    });
-    notifyListeners();
-  }
-
-  void pauseTimer() {
-    _isTimerRunning = false;
-    _timer?.cancel();
-    unawaited(_focusProtection.disableBlocking());
-    notifyListeners();
-  }
-
-  void resetTimer() {
-    _isTimerRunning = false;
-    _timer?.cancel();
-    _timerSeconds = _totalTimerSeconds;
-    unawaited(_focusProtection.disableBlocking());
-    notifyListeners();
-  }
-
-  void _timerComplete() {
-    _timer?.cancel();
-    _isTimerRunning = false;
-    unawaited(_focusProtection.disableBlocking());
-    final minutes = _totalTimerSeconds ~/ 60;
-    final points =
-        (minutes * 10 * _persona.ageGroup.pointsMultiplier).toInt();
-    _focusScore += points;
-    _totalFocusMinutes += minutes;
-    _sessionsCompleted++;
-    _completedSessionsInCycle++;
-
-    final now = DateTime.now();
-    _sessions.add(FocusSession(
-      id: 'session_${now.millisecondsSinceEpoch}',
-      startTime: now.subtract(Duration(seconds: _totalTimerSeconds)),
-      endTime: now,
-      durationMinutes: minutes,
-      pointsEarned: points,
-      completed: true,
-    ));
-
-    _streakDays = computedStreakDays;
-    _checkAchievements();
-    _vibrate();
-
-    _isBreakPhase = true;
-    _timerSeconds = breakDurationSeconds;
-    _totalTimerSeconds = breakDurationSeconds;
-
-    notifyListeners();
-  }
-
-  void completeBreak() {
-    _timer?.cancel();
-    _isTimerRunning = false;
-    _isBreakPhase = false;
-
-    if (isLongBreak) {
-      _completedSessionsInCycle = 0;
-    }
-
-    _timerSeconds = _persona.ageGroup.defaultFocusMinutes * 60;
-    _totalTimerSeconds = _timerSeconds;
-
-    _vibrate();
-    notifyListeners();
-  }
-
-  void skipBreak() {
-    completeBreak();
-  }
-
-  void startBreakTimer() {
-    if (_isTimerRunning || !_isBreakPhase) return;
-    _isTimerRunning = true;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timerSeconds > 0) {
-        _timerSeconds--;
-        notifyListeners();
-      } else {
-        completeBreak();
-      }
-    });
-    notifyListeners();
-  }
-
-  void _vibrate() {
-    try {
-      HapticFeedback.mediumImpact();
-    } catch (_) {}
-  }
-
-  void completeTimer() {
-    _timerComplete();
   }
 
   // ─── Focus Actions ───
@@ -975,7 +820,6 @@ class AppProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _screenTimeRefreshTimer?.cancel();
     super.dispose();
   }

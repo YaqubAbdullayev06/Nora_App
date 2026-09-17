@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../core/enums/age_group.dart';
 import '../models/models.dart';
+import '../services/notification_service.dart';
 import 'persona_provider.dart';
 
 /// Manages focus scores, sessions history, streaks, and achievements.
@@ -84,6 +85,16 @@ class FocusProvider extends ChangeNotifier {
 
     _checkAchievements();
     notifyListeners();
+
+    // Send AI notification for session complete
+    NotificationService().showAlert(
+      type: NotificationType.sessionComplete,
+      ageGroup: _personaProvider.ageGroup.name,
+      context: {
+        'duration': session.durationMinutes,
+        'points': session.pointsEarned,
+      },
+    );
   }
 
   void addFocusTime(int minutes) {
@@ -105,6 +116,13 @@ class FocusProvider extends ChangeNotifier {
     _streakDays = computedStreakDays;
     _checkAchievements();
     notifyListeners();
+
+    // Send AI notification for session complete
+    NotificationService().showAlert(
+      type: NotificationType.sessionComplete,
+      ageGroup: _personaProvider.ageGroup.name,
+      context: {'duration': minutes, 'points': points},
+    );
   }
 
   void updateStreak(int days) {
