@@ -41,3 +41,15 @@ flutter:
     - family: PermanentMarker
       fonts:
         - asset: assets/fonts/PermanentMarker-Regular.ttf
+    - family: Comfortaa
+      fonts:
+        - asset: assets/fonts/Comfortaa-Variable.ttf
+    - family: Baloo2
+      fonts:
+        - asset: assets/fonts/Baloo2-Variable.ttf
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Variable.ttf
+    - family: Lora
+      fonts:
+        - asset: assets/fonts/Lora-Variable.ttf

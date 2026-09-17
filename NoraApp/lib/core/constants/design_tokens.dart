@@ -85,17 +85,22 @@ class DesignTokens {
   static double get radius12 => 12;
   static double get radius14 => 14;
   static double get radius16 => 16;
-  static double get radius20 => _current.borderRadius;
+  static double get radius20 => _current.radiusCard;
   static double get radius24 => 24;
   static double get radius40 => 40;
   static double get radiusRound => 999;
+
+  /// The persona's most rounded, most "friendly" radius — for mascot
+  /// cards, hero CTAs, and celebratory moments. Deliberately not used
+  /// for everyday content surfaces; see [radius20] / [cardRadius] for that.
+  static double get radiusExpressive => _current.radiusExpressive;
 
   // ─────────────────────────────────────────────
   // TYPOGRAPHY
   // ─────────────────────────────────────────────
 
   static String get fontFamilyPrimary => _current.fontFamily;
-  static String get fontFamilyDisplay => _current.fontFamily;
+  static String get fontFamilyDisplay => _current.displayFontFamily;
 
   static const double fontSizeH1 = 28;
   static const double fontSizeH2 = 24;
@@ -225,18 +230,21 @@ class DesignTokens {
   // ─────────────────────────────────────────────
 
   static double get cardPadding => 16;
-  static double get cardRadius => _current.borderRadius;
+  static double get cardRadius => _current.radiusCard;
   static double get cardBorderWidth => 1;
 
   static double get buttonPaddingH => 16;
   static double get buttonPaddingV => 8;
-  static double get buttonRadius => _current.borderRadius;
+  // Buttons sit in the "dense control" tier, not the card tier — this is
+  // what makes a button read as a different kind of surface than the
+  // card it sits inside, instead of the same rounding stamped on both.
+  static double get buttonRadius => _current.radiusChip;
   static double get buttonHeight => _current.ageGroup == AgeGroup.baby ? 56 : 40;
   static double get buttonHeightLarge => _current.ageGroup == AgeGroup.baby ? 64 : 48;
 
   static double get inputPaddingH => 12;
   static double get inputPaddingV => 8;
-  static double get inputRadius => _current.borderRadius;
+  static double get inputRadius => _current.radiusInput;
   static double get inputBorderWidth => 1;
   static double get inputHeight => _current.ageGroup == AgeGroup.baby ? 48 : 40;
 

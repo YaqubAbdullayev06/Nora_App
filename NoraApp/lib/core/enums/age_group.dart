@@ -345,7 +345,7 @@ extension AgeGroupExtension on AgeGroup {
       case AgeGroup.baby:
         return 'assets/images/mascots/baby_star.svg';
       case AgeGroup.child:
-        return 'assets/images/mascots/baby_star.svg';
+        return 'assets/images/mascots/nora_cat.svg';
       case AgeGroup.kid:
         return 'assets/images/mascots/kid_fox.svg';
       case AgeGroup.teen:
