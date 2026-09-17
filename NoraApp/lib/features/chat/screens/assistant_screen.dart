@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/timer_provider.dart';
 import '../../../services/llm_service.dart';
 import '../../../services/app_scanner_service.dart';
 import '../../../services/screentime_service.dart';
@@ -87,7 +88,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   void _addWelcomeMessage() {
-    final provider = context.read<AppProvider>();
+    final provider = context.read<PersonaProvider>();
     final persona = provider.persona;
     setState(() {
       _messages.add(ChatMessage(
@@ -123,7 +124,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty || _isLoading) return;
 
-    final provider = context.read<AppProvider>();
+    final provider = context.read<PersonaProvider>();
     final ageGroup = provider.ageGroup.name;
 
     setState(() {
@@ -290,10 +291,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
     required String description,
     required List<String> packages,
   }) async {
-    final provider = context.read<AppProvider>();
-    final persona = provider.persona;
+      final provider = context.read<PersonaProvider>();
+      final persona = provider.persona;
 
-    final result = await showDialog<bool>(
+      final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
@@ -313,7 +314,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
               ),
               child: Text(
                 packages.take(5).join('\n') + (packages.length > 5 ? '\n...and ${packages.length - 5} more' : ''),
-                style: TextStyle(color: DesignTokens.textSecondary, fontSize: 12),
+                style: TextStyle(color: DesignTokens.textSecondary, fontSize: DesignTokens.fontSizeCaption),
               ),
             ),
           ],
@@ -368,7 +369,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
           .map((a) => a.toMap())
           .toList();
 
-      final provider = context.read<AppProvider>();
+      final provider = context.read<PersonaProvider>();
       final classification = await _apiService.classifyApps(
         apps: appMaps,
         ageGroup: provider.ageGroup.name,
@@ -542,7 +543,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   void _startFocusSession(int minutes) {
-    final provider = context.read<AppProvider>();
+    final provider = context.read<TimerProvider>();
     provider.setTimerDuration(minutes);
     provider.startTimer();
     setState(() {
@@ -570,7 +571,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
+    return Consumer<PersonaProvider>(
       builder: (context, provider, _) {
         final persona = provider.persona;
 
@@ -620,15 +621,15 @@ class _AssistantScreenState extends State<AssistantScreen> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          _isAvailable ? 'AI Online' : 'Offline Mode',
-                          style: TextStyle(
-                            color: _isAvailable
-                                ? DesignTokens.success
-                                : DesignTokens.warning,
-                            fontSize: 10,
+                          Text(
+                            _isAvailable ? 'AI Online' : 'Offline Mode',
+                            style: TextStyle(
+                              color: _isAvailable
+                                  ? DesignTokens.success
+                                  : DesignTokens.warning,
+                              fontSize: DesignTokens.fontSizeTiny,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -811,7 +812,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
               label,
               style: TextStyle(
                 color: persona.primary,
-                fontSize: 12,
+                fontSize: DesignTokens.fontSizeCaption,
                 fontWeight: DesignTokens.fontWeightMedium,
               ),
             ),

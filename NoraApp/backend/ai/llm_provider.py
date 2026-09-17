@@ -9,7 +9,7 @@ Providers (all free, no credit card):
   5. Ollama Colab GPU — heavy models via ngrok (backup only)
 
 Cost-saving features:
-  - Semantic response caching (diskcache, ~40% fewer API hits)
+  - Semantic response caching (diskcache — request dedup within same process lifetime; ephemeral on Render free tier)
   - Pydantic v2 schema enforcement on all LLM outputs
   - Automatic fallback across all 5 providers
 """
@@ -22,6 +22,15 @@ import httpx
 from typing import AsyncGenerator, Optional
 from enum import Enum
 from functools import lru_cache
+
+_shared_client: httpx.AsyncClient | None = None
+
+
+def get_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None or _shared_client.is_closed:
+        _shared_client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0))
+    return _shared_client
 
 try:
     from diskcache import Cache
@@ -129,7 +138,6 @@ class UnifiedLLMProvider:
         self.ollama_colab_url = (ollama_colab_url or os.getenv("OLLAMA_COLAB_URL", "")).rstrip("/")
 
         self.preferred_provider = preferred_provider or os.getenv("LLM_PROVIDER", "auto")
-        self.timeout = httpx.Timeout(60.0, connect=10.0)
 
     def _get_provider_priority(self) -> list[Provider]:
         """Return providers in priority order."""
@@ -217,52 +225,52 @@ class UnifiedLLMProvider:
         if cached:
             return cached
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.groq_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": self.groq_model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": 1024,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            result = data["choices"][0]["message"]["content"]
-            self._set_cache(messages, "groq", result)
-            return result
+        client = get_client()
+        response = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.groq_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.groq_model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": 1024,
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        result = data["choices"][0]["message"]["content"]
+        self._set_cache(messages, "groq", result)
+        return result
 
     async def _groq_chat_stream(self, messages: list[dict], temperature: float = 0.7) -> AsyncGenerator[str, None]:
         if not self.groq_api_key:
             raise ValueError("GROQ_API_KEY not set")
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            async with client.stream(
-                "POST",
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.groq_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": self.groq_model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": 1024,
-                    "stream": True,
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.strip():
-                        data = json.loads(line)
-                        if data["choices"][0]["delta"].get("content"):
-                            yield data["choices"][0]["delta"]["content"]
+        client = get_client()
+        async with client.stream(
+            "POST",
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.groq_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.groq_model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": 1024,
+                "stream": True,
+            },
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if line.strip():
+                    data = json.loads(line)
+                    if data["choices"][0]["delta"].get("content"):
+                        yield data["choices"][0]["delta"]["content"]
 
     # ─── Gemini API (Google AI Studio — 15 RPM free) ───
 
@@ -282,23 +290,23 @@ class UnifiedLLMProvider:
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent?key={self.gemini_api_key}"
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": contents,
-                    "generationConfig": {
-                        "temperature": temperature,
-                        "maxOutputTokens": 1024,
-                    },
+        client = get_client()
+        response = await client.post(
+            url,
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": contents,
+                "generationConfig": {
+                    "temperature": temperature,
+                    "maxOutputTokens": 1024,
                 },
-            )
-            response.raise_for_status()
-            data = response.json()
-            result = data["candidates"][0]["content"]["parts"][0]["text"]
-            self._set_cache(messages, "gemini", result)
-            return result
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        result = data["candidates"][0]["content"]["parts"][0]["text"]
+        self._set_cache(messages, "gemini", result)
+        return result
 
     async def _gemini_chat_stream(self, messages: list[dict], temperature: float = 0.7) -> AsyncGenerator[str, None]:
         # Gemini streaming — yield full response (no SSE in free tier)
@@ -328,25 +336,25 @@ class UnifiedLLMProvider:
 
         url = f"https://api.cloudflare.com/client/v4/accounts/{self.cloudflare_account_id}/ai/run/{self.cloudflare_model}"
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {self.cloudflare_api_token}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "messages": messages,
-                    "stream": False,
-                    "max_tokens": 1024,
-                    "temperature": temperature,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            result = data["result"]["response"]
-            self._set_cache(messages, "cloudflare", result)
-            return result
+        client = get_client()
+        response = await client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {self.cloudflare_api_token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "messages": messages,
+                "stream": False,
+                "max_tokens": 1024,
+                "temperature": temperature,
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        result = data["result"]["response"]
+        self._set_cache(messages, "cloudflare", result)
+        return result
 
     async def _cloudflare_chat_stream(self, messages: list[dict], temperature: float = 0.7) -> AsyncGenerator[str, None]:
         result = await self._cloudflare_chat(messages, temperature)
@@ -361,52 +369,48 @@ class UnifiedLLMProvider:
         if cached:
             return cached
 
-        # Longer timeout for Ollama - model cold start through ngrok can be slow
-        ollama_timeout = httpx.Timeout(120.0, connect=15.0)
-        async with httpx.AsyncClient(timeout=ollama_timeout) as client:
-            response = await client.post(
-                f"{url}/api/chat",
-                json={
-                    "model": self.get_model_for_age_group(age_group),
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": temperature,
-                        "num_predict": 1024,
-                    },
+        client = get_client()
+        response = await client.post(
+            f"{url}/api/chat",
+            json={
+                "model": self.get_model_for_age_group(age_group),
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": 1024,
                 },
-            )
-            response.raise_for_status()
-            data = response.json()
-            result = data["message"]["content"]
-            self._set_cache(messages, f"ollama_{url}", result)
-            return result
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        result = data["message"]["content"]
+        self._set_cache(messages, f"ollama_{url}", result)
+        return result
 
     async def _ollama_chat_stream(self, messages: list[dict], temperature: float = 0.7, base_url: str = None, age_group: str = "adult") -> AsyncGenerator[str, None]:
         url = (base_url or self.ollama_base_url).rstrip("/")
 
-        # Longer timeout for Ollama - model cold start through ngrok can be slow
-        ollama_timeout = httpx.Timeout(120.0, connect=15.0)
-        async with httpx.AsyncClient(timeout=ollama_timeout) as client:
-            async with client.stream(
-                "POST",
-                f"{url}/api/chat",
-                json={
-                    "model": self.get_model_for_age_group(age_group),
-                    "messages": messages,
-                    "stream": True,
-                    "options": {
-                        "temperature": temperature,
-                        "num_predict": 1024,
-                    },
+        client = get_client()
+        async with client.stream(
+            "POST",
+            f"{url}/api/chat",
+            json={
+                "model": self.get_model_for_age_group(age_group),
+                "messages": messages,
+                "stream": True,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": 1024,
                 },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.strip():
-                        data = json.loads(line)
-                        if "message" in data:
-                            yield data["message"].get("content", "")
+            },
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if line.strip():
+                    data = json.loads(line)
+                    if "message" in data:
+                        yield data["message"].get("content", "")
 
     # ─── Unified API ───
 
@@ -486,12 +490,13 @@ class UnifiedLLMProvider:
         # Groq
         try:
             if self.groq_api_key:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    resp = await client.get(
-                        "https://api.groq.com/openai/v1/models",
-                        headers={"Authorization": f"Bearer {self.groq_api_key}"},
-                    )
-                    status["groq"] = resp.status_code == 200
+                client = get_client()
+                resp = await client.get(
+                    "https://api.groq.com/openai/v1/models",
+                    headers={"Authorization": f"Bearer {self.groq_api_key}"},
+                    timeout=5.0,
+                )
+                status["groq"] = resp.status_code == 200
             else:
                 status["groq"] = False
         except Exception:
@@ -500,11 +505,12 @@ class UnifiedLLMProvider:
         # Gemini
         try:
             if self.gemini_api_key:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    resp = await client.get(
-                        f"https://generativelanguage.googleapis.com/v1beta/models?key={self.gemini_api_key}",
-                    )
-                    status["gemini"] = resp.status_code == 200
+                client = get_client()
+                resp = await client.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={self.gemini_api_key}",
+                    timeout=5.0,
+                )
+                status["gemini"] = resp.status_code == 200
             else:
                 status["gemini"] = False
         except Exception:
@@ -513,12 +519,13 @@ class UnifiedLLMProvider:
         # Cloudflare
         try:
             if self.cloudflare_account_id and self.cloudflare_api_token:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    resp = await client.get(
-                        f"https://api.cloudflare.com/client/v4/accounts/{self.cloudflare_account_id}/ai/models/search",
-                        headers={"Authorization": f"Bearer {self.cloudflare_api_token}"},
-                    )
-                    status["cloudflare"] = resp.status_code == 200
+                client = get_client()
+                resp = await client.get(
+                    f"https://api.cloudflare.com/client/v4/accounts/{self.cloudflare_account_id}/ai/models/search",
+                    headers={"Authorization": f"Bearer {self.cloudflare_api_token}"},
+                    timeout=5.0,
+                )
+                status["cloudflare"] = resp.status_code == 200
             else:
                 status["cloudflare"] = False
         except Exception:
@@ -526,21 +533,22 @@ class UnifiedLLMProvider:
 
         # Ollama local
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(f"{self.ollama_base_url}/api/tags")
-                status["ollama_local"] = resp.status_code == 200
+            client = get_client()
+            resp = await client.get(f"{self.ollama_base_url}/api/tags", timeout=5.0)
+            status["ollama_local"] = resp.status_code == 200
         except Exception:
             status["ollama_local"] = False
 
         # Ollama Colab
         if self.ollama_colab_url:
             try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    resp = await client.get(
-                        f"{self.ollama_colab_url}/api/tags",
-                        headers={"ngrok-skip-browser-warning": "true"},
-                    )
-                    status["ollama_colab"] = resp.status_code == 200
+                client = get_client()
+                resp = await client.get(
+                    f"{self.ollama_colab_url}/api/tags",
+                    headers={"ngrok-skip-browser-warning": "true"},
+                    timeout=5.0,
+                )
+                status["ollama_colab"] = resp.status_code == 200
             except Exception:
                 status["ollama_colab"] = False
         else:

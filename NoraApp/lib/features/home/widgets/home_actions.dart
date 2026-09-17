@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
 import '../../../widgets/nora_components.dart';
 
 /// Hero actions — prominent scanner card + one-tap focus button + secondary actions.
 class HomeActions extends StatelessWidget {
-  final AppProvider provider;
+  final PersonaProvider personaProvider;
   final VoidCallback? onPlanTap;
 
   const HomeActions({
     super.key,
-    required this.provider,
+    required this.personaProvider,
     this.onPlanTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final persona = provider.persona;
+    final persona = personaProvider.persona;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

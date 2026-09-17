@@ -204,7 +204,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
           label,
           style: TextStyle(
             color: DesignTokens.textMuted,
-            fontSize: 10,
+            fontSize: DesignTokens.fontSizeTiny,
             fontFamily: DesignTokens.fontFamilyPrimary,
           ),
         ),
@@ -351,7 +351,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
               '${provider.phaseCountdown}',
               style: TextStyle(
                 color: DesignTokens.textPrimary,
-                fontSize: 48,
+                fontSize: DesignTokens.fontSizeDisplaySmall,
                 fontWeight: DesignTokens.fontWeightBold,
                 fontFamily: DesignTokens.fontFamilyDisplay,
               ),
@@ -376,7 +376,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
                     '+${provider.sessionPointsEarned} pts',
                     style: TextStyle(
                       color: DesignTokens.success,
-                      fontSize: 14,
+                      fontSize: DesignTokens.fontSizeBodySmall,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

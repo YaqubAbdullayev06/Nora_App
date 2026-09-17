@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
 import '../../../services/llm_service.dart';
 
 /// Chat Screen — talk to Nora AI via cloud LLM (Groq/Gemini).
@@ -36,7 +36,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _addWelcomeMessage() {
-    final provider = context.read<AppProvider>();
+    final provider = context.read<PersonaProvider>();
     final persona = provider.persona;
     setState(() {
       _messages.add(ChatMessage(
@@ -67,7 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty || _isLoading) return;
 
-    final provider = context.read<AppProvider>();
+    final provider = context.read<PersonaProvider>();
     final ageGroup = provider.ageGroup.name;
 
     setState(() {
@@ -116,7 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
+    return Consumer<PersonaProvider>(
       builder: (context, provider, _) {
         final persona = provider.persona;
 
@@ -156,7 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       _isAvailable ? 'Powered by cloud AI' : 'Connecting...',
                       style: TextStyle(
                         color: _isAvailable ? DesignTokens.success : DesignTokens.warning,
-                        fontSize: 10,
+                        fontSize: DesignTokens.fontSizeTiny,
                       ),
                     ),
                   ],

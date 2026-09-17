@@ -260,7 +260,7 @@ class FocusHistoryScreen extends StatelessWidget {
             value,
             style: TextStyle(
               color: color,
-              fontSize: 22,
+              fontSize: DesignTokens.fontSizeTitleMedium,
               fontWeight: DesignTokens.fontWeightBold,
               fontFamily: DesignTokens.fontFamilyDisplay,
             ),
@@ -270,7 +270,7 @@ class FocusHistoryScreen extends StatelessWidget {
             label,
             style: TextStyle(
               color: DesignTokens.textMuted,
-              fontSize: 10,
+              fontSize: DesignTokens.fontSizeTiny,
               fontFamily: DesignTokens.fontFamilyPrimary,
             ),
             textAlign: TextAlign.center,
@@ -379,7 +379,7 @@ class FocusHistoryScreen extends StatelessWidget {
                 timeRange,
                 style: TextStyle(
                   color: DesignTokens.textMuted,
-                  fontSize: 10,
+                  fontSize: DesignTokens.fontSizeTiny,
                   fontFamily: DesignTokens.fontFamilyPrimary,
                 ),
               ),
@@ -464,7 +464,7 @@ class FocusHistoryScreen extends StatelessWidget {
                                   '${minutes}m',
                                   style: TextStyle(
                                     color: isToday ? DesignTokens.accent : DesignTokens.textMuted,
-                                    fontSize: 9,
+                                    fontSize: DesignTokens.fontSizeMicro,
                                     fontWeight: DesignTokens.fontWeightBold,
                                     fontFamily: DesignTokens.fontFamilyPrimary,
                                   ),
@@ -495,7 +495,7 @@ class FocusHistoryScreen extends StatelessWidget {
                                 days[index],
                                 style: TextStyle(
                                   color: isToday ? DesignTokens.accent : DesignTokens.textMuted,
-                                  fontSize: 10,
+                                  fontSize: DesignTokens.fontSizeTiny,
                                   fontWeight: isToday ? DesignTokens.fontWeightSemiBold : DesignTokens.fontWeightRegular,
                                   fontFamily: DesignTokens.fontFamilyPrimary,
                                 ),
@@ -537,9 +537,9 @@ class FocusHistoryScreen extends StatelessWidget {
     final colors = [
       DesignTokens.accent,
       DesignTokens.success,
-      DesignTokens.warning,
       DesignTokens.accentSecondary,
-      DesignTokens.danger,
+      DesignTokens.warning,
+      DesignTokens.accent,
     ];
 
     return NoraCard(
@@ -666,7 +666,7 @@ class FocusHistoryScreen extends StatelessWidget {
                         isCompleted ? 'Completed' : 'Partial',
                         style: TextStyle(
                           color: isCompleted ? DesignTokens.success : DesignTokens.warning,
-                          fontSize: 10,
+                          fontSize: DesignTokens.fontSizeTiny,
                           fontWeight: DesignTokens.fontWeightMedium,
                           fontFamily: DesignTokens.fontFamilyPrimary,
                         ),
@@ -703,7 +703,7 @@ class FocusHistoryScreen extends StatelessWidget {
                     '+${session.pointsEarned}',
                     style: TextStyle(
                       color: DesignTokens.warning,
-                      fontSize: 12,
+                      fontSize: DesignTokens.fontSizeCaption,
                       fontWeight: DesignTokens.fontWeightBold,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),

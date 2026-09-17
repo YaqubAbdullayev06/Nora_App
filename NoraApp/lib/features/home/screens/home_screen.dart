@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/focus_provider.dart';
 import '../../../services/proactive_assist_service.dart';
 import '../../../models/app_info.dart';
 import '../widgets/home_header.dart';
@@ -40,8 +42,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, provider, _) {
+    return Consumer2<PersonaProvider, AuthProvider>(
+      builder: (context, personaProvider, authProvider, _) {
+        final focusProvider = context.watch<FocusProvider>();
         return Scaffold(
           backgroundColor: DesignTokens.background,
           body: SafeArea(
@@ -51,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Header
-                  HomeHeader(provider: provider),
+                  HomeHeader(personaProvider: personaProvider, authProvider: authProvider),
                   const SizedBox(height: DesignTokens.spacing24),
 
                   // Smart Insight (if available)
@@ -61,15 +64,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
 
                   // Stats
-                  HomeStats(provider: provider),
+                  HomeStats(personaProvider: personaProvider, focusProvider: focusProvider),
                   const SizedBox(height: DesignTokens.spacing24),
 
                   // Quick Actions
-                  HomeActions(provider: provider, onPlanTap: widget.onPlanTap),
+                  HomeActions(personaProvider: personaProvider, onPlanTap: widget.onPlanTap),
                   const SizedBox(height: DesignTokens.spacing24),
 
                   // Motivation
-                  HomeMotivation(provider: provider),
+                  HomeMotivation(personaProvider: personaProvider),
                 ],
               ),
             ),

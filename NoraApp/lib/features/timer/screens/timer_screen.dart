@@ -1,22 +1,19 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/router/slide_route.dart';
 import '../../../core/theme/persona_theme.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/timer_provider.dart';
+import '../../../providers/pomodoro_provider.dart';
 import '../../../services/flow_state_sounds.dart';
 import '../../../services/haptic_service.dart';
 import '../../../widgets/flow_state_sound_player.dart';
 import '../../../widgets/nora_components.dart';
-import '../../breathing/models/breathing_pattern.dart';
-import '../../breathing/providers/breathing_provider.dart';
-import '../../breathing/widgets/animated_breathing_guide.dart'
-    hide AnimatedBuilder;
-import '../../breathing/widgets/breathing_pattern_card.dart';
+import '../widgets/breathe_tab.dart';
 import 'break_screen.dart';
 
 /// Timer Screen — Pomodoro with AI "interrupter" feature.
@@ -45,10 +42,6 @@ class _TimerScreenState extends State<TimerScreen>
 
   // Tab selector: 0 = Focus, 1 = Breathe
   int _selectedTab = 0;
-
-  // Breathing state
-  BreathingPattern? _selectedBreathPattern;
-  int _selectedBreathDuration = 3;
 
   @override
   void initState() {
@@ -83,7 +76,7 @@ class _TimerScreenState extends State<TimerScreen>
 
   void _triggerInterrupter() {
     final messages = _getInterrupterMessages(
-      context.read<AppProvider>().persona.ageGroup,
+      context.read<PersonaProvider>().persona.ageGroup,
     );
     final random = Random();
     setState(() {
@@ -98,19 +91,23 @@ class _TimerScreenState extends State<TimerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, provider, _) {
-        final persona = provider.persona;
-        final progress = provider.timerProgress;
+    return Consumer2<PersonaProvider, TimerProvider>(
+      builder: (context, personaProvider, timerProvider, _) {
+        final persona = personaProvider.persona;
+        final progress = timerProvider.timerProgress;
 
         // Auto-navigate to break screen when break phase starts
-        if (provider.isBreakPhase) {
+        if (timerProvider.isBreakPhase) {
+          // Record session in PomodoroProvider
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
+              final pomodoro = context.read<PomodoroProvider>();
+              pomodoro.recordSession(timerProvider.totalTimerSeconds ~/ 60);
+
               Navigator.of(context).push(
                 FadePageRoute(
                   pageBuilder: (_, __, ___) => ChangeNotifierProvider.value(
-                    value: provider,
+                    value: timerProvider,
                     child: const BreakScreen(),
                   ),
                 ),
@@ -124,11 +121,11 @@ class _TimerScreenState extends State<TimerScreen>
           body: SafeArea(
             child: Column(
               children: [
-                _buildHeader(persona, provider),
+                _buildHeader(persona, timerProvider),
                 _buildTabSelector(persona),
                 Expanded(
                   child: _selectedTab == 0
-                      ? _buildFocusTab(provider, persona, progress)
+                      ? _buildFocusTab(timerProvider, persona, progress)
                       : _buildBreatheTab(persona),
                 ),
                 // AI Interrupter overlay
@@ -141,67 +138,117 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
-  Widget _buildHeader(PersonaTheme persona, AppProvider provider) {
-    return Container(
-      padding: const EdgeInsets.all(DesignTokens.spacing20),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getTitle(persona.ageGroup),
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontSize: DesignTokens.fontSizeH2,
-                    fontWeight: DesignTokens.fontWeightBold,
-                    fontFamily: DesignTokens.fontFamilyDisplay,
-                  ),
+  Widget _buildHeader(PersonaTheme persona, TimerProvider provider) {
+    return Consumer<PomodoroProvider>(
+      builder: (context, pomodoro, _) {
+        return Container(
+          padding: const EdgeInsets.all(DesignTokens.spacing20),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getTitle(persona.ageGroup),
+                      style: TextStyle(
+                        color: DesignTokens.textPrimary,
+                        fontSize: DesignTokens.fontSizeH2,
+                        fontWeight: DesignTokens.fontWeightBold,
+                        fontFamily: DesignTokens.fontFamilyDisplay,
+                      ),
+                    ),
+                    Text(
+                      _getSubtitle(persona.ageGroup),
+                      style: TextStyle(
+                        color: DesignTokens.textMuted,
+                        fontSize: DesignTokens.fontSizeBodySmall,
+                        fontFamily: DesignTokens.fontFamilyPrimary,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  _getSubtitle(persona.ageGroup),
-                  style: TextStyle(
-                    color: DesignTokens.textMuted,
-                    fontSize: DesignTokens.fontSizeBodySmall,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
+              ),
+              // Cycle progress badge (when auto-cycle is enabled)
+              if (pomodoro.autoCycleEnabled) ...[
+                GestureDetector(
+                  onTap: () =>
+                      Navigator.pushNamed(context, '/pomodoro-setup'),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: pomodoro.allCyclesCompleted
+                          ? DesignTokens.success.withValues(alpha: 0.15)
+                          : DesignTokens.accent.withValues(alpha: 0.15),
+                      borderRadius:
+                          BorderRadius.circular(DesignTokens.radius20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          pomodoro.allCyclesCompleted
+                              ? Icons.check_circle_rounded
+                              : Icons.repeat_rounded,
+                          color: pomodoro.allCyclesCompleted
+                              ? DesignTokens.success
+                              : DesignTokens.accent,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${pomodoro.completedCycles}/${pomodoro.targetCycles}',
+                          style: TextStyle(
+                            color: pomodoro.allCyclesCompleted
+                                ? DesignTokens.success
+                                : DesignTokens.accent,
+                            fontSize: DesignTokens.fontSizeCaption,
+                            fontWeight: DesignTokens.fontWeightBold,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-          // Session counter badge
-          if (provider.completedSessionsInCycle > 0)
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: persona.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(DesignTokens.radius20),
-              ),
-              child: Text(
-                '${provider.completedSessionsInCycle}/${persona.ageGroup.pomodoroSessionsPerCycle}',
-                style: TextStyle(
-                  color: persona.primary,
-                  fontSize: DesignTokens.fontSizeCaption,
-                  fontWeight: DesignTokens.fontWeightBold,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
+              // Session counter badge
+              if (provider.completedSessionsInCycle > 0) ...[
+                const SizedBox(width: DesignTokens.spacing8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: persona.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(DesignTokens.radius20),
+                  ),
+                  child: Text(
+                    '${provider.completedSessionsInCycle}/${persona.ageGroup.pomodoroSessionsPerCycle}',
+                    style: TextStyle(
+                      color: persona.primary,
+                      fontSize: DesignTokens.fontSizeCaption,
+                      fontWeight: DesignTokens.fontWeightBold,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          // Screen time indicator (for kids/teens)
-          if (persona.ageGroup.screenTimeLimitMinutes > 0) ...[
-            if (provider.completedSessionsInCycle > 0)
-              const SizedBox(width: DesignTokens.spacing8),
-            _buildScreenTimeBadge(persona),
-          ],
-        ],
-      ),
+              ],
+              // Screen time indicator (for kids/teens)
+              if (persona.ageGroup.screenTimeLimitMinutes > 0) ...[
+                if (provider.completedSessionsInCycle > 0)
+                  const SizedBox(width: DesignTokens.spacing8),
+                _buildScreenTimeBadge(persona),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildScreenTimeBadge(PersonaTheme persona) {
-    final provider = context.read<AppProvider>();
+    final provider = context.read<TimerProvider>();
     final exceeded = provider.isScreenTimeExceeded;
     final limit = persona.ageGroup.screenTimeLimitMinutes;
     final current = provider.screenTimeTodayMinutes;
@@ -209,24 +256,24 @@ class _TimerScreenState extends State<TimerScreen>
     return NoraCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       backgroundColor:
-          exceeded ? DesignTokens.danger.withValues(alpha: 0.15) : null,
+          exceeded ? DesignTokens.accent.withValues(alpha: 0.1) : null,
       border:
-          exceeded ? Border.all(color: DesignTokens.danger, width: 1) : null,
+          exceeded ? Border.all(color: DesignTokens.accent.withValues(alpha: 0.3), width: 1) : null,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             exceeded
-                ? Icons.warning_rounded
+                ? Icons.hourglass_bottom_rounded
                 : Icons.screen_lock_portrait_rounded,
-            color: exceeded ? DesignTokens.danger : DesignTokens.textMuted,
+            color: exceeded ? DesignTokens.accent : DesignTokens.textMuted,
             size: 16,
           ),
           const SizedBox(width: DesignTokens.spacing4),
           Text(
             '$current / $limit min',
             style: TextStyle(
-              color: exceeded ? DesignTokens.danger : DesignTokens.textMuted,
+              color: exceeded ? DesignTokens.accent : DesignTokens.textMuted,
               fontSize: DesignTokens.fontSizeCaption,
               fontWeight: DesignTokens.fontWeightMedium,
               fontFamily: DesignTokens.fontFamilyPrimary,
@@ -305,7 +352,7 @@ class _TimerScreenState extends State<TimerScreen>
   // ═══════════════════════════════════════════════
 
   Widget _buildFocusTab(
-      AppProvider provider, PersonaTheme persona, double progress) {
+      TimerProvider provider, PersonaTheme persona, double progress) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(DesignTokens.spacing24),
@@ -349,357 +396,11 @@ class _TimerScreenState extends State<TimerScreen>
   // ═══════════════════════════════════════════════
 
   Widget _buildBreatheTab(PersonaTheme persona) {
-    return Consumer<BreathingProvider>(
-      builder: (context, breathingProvider, _) {
-        return breathingProvider.isSessionActive
-            ? _buildBreatheSessionView(breathingProvider, persona)
-            : _buildBreatheSelectionView(breathingProvider, persona);
-      },
-    );
-  }
-
-  Widget _buildBreatheSelectionView(
-      BreathingProvider breathingProvider, PersonaTheme persona) {
-    final patterns = BreathingPattern.forAgeGroup(persona.ageGroup);
-    final maxDuration =
-        BreathingPattern.maxDurationMinutes(persona.ageGroup);
-    final stats = breathingProvider.stats;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(DesignTokens.spacing24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Stats summary
-          NoraCard(
-            backgroundColor: persona.primary.withValues(alpha: 0.08),
-            border: Border.all(
-              color: persona.primary.withValues(alpha: 0.2),
-              width: 1,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildBreatheStatItem(
-                    '${stats.totalSessions}', 'Sessions', Icons.repeat_rounded, persona.primary),
-                _buildBreatheStatItem(
-                    '${stats.totalMinutes}', 'Minutes', Icons.schedule_rounded, persona.secondary),
-                _buildBreatheStatItem(
-                    '${stats.currentStreak}', 'Streak', Icons.local_fire_department_rounded, DesignTokens.warning),
-                _buildBreatheStatItem(
-                    '${stats.pointsEarned}', 'Points', Icons.star_rounded, DesignTokens.accent),
-              ],
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spacing24),
-          // Pattern list
-          Text(
-            'Choose a Pattern',
-            style: TextStyle(
-              color: DesignTokens.textPrimary,
-              fontSize: DesignTokens.fontSizeH3,
-              fontWeight: DesignTokens.fontWeightSemiBold,
-              fontFamily: DesignTokens.fontFamilyDisplay,
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spacing12),
-          ...patterns.map((pattern) => Padding(
-                padding: const EdgeInsets.only(bottom: DesignTokens.spacing12),
-                child: BreathingPatternCard(
-                  pattern: pattern,
-                  isSelected: _selectedBreathPattern?.id == pattern.id,
-                  onTap: () => setState(() {
-                    _selectedBreathPattern = pattern;
-                    _selectedBreathDuration = pattern.defaultDurationMinutes
-                        .clamp(1, maxDuration);
-                  }),
-                ),
-              )),
-          if (_selectedBreathPattern != null) ...[
-            const SizedBox(height: DesignTokens.spacing16),
-            _buildBreatheDurationSelector(maxDuration, persona),
-            const SizedBox(height: DesignTokens.spacing20),
-            NoraButton(
-              label: 'Start Breathing',
-              icon: Icons.play_arrow_rounded,
-              expanded: true,
-              onPressed: () {
-                breathingProvider.startSession(
-                  _selectedBreathPattern!,
-                  _selectedBreathDuration,
-                );
-              },
-              height: 48,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBreatheSessionView(
-      BreathingProvider provider, PersonaTheme persona) {
-    return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: DesignTokens.spacing24),
-      child: Column(
-        children: [
-          const SizedBox(height: DesignTokens.spacing20),
-          // Top bar: pattern name + close
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  provider.selectedPattern?.name ?? '',
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontSize: DesignTokens.fontSizeH3,
-                    fontWeight: DesignTokens.fontWeightSemiBold,
-                    fontFamily: DesignTokens.fontFamilyDisplay,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () => _showBreatheStopDialog(provider),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: DesignTokens.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: DesignTokens.border),
-                  ),
-                  child: Icon(Icons.close_rounded,
-                      color: DesignTokens.textMuted, size: 20),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: DesignTokens.spacing16),
-          // Progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: provider.sessionProgress,
-              backgroundColor: DesignTokens.border,
-              valueColor: AlwaysStoppedAnimation<Color>(persona.primary),
-              minHeight: 4,
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spacing12),
-          // Elapsed time
-          Text(
-            provider.elapsedDisplay,
-            style: TextStyle(
-              color: DesignTokens.textMuted,
-              fontSize: DesignTokens.fontSizeCaption,
-              fontFamily: DesignTokens.fontFamilyPrimary,
-            ),
-          ),
-          const Spacer(),
-          // Animated breathing guide
-          AnimatedBreathingGuide(
-            mascotAssetPath: persona.mascotAssetPath ??
-                'assets/images/mascots/adult_brain.svg',
-            color: provider.selectedPattern?.color ?? persona.primary,
-            phase: provider.currentPhase,
-            phaseProgress: provider.phaseProgress,
-            isActive: provider.isSessionActive && !provider.isPaused,
-          ),
-          const Spacer(),
-          // Phase countdown
-          if (provider.currentPhase != null) ...[
-            Text(
-              '${provider.phaseCountdown}',
-              style: TextStyle(
-                color: DesignTokens.textPrimary,
-                fontSize: 48,
-                fontWeight: DesignTokens.fontWeightBold,
-                fontFamily: DesignTokens.fontFamilyDisplay,
-              ),
-            ),
-            const SizedBox(height: DesignTokens.spacing8),
-          ],
-          // Points earned
-          if (provider.sessionPointsEarned > 0)
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: DesignTokens.success.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.star_rounded,
-                      color: DesignTokens.success, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    '+${provider.sessionPointsEarned} pts',
-                    style: TextStyle(
-                      color: DesignTokens.success,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: DesignTokens.spacing24),
-          // Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildTimerIconButton(
-                onTap: provider.isPaused
-                    ? provider.resumeSession
-                    : provider.pauseSession,
-                icon: provider.isPaused
-                    ? Icons.play_arrow_rounded
-                    : Icons.pause_rounded,
-                color: DesignTokens.textMuted,
-              ),
-              const SizedBox(width: DesignTokens.spacing24),
-              _buildTimerIconButton(
-                onTap: () => _showBreatheStopDialog(provider),
-                icon: Icons.stop_rounded,
-                color: DesignTokens.danger,
-              ),
-            ],
-          ),
-          const SizedBox(height: DesignTokens.spacing24),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBreatheStatItem(
-      String value, String label, IconData icon, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            color: DesignTokens.textPrimary,
-            fontSize: DesignTokens.fontSizeBody,
-            fontWeight: DesignTokens.fontWeightBold,
-            fontFamily: DesignTokens.fontFamilyPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: DesignTokens.textMuted,
-            fontSize: 10,
-            fontFamily: DesignTokens.fontFamilyPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBreatheDurationSelector(int maxDuration, PersonaTheme persona) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Duration',
-          style: TextStyle(
-            color: DesignTokens.textMuted,
-            fontSize: DesignTokens.fontSizeCaption,
-            fontWeight: DesignTokens.fontWeightMedium,
-            fontFamily: DesignTokens.fontFamilyPrimary,
-          ),
-        ),
-        const SizedBox(height: DesignTokens.spacing8),
-        Row(
-          children: List.generate(maxDuration, (index) {
-            final minutes = index + 1;
-            final isSelected = _selectedBreathDuration == minutes;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () =>
-                    setState(() => _selectedBreathDuration = minutes),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: EdgeInsets.only(
-                    right: index < maxDuration - 1 ? 8 : 0,
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? persona.primary.withValues(alpha: 0.15)
-                        : DesignTokens.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color:
-                          isSelected ? persona.primary : DesignTokens.border,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  child: Text(
-                    '$minutes min',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: isSelected
-                          ? persona.primary
-                          : DesignTokens.textMuted,
-                      fontSize: DesignTokens.fontSizeCaption,
-                      fontWeight: DesignTokens.fontWeightMedium,
-                      fontFamily: DesignTokens.fontFamilyPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  void _showBreatheStopDialog(BreathingProvider provider) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: DesignTokens.surfaceRaised,
-        title: Text(
-          'End Session?',
-          style: TextStyle(
-            color: DesignTokens.textPrimary,
-            fontFamily: DesignTokens.fontFamilyDisplay,
-          ),
-        ),
-        content: Text(
-          'You\'ve earned ${provider.sessionPointsEarned} points so far.',
-          style: TextStyle(
-            color: DesignTokens.textMuted,
-            fontFamily: DesignTokens.fontFamilyPrimary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Continue',
-                style: TextStyle(color: DesignTokens.textMuted)),
-          ),
-          TextButton(
-            onPressed: () {
-              provider.stopSession();
-              Navigator.pop(ctx);
-            },
-            child: Text('End',
-                style: TextStyle(color: DesignTokens.danger)),
-          ),
-        ],
-      ),
-    );
+    return BreatheTab(persona: persona);
   }
 
   Widget _buildTimerRing(
-      AppProvider provider, double progress, PersonaTheme persona) {
+      TimerProvider provider, double progress, PersonaTheme persona) {
     final isRunning = provider.isTimerRunning;
     final size = persona.ageGroup == AgeGroup.baby ? 220.0 : 260.0;
 
@@ -726,31 +427,16 @@ class _TimerScreenState extends State<TimerScreen>
                     ),
                   ),
                 ),
-                // Progress ring
-                SizedBox(
-                  width: size,
-                  height: size,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 16,
-                    valueColor: AlwaysStoppedAnimation<Color>(persona.primary),
-                    strokeCap: StrokeCap.round,
-                  ),
+                // Progress ring — Selector rebuilds only on timer tick
+                _TimerProgressRing(
+                  size: size,
+                  persona: persona,
                 ),
                 // Center content
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      provider.timerDisplay,
-                      style: TextStyle(
-                        color: DesignTokens.textPrimary,
-                        fontSize: 56,
-                        fontWeight: DesignTokens.fontWeightBold,
-                        fontFamily: DesignTokens.fontFamilyDisplay,
-                        height: 1,
-                      ),
-                    ),
+                    _TimerCountdownText(persona: persona),
                     const SizedBox(height: DesignTokens.spacing4),
                     Text(
                       _getTimerLabel(persona.ageGroup),
@@ -770,7 +456,7 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
-  Widget _buildPhaseIndicator(PersonaTheme persona, AppProvider provider) {
+  Widget _buildPhaseIndicator(PersonaTheme persona, TimerProvider provider) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -801,8 +487,8 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
-  Widget _buildSessionDots(AppProvider provider, PersonaTheme persona) {
-    final total = provider.persona.ageGroup.pomodoroSessionsPerCycle;
+  Widget _buildSessionDots(TimerProvider provider, PersonaTheme persona) {
+    final total = persona.ageGroup.pomodoroSessionsPerCycle;
     final completed = provider.completedSessionsInCycle;
 
     return Row(
@@ -827,7 +513,7 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
-  Widget _buildDurationSelector(AppProvider provider, PersonaTheme persona) {
+  Widget _buildDurationSelector(TimerProvider provider, PersonaTheme persona) {
     final durations = _getDurationsForAgeGroup(persona.ageGroup);
     final currentMinutes = provider.totalTimerSeconds ~/ 60;
 
@@ -872,7 +558,7 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
-  Widget _buildControls(AppProvider provider, PersonaTheme persona) {
+  Widget _buildControls(TimerProvider provider, PersonaTheme persona) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -1008,7 +694,7 @@ class _TimerScreenState extends State<TimerScreen>
             ),
             GestureDetector(
               onTap: () => setState(() => _showInterrupter = false),
-              child: Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+              child: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
             ),
           ],
         ),
@@ -1167,6 +853,59 @@ class _PressedTimerIconButtonState extends State<_PressedTimerIconButton> {
           child: Icon(widget.icon, color: widget.color, size: 24),
         ),
       ),
+    );
+  }
+}
+
+/// Only rebuilds the progress ring on timer ticks, not the entire screen.
+class _TimerProgressRing extends StatelessWidget {
+  const _TimerProgressRing({required this.size, required this.persona});
+
+  final double size;
+  final PersonaTheme persona;
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<TimerProvider, double>(
+      selector: (_, p) => p.timerProgress,
+      builder: (context, progress, _) {
+        return SizedBox(
+          width: size,
+          height: size,
+          child: CircularProgressIndicator(
+            value: progress,
+            strokeWidth: 16,
+            valueColor: AlwaysStoppedAnimation<Color>(persona.primary),
+            strokeCap: StrokeCap.round,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Only rebuilds the countdown text on timer ticks, not the entire screen.
+class _TimerCountdownText extends StatelessWidget {
+  const _TimerCountdownText({required this.persona});
+
+  final PersonaTheme persona;
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<TimerProvider, String>(
+      selector: (_, p) => p.timerDisplay,
+      builder: (context, display, _) {
+        return Text(
+          display,
+          style: TextStyle(
+            color: DesignTokens.textPrimary,
+            fontSize: DesignTokens.fontSizeTimer,
+            fontWeight: DesignTokens.fontWeightBold,
+            fontFamily: DesignTokens.fontFamilyDisplay,
+            height: 1,
+          ),
+        );
+      },
     );
   }
 }

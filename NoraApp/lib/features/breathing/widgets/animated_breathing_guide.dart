@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../core/constants/design_tokens.dart';
 import '../models/breathing_pattern.dart';
 
 /// The core animated widget that guides the user through a breathing phase.
@@ -212,7 +213,7 @@ class _AnimatedBreathingGuideState extends State<AnimatedBreathingGuide>
                 key: ValueKey(widget.phase?.instruction),
                 style: TextStyle(
                   color: widget.color,
-                  fontSize: 18,
+                  fontSize: DesignTokens.fontSizeSubhead,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
                 ),

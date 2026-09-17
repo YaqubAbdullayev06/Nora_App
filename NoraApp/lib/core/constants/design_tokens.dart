@@ -104,6 +104,20 @@ class DesignTokens {
   static const double fontSizeBodySmall = 14;
   static const double fontSizeCaption = 12;
 
+  static const double fontSizeDisplayLarge = 64;
+  static const double fontSizeDisplayMedium = 56;
+  static const double fontSizeDisplaySmall = 48;
+  static const double fontSizeTimer = 56;
+  static const double fontSizeTitleLarge = 32;
+  static const double fontSizeTitleMedium = 22;
+  static const double fontSizeSubhead = 18;
+  static const double fontSizeBodyMedium = 15;
+  static const double fontSizeSmall = 13;
+  static const double fontSizeExtraSmall = 11;
+  static const double fontSizeTiny = 10;
+  static const double fontSizeMicro = 9;
+  static const double fontSizeNano = 8;
+
   static const FontWeight fontWeightBold = FontWeight.w700;
   static const FontWeight fontWeightSemiBold = FontWeight.w600;
   static const FontWeight fontWeightMedium = FontWeight.w500;
@@ -111,6 +125,35 @@ class DesignTokens {
 
   static const double lineHeightHeading = 1.2;
   static const double lineHeightBody = 1.5;
+
+  // ─────────────────────────────────────────────
+  // SEMANTIC COLORS (static — app-level, not persona-specific)
+  // ─────────────────────────────────────────────
+
+  static const Color brandPink = Color(0xFFE91E63);
+  static const Color brandPurple = Color(0xFF9C27B0);
+  static const Color brandDeepOrange = Color(0xFFFF5722);
+  static const Color brandGreen = Color(0xFF4CAF50);
+  static const Color brandBlue = Color(0xFF2196F3);
+  static const Color brandTeal = Color(0xFF00BCD4);
+  static const Color brandOrange = Color(0xFFFF9800);
+  static const Color brandIndigo = Color(0xFF3F51B5);
+  static const Color brandBrown = Color(0xFF795548);
+
+  static const Color categorySocial = brandPink;
+  static const Color categoryEntertainment = brandPurple;
+  static const Color categoryProductivity = brandDeepOrange;
+  static const Color categoryGames = brandGreen;
+  static const Color categoryEducation = brandBlue;
+  static const Color categoryHealth = brandTeal;
+  static const Color categoryFinance = brandOrange;
+  static const Color categoryNews = Color(0xFF4CAF50);
+  static const Color categoryShopping = brandIndigo;
+  static const Color categoryCreativity = brandPink;
+  static const Color categoryCommunication = brandBrown;
+
+  static const Color darkBackground = Color(0xFF1E1F36);
+  static const Color darkSurface = Color(0xFF1A1B2E);
 
   // ─────────────────────────────────────────────
   // SHADOW / ELEVATION (adapt to light/dark persona)

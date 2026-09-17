@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../../../providers/app_provider.dart';
+import '../../../core/constants/design_tokens.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/persona_provider.dart';
 import '../../../widgets/loader_one.dart';
 import '../../../widgets/animated_text.dart';
 
 /// Splash Screen — animated brand introduction.
 /// Adapts its colors and mascot based on the current persona.
+/// Checks auth state and routes accordingly after animation.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -45,6 +48,26 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
+        _navigateAfterSplash();
+      }
+    });
+  }
+
+  /// Determine where to route after splash: check auth state first.
+  void _navigateAfterSplash() {
+    final authProvider = context.read<AuthProvider>();
+    authProvider.initialize().then((_) {
+      if (!mounted) return;
+      if (authProvider.isAuthenticated) {
+        // User has valid session — go straight to main
+        Navigator.pushReplacementNamed(context, '/main');
+      } else {
+        // No session — show welcome/onboarding
+        Navigator.pushReplacementNamed(context, '/welcome');
+      }
+    }).catchError((_) {
+      // Auth check failed — show welcome
+      if (mounted) {
         Navigator.pushReplacementNamed(context, '/welcome');
       }
     });
@@ -58,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
+    return Consumer<PersonaProvider>(
       builder: (context, provider, _) {
         final persona = provider.persona;
 
@@ -108,7 +131,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   text: 'Nora',
                   style: TextStyle(
                     color: persona.primary,
-                    fontSize: 48,
+                    fontSize: DesignTokens.fontSizeDisplaySmall,
                     fontWeight: FontWeight.w700,
                     fontFamily: persona.fontFamily,
                     letterSpacing: 2,
@@ -122,7 +145,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   text: persona.tagline,
                   style: TextStyle(
                     color: persona.textMuted,
-                    fontSize: 16,
+                    fontSize: DesignTokens.fontSizeBody,
                     fontWeight: FontWeight.w400,
                     fontFamily: persona.fontFamily,
                   ),

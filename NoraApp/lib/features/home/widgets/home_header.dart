@@ -2,19 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../widgets/nora_components.dart';
 
 /// Home header — mascot with glow, greeting, name, tagline, and age badge.
 class HomeHeader extends StatelessWidget {
-  final AppProvider provider;
+  final PersonaProvider personaProvider;
+  final AuthProvider authProvider;
 
-  const HomeHeader({super.key, required this.provider});
+  const HomeHeader({super.key, required this.personaProvider, required this.authProvider});
 
   @override
   Widget build(BuildContext context) {
-    final persona = provider.persona;
-    final userName = provider.currentUser?.name ?? 'Explorer';
+    final persona = personaProvider.persona;
+    final userName = authProvider.currentUser?.name ?? 'Explorer';
 
     return Row(
       children: [

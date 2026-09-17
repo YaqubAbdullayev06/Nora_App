@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   final AgeGroup? ageGroup;
@@ -85,7 +85,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'JOIN NORA',
           style: TextStyle(
             color: DesignTokens.textPrimary,
-            fontSize: 32,
+            fontSize: DesignTokens.fontSizeTitleLarge,
             fontWeight: DesignTokens.fontWeightBold,
             letterSpacing: 8,
             fontFamily: DesignTokens.fontFamilyDisplay,
@@ -157,7 +157,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildRegisterButton() {
-    return Consumer<AppProvider>(
+    return Consumer<AuthProvider>(
       builder: (context, provider, _) {
         return SizedBox(
           height: DesignTokens.buttonHeightLarge,
@@ -231,8 +231,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    final provider = context.read<AppProvider>();
-    final success = await provider.register(email, name, password, ageGroup: widget.ageGroup ?? provider.ageGroup);
+    final provider = context.read<AuthProvider>();
+    final success = await provider.register(email, name, password, ageGroup: widget.ageGroup ?? AgeGroup.adult);
 
     if (success && mounted) {
       Navigator.pushReplacementNamed(context, '/main');

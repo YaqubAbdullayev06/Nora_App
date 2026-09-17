@@ -423,7 +423,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
                         '${minutes}m',
                         style: TextStyle(
                           color: DesignTokens.textMuted,
-                          fontSize: 10,
+                          fontSize: DesignTokens.fontSizeTiny,
                         ),
                       ),
                     const SizedBox(height: 4),
@@ -454,7 +454,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
                         color: isToday
                             ? DesignTokens.accent
                             : DesignTokens.textMuted,
-                        fontSize: 11,
+                        fontSize: DesignTokens.fontSizeExtraSmall,
                         fontWeight:
                             isToday ? FontWeight.bold : FontWeight.normal,
                       ),

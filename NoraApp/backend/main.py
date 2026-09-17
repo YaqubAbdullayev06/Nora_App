@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Any, List, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Text, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
 import jwt
@@ -569,7 +569,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
     token = create_access_token({"sub": new_user.id})
     refresh = create_refresh_token({"sub": new_user.id})
-    return {"user": UserResponse.from_orm(new_user), "token": token, "refresh_token": refresh}
+    return {"user": UserResponse.model_validate(new_user), "token": token, "refresh_token": refresh}
 
 @app.post("/auth/login")
 def login(credentials: UserLogin, db: Session = Depends(get_db)):
@@ -579,7 +579,7 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
 
     token = create_access_token({"sub": user.id})
     refresh = create_refresh_token({"sub": user.id})
-    return {"user": UserResponse.from_orm(user), "token": token, "refresh_token": refresh}
+    return {"user": UserResponse.model_validate(user), "token": token, "refresh_token": refresh}
 
 @app.post("/auth/refresh")
 def refresh_token(refresh_req: dict, db: Session = Depends(get_db)):
@@ -608,7 +608,7 @@ def refresh_token(refresh_req: dict, db: Session = Depends(get_db)):
 
 @app.get("/auth/me", response_model=UserResponse)
 def get_me(current_user: UserModel = Depends(get_current_user)):
-    return UserResponse.from_orm(current_user)
+    return UserResponse.model_validate(current_user)
 
 
 # ─── Accountability Lock ───
@@ -1272,7 +1272,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserResponse.from_orm(user)
+    return UserResponse.model_validate(user)
 
 # ─── Focus Sessions ───
 
@@ -1291,7 +1291,7 @@ def create_session(
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
-    return SessionResponse.from_orm(new_session)
+    return SessionResponse.model_validate(new_session)
 
 @app.get("/sessions/", response_model=List[SessionResponse])
 def get_user_sessions(
@@ -1301,7 +1301,7 @@ def get_user_sessions(
     sessions = db.query(SessionModel).filter(
         SessionModel.user_id == current_user.id
     ).order_by(SessionModel.started_at.desc()).all()
-    return [SessionResponse.from_orm(s) for s in sessions]
+    return [SessionResponse.model_validate(s) for s in sessions]
 
 @app.put("/sessions/{session_id}/complete")
 def complete_session(
@@ -1330,7 +1330,7 @@ def get_content(category: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(ContentModel).filter(ContentModel.is_active == True)
     if category:
         query = query.filter(ContentModel.category == category)
-    return [ContentResponse.from_orm(c) for c in query.all()]
+    return [ContentResponse.model_validate(c) for c in query.all()]
 
 @app.post("/content/", response_model=ContentResponse)
 def create_content(content: ContentCreate, db: Session = Depends(get_db)):
@@ -1347,7 +1347,7 @@ def create_content(content: ContentCreate, db: Session = Depends(get_db)):
     db.add(new_content)
     db.commit()
     db.refresh(new_content)
-    return ContentResponse.from_orm(new_content)
+    return ContentResponse.model_validate(new_content)
 
 # ─── Focus Score ───
 

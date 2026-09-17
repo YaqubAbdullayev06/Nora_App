@@ -827,3 +827,112 @@ class WeeklyAppUsage {
     return '${mins}m';
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ACCOUNTABILITY LOCK MODELS
+// ═══════════════════════════════════════════════════════════════
+
+/// Represents a guardian-set accountability lock.
+class AccountabilityLock {
+  final bool isActive;
+  final String? guardianName;
+  final DateTime? createdAt;
+  final DateTime? expiresAt;
+  final bool isExpired;
+
+  const AccountabilityLock({
+    required this.isActive,
+    this.guardianName,
+    this.createdAt,
+    this.expiresAt,
+    this.isExpired = false,
+  });
+
+  factory AccountabilityLock.fromJson(Map<String, dynamic> json) {
+    return AccountabilityLock(
+      isActive: json['is_active'] ?? false,
+      guardianName: json['guardian_name'],
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : null,
+      expiresAt: json['expires_at'] != null
+          ? DateTime.parse(json['expires_at'])
+          : null,
+      isExpired: json['is_expired'] ?? false,
+    );
+  }
+
+  /// Whether the lock has an expiry date.
+  bool get hasExpiry => expiresAt != null;
+
+  /// Remaining time for the lock (null if indefinite).
+  Duration? get remainingTime {
+    if (expiresAt == null) return null;
+    final now = DateTime.now();
+    if (now.isAfter(expiresAt!)) return Duration.zero;
+    return expiresAt!.difference(now);
+  }
+
+  /// Human-readable remaining time string.
+  String get remainingTimeString {
+    if (expiresAt == null) return 'Indefinite';
+    final remaining = remainingTime;
+    if (remaining == null || remaining == Duration.zero) return 'Expired';
+    if (remaining.inDays > 0) return '${remaining.inDays}d remaining';
+    if (remaining.inHours > 0) return '${remaining.inHours}h remaining';
+    return '${remaining.inMinutes}m remaining';
+  }
+}
+
+/// Habit — A real-world activity that earns screen time when completed.
+class Habit {
+  final int id;
+  final String name;
+  final String category; // exercise, reading, meditation, outdoor, custom
+  final String icon;
+  final String color; // Hex color
+  final int screenTimeMinutes; // Minutes earned per completion
+  final int targetPerDay;
+  final bool isActive;
+  final int completionsToday;
+  final DateTime? createdAt;
+
+  const Habit({
+    required this.id,
+    required this.name,
+    this.category = 'general',
+    this.icon = 'check_circle',
+    this.color = '#4CAF50',
+    this.screenTimeMinutes = 15,
+    this.targetPerDay = 1,
+    this.isActive = true,
+    this.completionsToday = 0,
+    this.createdAt,
+  });
+
+  factory Habit.fromJson(Map<String, dynamic> json) {
+    return Habit(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      category: json['category'] ?? 'general',
+      icon: json['icon'] ?? 'check_circle',
+      color: json['color'] ?? '#4CAF50',
+      screenTimeMinutes: json['screen_time_minutes'] ?? 15,
+      targetPerDay: json['target_per_day'] ?? 1,
+      isActive: json['is_active'] ?? true,
+      completionsToday: json['completions_today'] ?? 0,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : null,
+    );
+  }
+
+  /// Whether the daily target is reached.
+  bool get isCompletedToday => completionsToday >= targetPerDay;
+
+  /// Progress toward daily target (0.0 to 1.0+).
+  double get todayProgress {
+    if (targetPerDay <= 0) return 0.0;
+    return (completionsToday / targetPerDay).clamp(0.0, 1.0);
+  }
+}

@@ -4,8 +4,18 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/theme/persona_theme.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/focus_provider.dart';
+import '../../../providers/accountability_provider.dart';
+import '../../../providers/hard_cap_provider.dart';
+import '../../../providers/pomodoro_provider.dart';
+import '../../../providers/habit_provider.dart';
 import '../../../widgets/nora_components.dart';
+import '../utils/age_group_helpers.dart';
+import '../widgets/profile_dialogs.dart';
+import '../../accountability/screens/accountability_setup_screen.dart';
+import '../../planning/screens/calendar_screen.dart';
 
 /// Profile Screen — age-adaptive settings and user info.
 /// Baby: Parent controls, simple UI
@@ -17,9 +27,9 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, provider, _) {
-        final persona = provider.persona;
+    return Consumer3<PersonaProvider, AuthProvider, FocusProvider>(
+      builder: (context, personaProvider, authProvider, focusProvider, _) {
+        final persona = personaProvider.persona;
 
         return Scaffold(
           backgroundColor: DesignTokens.background,
@@ -29,15 +39,15 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(context, provider, persona),
+                  _buildHeader(context, personaProvider, authProvider, persona),
                   const SizedBox(height: DesignTokens.spacing24),
                   _buildPersonaCard(persona),
                   const SizedBox(height: DesignTokens.spacing24),
-                  _buildQuickStats(provider, persona),
+                  _buildQuickStats(focusProvider, persona),
                   const SizedBox(height: DesignTokens.spacing24),
-                  _buildSettingsSection(context, provider, persona),
+                  _buildSettingsSection(context, personaProvider, authProvider, persona),
                   const SizedBox(height: DesignTokens.spacing24),
-                  _buildAccountSection(context, provider, persona),
+                  _buildAccountSection(context, authProvider, persona),
                 ],
               ),
             ),
@@ -48,17 +58,17 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(
-      BuildContext context, AppProvider provider, PersonaTheme persona) {
+      BuildContext context, PersonaProvider personaProvider, AuthProvider authProvider, PersonaTheme persona) {
     return Row(
       children: [
-        NoraMascot(size: 80, showGlow: true),
+        const NoraMascot(size: 80, showGlow: true),
         const SizedBox(width: DesignTokens.spacing16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                provider.currentUser?.name ?? 'Explorer',
+                authProvider.currentUser?.name ?? 'Explorer',
                 style: TextStyle(
                   color: DesignTokens.textPrimary,
                   fontSize: DesignTokens.fontSizeH2,
@@ -67,7 +77,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                provider.currentUser?.email ?? 'explorer@nora.app',
+                authProvider.currentUser?.email ?? 'explorer@nora.app',
                 style: TextStyle(
                   color: DesignTokens.textMuted,
                   fontSize: DesignTokens.fontSizeBodySmall,
@@ -75,12 +85,12 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: DesignTokens.spacing4),
-              AgeGroupBadge(),
+              const AgeGroupBadge(),
             ],
           ),
         ),
         GestureDetector(
-          onTap: () => _showEditProfile(context, provider),
+          onTap: () => showEditProfileSheet(context, authProvider),
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -149,26 +159,26 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildPersonaFeatures(PersonaTheme persona) {
-    final features = _getFeaturesForAgeGroup(persona.ageGroup);
+    final features = persona.ageGroup.features;
     return Wrap(
       spacing: DesignTokens.spacing8,
       runSpacing: DesignTokens.spacing8,
       children: features.map((feature) {
         return NoraBadge(
           label: feature['label']!,
-          icon: _getFeatureIcon(feature['icon']!),
+          icon: persona.ageGroup.featureIcon(feature['icon']!),
           color: persona.primary,
         );
       }).toList(),
     );
   }
 
-  Widget _buildQuickStats(AppProvider provider, PersonaTheme persona) {
+  Widget _buildQuickStats(FocusProvider provider, PersonaTheme persona) {
     return Row(
       children: [
         Expanded(
           child: StatsCard(
-            label: _getScoreLabel(persona.ageGroup),
+            label: persona.ageGroup.scoreLabel,
             value: '${provider.focusScore}',
             icon: Icons.star_rounded,
             color: DesignTokens.accent,
@@ -177,7 +187,7 @@ class ProfileScreen extends StatelessWidget {
         const SizedBox(width: DesignTokens.spacing12),
         Expanded(
           child: StatsCard(
-            label: _getStreakLabel(persona.ageGroup),
+            label: persona.ageGroup.streakLabel,
             value: '${provider.streakDays}',
             icon: Icons.local_fire_department_rounded,
             color: DesignTokens.warning,
@@ -186,7 +196,7 @@ class ProfileScreen extends StatelessWidget {
         const SizedBox(width: DesignTokens.spacing12),
         Expanded(
           child: StatsCard(
-            label: _getSessionsLabel(persona.ageGroup),
+            label: persona.ageGroup.sessionsLabel,
             value: '${provider.sessionsCompleted}',
             icon: Icons.check_circle_rounded,
             color: DesignTokens.success,
@@ -197,12 +207,12 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildSettingsSection(
-      BuildContext context, AppProvider provider, PersonaTheme persona) {
+      BuildContext context, PersonaProvider personaProvider, AuthProvider authProvider, PersonaTheme persona) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: _getSettingsTitle(persona.ageGroup),
+          title: persona.ageGroup.settingsTitle,
           icon: Icons.settings_rounded,
           iconColor: DesignTokens.textMuted,
         ),
@@ -210,26 +220,31 @@ class ProfileScreen extends StatelessWidget {
         _buildSettingsTile(
           icon: Icons.person_rounded,
           title: 'Edit Profile',
-          subtitle: _getEditProfileSubtitle(persona.ageGroup),
-          onTap: () => _showEditProfile(context, provider),
+          subtitle: persona.ageGroup.editProfileSubtitle,
+          onTap: () => showEditProfileSheet(context, authProvider),
         ),
         _buildSettingsTile(
           icon: Icons.notifications_rounded,
           title: 'Notifications',
-          subtitle: _getNotificationSubtitle(persona.ageGroup),
-          onTap: () => _showNotifications(context, provider),
+          subtitle: persona.ageGroup.notificationSubtitle,
+          onTap: () => showNotificationsDialog(context, authProvider),
         ),
         _buildSettingsTile(
           icon: Icons.shield_rounded,
           title: 'Focus protection',
           subtitle: 'Choose permissions to block distracting apps',
-          onTap: () => _showFocusProtection(context, provider),
+          onTap: () => showFocusProtectionDialog(context, personaProvider),
         ),
+        _buildAccountabilityTile(context, persona),
+        _buildHardCapTile(context, persona),
+        _buildPomodoroTile(context, persona),
+        _buildHabitsTile(context, persona),
+        _buildCalendarTile(context, persona),
         _buildSettingsTile(
           icon: Icons.auto_awesome_rounded,
           title: 'Nora capabilities',
           subtitle: 'View the skills available to your AI assistant',
-          onTap: () => _showAgentCapabilities(context, provider),
+          onTap: () => showAgentCapabilitiesDialog(context, personaProvider),
         ),
         if (persona.ageGroup == AgeGroup.adult) ...[
           _buildSettingsTile(
@@ -242,7 +257,7 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.palette_rounded,
             title: 'Switch Persona',
             subtitle: 'Change age group (for testing)',
-            onTap: () => _showPersonaSwitcher(context, provider),
+            onTap: () => showPersonaSwitcher(context, personaProvider),
           ),
         ],
         if (persona.ageGroup.requiresParentalControl) ...[
@@ -257,245 +272,423 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _showFocusProtection(
-      BuildContext context, AppProvider provider) async {
-    final status = await provider.requestFocusProtectionAuthorization();
-    if (!context.mounted) return;
+  Widget _buildAccountabilityTile(BuildContext context, PersonaTheme persona) {
+    return Consumer<AccountabilityProvider>(
+      builder: (context, accountability, _) {
+        final isActive = accountability.isLockActive;
+        final guardianName = accountability.guardianName;
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: DesignTokens.surface,
-        title: Text(
-          'Focus protection',
-          style: TextStyle(
-            color: DesignTokens.textPrimary,
-            fontFamily: DesignTokens.fontFamilyDisplay,
+        return GestureDetector(
+          onTap: () {
+            if (isActive) {
+              // Show unlink dialog
+              _showUnlinkDialog(context, accountability);
+            } else {
+              // Navigate to setup
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AccountabilitySetupScreen(),
+                ),
+              );
+            }
+          },
+          child: NoraCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (isActive ? Colors.green : DesignTokens.accent)
+                        .withValues(alpha: 0.15),
+                    borderRadius:
+                        BorderRadius.circular(DesignTokens.radius10),
+                  ),
+                  child: Icon(
+                    isActive ? Icons.lock_rounded : Icons.lock_open_rounded,
+                    color: isActive ? Colors.green : DesignTokens.accent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: DesignTokens.spacing12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Accountability Lock',
+                        style: TextStyle(
+                          color: DesignTokens.textPrimary,
+                          fontSize: DesignTokens.fontSizeBodySmall,
+                          fontWeight: DesignTokens.fontWeightSemiBold,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                      Text(
+                        isActive
+                            ? 'Active — set by ${guardianName ?? "guardian"}'
+                            : 'Guardian PIN lock for focus sessions',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeCaption,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: DesignTokens.textMuted, size: 20),
+              ],
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHardCapTile(BuildContext context, PersonaTheme persona) {
+    return Consumer<HardCapProvider>(
+      builder: (context, cap, _) {
+        final isActive = cap.isActive;
+        final remaining = cap.remainingMinutes;
+        final usage = cap.todayUsageMinutes;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.pushNamed(context, '/hard-cap-setup');
+          },
+          child: NoraCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (isActive ? Colors.orange : DesignTokens.accent)
+                        .withValues(alpha: 0.15),
+                    borderRadius:
+                        BorderRadius.circular(DesignTokens.radius10),
+                  ),
+                  child: Icon(
+                    isActive
+                        ? Icons.timer_rounded
+                        : Icons.timer,
+                    color: isActive ? Colors.orange : DesignTokens.accent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: DesignTokens.spacing12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Daily Hard Cap',
+                        style: TextStyle(
+                          color: DesignTokens.textPrimary,
+                          fontSize: DesignTokens.fontSizeBodySmall,
+                          fontWeight: DesignTokens.fontWeightSemiBold,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                      Text(
+                        isActive
+                            ? '$usage / ${cap.capMinutes} min today — ${remaining > 0 ? "${remaining}m left" : "Over limit"}'
+                            : 'Set a total daily screen time limit',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeCaption,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: DesignTokens.textMuted, size: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPomodoroTile(BuildContext context, PersonaTheme persona) {
+    return Consumer<PomodoroProvider>(
+      builder: (context, pomodoro, _) {
+        final isEnabled = pomodoro.autoCycleEnabled;
+        final completed = pomodoro.completedCycles;
+        final target = pomodoro.targetCycles;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.pushNamed(context, '/pomodoro-setup');
+          },
+          child: NoraCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (isEnabled ? Colors.purple : DesignTokens.accent)
+                        .withValues(alpha: 0.15),
+                    borderRadius:
+                        BorderRadius.circular(DesignTokens.radius10),
+                  ),
+                  child: Icon(
+                    isEnabled ? Icons.repeat_rounded : Icons.repeat_one_rounded,
+                    color: isEnabled ? Colors.purple : DesignTokens.accent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: DesignTokens.spacing12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pomodoro Cycles',
+                        style: TextStyle(
+                          color: DesignTokens.textPrimary,
+                          fontSize: DesignTokens.fontSizeBodySmall,
+                          fontWeight: DesignTokens.fontWeightSemiBold,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                      Text(
+                        isEnabled
+                            ? 'Auto-cycle: $completed/$target cycles today'
+                            : 'Chain focus sessions automatically',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeCaption,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: DesignTokens.textMuted, size: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHabitsTile(BuildContext context, PersonaTheme persona) {
+    return Consumer<HabitProvider>(
+      builder: (context, habitProvider, _) {
+        final todayEarned = habitProvider.todayScreenTimeEarned;
+        final completedCount = habitProvider.completedHabits.length;
+        final totalCount = habitProvider.habits.length;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.pushNamed(context, '/habits');
+          },
+          child: NoraCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (todayEarned > 0
+                            ? DesignTokens.success
+                            : DesignTokens.accent)
+                        .withValues(alpha: 0.15),
+                    borderRadius:
+                        BorderRadius.circular(DesignTokens.radius10),
+                  ),
+                  child: Icon(
+                    todayEarned > 0
+                        ? Icons.check_circle_rounded
+                        : Icons.task_alt_rounded,
+                    color: todayEarned > 0
+                        ? DesignTokens.success
+                        : DesignTokens.accent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: DesignTokens.spacing12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Earn Screen Time',
+                        style: TextStyle(
+                          color: DesignTokens.textPrimary,
+                          fontSize: DesignTokens.fontSizeBodySmall,
+                          fontWeight: DesignTokens.fontWeightSemiBold,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                      Text(
+                        todayEarned > 0
+                            ? '+${todayEarned}m earned • $completedCount/$totalCount habits'
+                            : 'Complete habits to earn bonus minutes',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeCaption,
+                          fontFamily: DesignTokens.fontFamilyPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: DesignTokens.textMuted, size: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCalendarTile(BuildContext context, PersonaTheme persona) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const CalendarScreen(),
+          ),
+        );
+      },
+      child: NoraCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: DesignTokens.accent.withValues(alpha: 0.15),
+                borderRadius:
+                    BorderRadius.circular(DesignTokens.radius10),
+              ),
+              child: Icon(
+                Icons.calendar_month_rounded,
+                color: DesignTokens.accent,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: DesignTokens.spacing12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Calendar',
+                    style: TextStyle(
+                      color: DesignTokens.textPrimary,
+                      fontSize: DesignTokens.fontSizeBodySmall,
+                      fontWeight: DesignTokens.fontWeightSemiBold,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                  Text(
+                    'View your task history and progress',
+                    style: TextStyle(
+                      color: DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: DesignTokens.textMuted, size: 20),
+          ],
         ),
-        content: Text(
-          status.message,
-          style: TextStyle(
-            color: DesignTokens.textMuted,
-            fontFamily: DesignTokens.fontFamilyPrimary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child:
-                Text('Close', style: TextStyle(color: DesignTokens.textMuted)),
-          ),
-          if (status.supported)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                provider.selectFocusApps();
-              },
-              child: Text('Choose apps',
-                  style: TextStyle(color: DesignTokens.accent)),
-            ),
-          if (status.supported && !status.blockingEnabled)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                provider.enableFocusProtection();
-              },
-              child: Text('Enable blocking',
-                  style: TextStyle(color: DesignTokens.accent)),
-            ),
-          if (status.blockingEnabled)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                provider.disableFocusProtection();
-              },
-              child: Text('Disable blocking',
-                  style: TextStyle(color: DesignTokens.danger)),
-            ),
-        ],
       ),
     );
   }
 
-  Future<void> _showAgentCapabilities(
-      BuildContext context, AppProvider provider) async {
-    try {
-      final data = await provider.getAgentCapabilities();
-      if (!context.mounted) return;
-      final capabilities = data['capabilities'] as Map<String, dynamic>? ?? {};
-      final restricted = (data['restricted'] as List<dynamic>? ?? [])
-          .map((item) => item.toString())
-          .toList();
+  void _showUnlinkDialog(
+      BuildContext context, AccountabilityProvider accountability) {
+    final pinController = TextEditingController();
 
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: DesignTokens.surface,
-          title: Text(
-            'Nora capabilities',
-            style: TextStyle(
-              color: DesignTokens.textPrimary,
-              fontFamily: DesignTokens.fontFamilyDisplay,
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: DesignTokens.darkBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Remove Accountability Lock',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Enter the guardian PIN to remove this lock.',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: DesignTokens.fontSizeBodySmall,
+              ),
             ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ...capabilities.entries.map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(
-                      '${entry.key}: ${(entry.value as List<dynamic>).join(', ')}',
-                      style: TextStyle(
-                        color: DesignTokens.textPrimary,
-                        fontFamily: DesignTokens.fontFamilyPrimary,
-                      ),
-                    ),
-                  ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              style: const TextStyle(
+                fontSize: DesignTokens.fontSizeSubhead,
+                letterSpacing: 6,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '• • • •',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  letterSpacing: 6,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Restricted for safety: ${restricted.join(', ')}',
-                  style: TextStyle(
-                    color: DesignTokens.textMuted,
-                    fontSize: DesignTokens.fontSizeCaption,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
-                  ),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.06),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child:
-                  Text('Close', style: TextStyle(color: DesignTokens.accent)),
+              ),
             ),
           ],
         ),
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not load Nora capabilities: $error'),
-          backgroundColor: DesignTokens.danger,
-        ),
-      );
-    }
-  }
-
-  Future<void> _showNotifications(
-      BuildContext context, AppProvider provider) async {
-    bool focusReminders = true;
-    bool dailyDigest = false;
-    bool achievementAlerts = true;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: DesignTokens.surface,
-          title: Text(
-            'Notifications',
-            style: TextStyle(
-              color: DesignTokens.textPrimary,
-              fontFamily: DesignTokens.fontFamilyDisplay,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
             ),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SwitchListTile(
-                title: Text(
-                  'Focus reminders',
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
-                  ),
-                ),
-                subtitle: Text(
-                  'Get reminded when it\'s time to focus',
-                  style: TextStyle(
-                    color: DesignTokens.textMuted,
-                    fontSize: DesignTokens.fontSizeCaption,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
-                  ),
-                ),
-                value: focusReminders,
-                onChanged: (value) =>
-                    setDialogState(() => focusReminders = value),
-                activeThumbColor: DesignTokens.accent,
-                contentPadding: EdgeInsets.zero,
-              ),
-              SwitchListTile(
-                title: Text(
-                  'Daily digest',
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
-                  ),
-                ),
-                subtitle: Text(
-                  'Summary of your daily progress',
-                  style: TextStyle(
-                    color: DesignTokens.textMuted,
-                    fontSize: DesignTokens.fontSizeCaption,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
-                  ),
-                ),
-                value: dailyDigest,
-                onChanged: (value) =>
-                    setDialogState(() => dailyDigest = value),
-                activeThumbColor: DesignTokens.accent,
-                contentPadding: EdgeInsets.zero,
-              ),
-              SwitchListTile(
-                title: Text(
-                  'Achievement alerts',
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
-                  ),
-                ),
-                subtitle: Text(
-                  'Celebrate when you unlock milestones',
-                  style: TextStyle(
-                    color: DesignTokens.textMuted,
-                    fontSize: DesignTokens.fontSizeCaption,
-                    fontFamily: DesignTokens.fontFamilyPrimary,
-                  ),
-                ),
-                value: achievementAlerts,
-                onChanged: (value) =>
-                    setDialogState(() => achievementAlerts = value),
-                activeThumbColor: DesignTokens.accent,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child:
-                  Text('Cancel', style: TextStyle(color: DesignTokens.textMuted)),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
+          TextButton(
+            onPressed: () async {
+              final success =
+                  await accountability.unlinkLock(pinController.text);
+              if (success && ctx.mounted) {
+                Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Notification preferences saved!')),
+                    content: Text('Accountability lock removed'),
+                    backgroundColor: Colors.green,
+                  ),
                 );
-              },
-              child:
-                  Text('Save', style: TextStyle(color: DesignTokens.accent)),
-            ),
-          ],
-        ),
+              }
+            },
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }
@@ -554,12 +747,12 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildAccountSection(
-      BuildContext context, AppProvider provider, PersonaTheme persona) {
+      BuildContext context, AuthProvider authProvider, PersonaTheme persona) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: _getAccountTitle(persona.ageGroup),
+          title: persona.ageGroup.accountTitle,
           icon: Icons.account_circle_rounded,
           iconColor: DesignTokens.textMuted,
         ),
@@ -572,475 +765,21 @@ class ProfileScreen extends StatelessWidget {
         ),
         _buildSettingsTile(
           icon: Icons.help_rounded,
-          title: _getHelpTitle(persona.ageGroup),
-          subtitle: _getHelpSubtitle(persona.ageGroup),
+          title: persona.ageGroup.helpTitle,
+          subtitle: persona.ageGroup.helpSubtitle,
           onTap: () {},
         ),
         const SizedBox(height: DesignTokens.spacing16),
-        // Logout button
         SizedBox(
           width: double.infinity,
           child: NoraButton(
-            label: _getLogoutLabel(persona.ageGroup),
+            label: persona.ageGroup.logoutLabel,
             icon: Icons.logout_rounded,
             outlined: true,
-            onPressed: () => _showLogoutConfirmation(context, provider),
+            onPressed: () => showLogoutConfirmation(context, authProvider),
           ),
         ),
       ],
     );
-  }
-
-  void _showEditProfile(BuildContext context, AppProvider provider) {
-    final nameController =
-        TextEditingController(text: provider.currentUser?.name ?? '');
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: DesignTokens.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            top: 20,
-            left: 20,
-            right: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Edit Profile',
-                style: TextStyle(
-                  color: DesignTokens.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: DesignTokens.fontFamilyDisplay,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                style: TextStyle(color: DesignTokens.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Name',
-                  labelStyle: TextStyle(color: DesignTokens.textMuted),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              NoraButton(
-                label: 'Save Changes',
-                expanded: true,
-                onPressed: () {
-                  provider.updateProfile(name: nameController.text);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Profile updated successfully!')),
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showPersonaSwitcher(BuildContext context, AppProvider provider) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: DesignTokens.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: DesignTokens.spacing12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: DesignTokens.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spacing16),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: DesignTokens.spacing20),
-                child: Text(
-                  'Switch Persona',
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontSize: DesignTokens.fontSizeH3,
-                    fontWeight: DesignTokens.fontWeightSemiBold,
-                    fontFamily: DesignTokens.fontFamilyDisplay,
-                  ),
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spacing16),
-              ...AgeGroup.values.map((group) {
-                final theme = PersonaTheme.forAgeGroup(group);
-                final isSelected = provider.ageGroup == group;
-                return ListTile(
-                  leading: SvgPicture.asset(
-                    theme.mascotAssetPath,
-                    width: 24,
-                    height: 24,
-                  ),
-                  title: Text(
-                    '${group.displayName} (${theme.mascotName})',
-                    style: TextStyle(
-                      color:
-                          isSelected ? theme.primary : DesignTokens.textPrimary,
-                      fontWeight: isSelected
-                          ? DesignTokens.fontWeightSemiBold
-                          : DesignTokens.fontWeightRegular,
-                      fontFamily: DesignTokens.fontFamilyPrimary,
-                    ),
-                  ),
-                  subtitle: Text(
-                    theme.tagline,
-                    style: TextStyle(
-                      color: DesignTokens.textMuted,
-                      fontSize: DesignTokens.fontSizeCaption,
-                      fontFamily: DesignTokens.fontFamilyPrimary,
-                    ),
-                  ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: theme.primary)
-                      : null,
-                  onTap: () {
-                    provider.setAgeGroup(group);
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-              const SizedBox(height: DesignTokens.spacing16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showLogoutConfirmation(BuildContext context, AppProvider provider) {
-    final persona = provider.persona;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: DesignTokens.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DesignTokens.radius20),
-          side: BorderSide(color: DesignTokens.border, width: 1),
-        ),
-        title: Text(
-          _getLogoutTitle(persona.ageGroup),
-          style: TextStyle(
-            color: DesignTokens.textPrimary,
-            fontFamily: DesignTokens.fontFamilyDisplay,
-          ),
-        ),
-        content: Text(
-          _getLogoutMessage(persona.ageGroup),
-          style: TextStyle(
-            color: DesignTokens.textMuted,
-            fontFamily: DesignTokens.fontFamilyPrimary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: DesignTokens.textMuted),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              provider.logout();
-              Navigator.pop(context);
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-            child: Text(
-              _getLogoutButtonLabel(persona.ageGroup),
-              style: TextStyle(color: DesignTokens.danger),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Age-specific helpers ───
-
-  String _getScoreLabel(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Stars';
-      case AgeGroup.child:
-        return 'Stars';
-      case AgeGroup.kid:
-        return 'Points';
-      case AgeGroup.teen:
-        return 'XP';
-      case AgeGroup.adult:
-        return 'Score';
-    }
-  }
-
-  String _getStreakLabel(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Days';
-      case AgeGroup.child:
-        return 'Days';
-      case AgeGroup.kid:
-        return 'Streak';
-      case AgeGroup.teen:
-        return 'Streak';
-      case AgeGroup.adult:
-        return 'Streak';
-    }
-  }
-
-  String _getSessionsLabel(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Plays';
-      case AgeGroup.child:
-        return 'Plays';
-      case AgeGroup.kid:
-        return 'Quests';
-      case AgeGroup.teen:
-        return 'Sessions';
-      case AgeGroup.adult:
-        return 'Sessions';
-    }
-  }
-
-  String _getSettingsTitle(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Settings';
-      case AgeGroup.child:
-        return 'Settings';
-      case AgeGroup.kid:
-        return 'Options';
-      case AgeGroup.teen:
-        return 'Settings';
-      case AgeGroup.adult:
-        return 'Settings';
-    }
-  }
-
-  String _getEditProfileSubtitle(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Ask a grown-up to help';
-      case AgeGroup.child:
-        return 'Ask a grown-up to help';
-      case AgeGroup.kid:
-        return 'Change your name or avatar';
-      case AgeGroup.teen:
-        return 'Update your info';
-      case AgeGroup.adult:
-        return 'Manage your account';
-    }
-  }
-
-  String _getNotificationSubtitle(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Fun reminders';
-      case AgeGroup.child:
-        return 'Fun reminders';
-      case AgeGroup.kid:
-        return 'Alert me for quests';
-      case AgeGroup.teen:
-        return 'Customize alerts';
-      case AgeGroup.adult:
-        return 'Manage notifications';
-    }
-  }
-
-  String _getAccountTitle(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'More';
-      case AgeGroup.child:
-        return 'More';
-      case AgeGroup.kid:
-        return 'Account';
-      case AgeGroup.teen:
-        return 'Account';
-      case AgeGroup.adult:
-        return 'Account';
-    }
-  }
-
-  String _getHelpTitle(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Help';
-      case AgeGroup.child:
-        return 'Help';
-      case AgeGroup.kid:
-        return 'Get Help';
-      case AgeGroup.teen:
-        return 'Support';
-      case AgeGroup.adult:
-        return 'Help & Support';
-    }
-  }
-
-  String _getHelpSubtitle(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Ask a grown-up';
-      case AgeGroup.child:
-        return 'Ask a grown-up';
-      case AgeGroup.kid:
-        return 'Chat with Nora';
-      case AgeGroup.teen:
-        return 'FAQ and contact';
-      case AgeGroup.adult:
-        return 'FAQ, contact, docs';
-    }
-  }
-
-  String _getLogoutLabel(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Bye-bye!';
-      case AgeGroup.child:
-        return 'Bye-bye!';
-      case AgeGroup.kid:
-        return 'Log Out';
-      case AgeGroup.teen:
-        return 'Sign Out';
-      case AgeGroup.adult:
-        return 'Sign Out';
-    }
-  }
-
-  String _getLogoutTitle(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Say bye-bye?';
-      case AgeGroup.child:
-        return 'Say bye-bye?';
-      case AgeGroup.kid:
-        return 'Log out?';
-      case AgeGroup.teen:
-        return 'Sign out?';
-      case AgeGroup.adult:
-        return 'Sign out?';
-    }
-  }
-
-  String _getLogoutMessage(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Nora will miss you! See you soon!';
-      case AgeGroup.child:
-        return 'Nora will miss you! See you soon!';
-      case AgeGroup.kid:
-        return 'Your progress will be saved. Come back soon!';
-      case AgeGroup.teen:
-        return 'Your data is safe. See you next time!';
-      case AgeGroup.adult:
-        return 'Your session will end. All data is saved.';
-    }
-  }
-
-  String _getLogoutButtonLabel(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return 'Bye!';
-      case AgeGroup.child:
-        return 'Bye!';
-      case AgeGroup.kid:
-        return 'Log Out';
-      case AgeGroup.teen:
-        return 'Sign Out';
-      case AgeGroup.adult:
-        return 'Sign Out';
-    }
-  }
-
-  List<Map<String, String>> _getFeaturesForAgeGroup(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby:
-        return [
-          {'label': 'Play', 'icon': 'sports_esports'},
-          {'label': 'Colors', 'icon': 'palette'},
-          {'label': 'Music', 'icon': 'music_note'},
-        ];
-      case AgeGroup.child:
-        return [
-          {'label': 'Play', 'icon': 'sports_esports'},
-          {'label': 'Colors', 'icon': 'palette'},
-          {'label': 'Music', 'icon': 'music_note'},
-        ];
-      case AgeGroup.kid:
-        return [
-          {'label': 'Adventures', 'icon': 'explore'},
-          {'label': 'Games', 'icon': 'sports_esports'},
-          {'label': 'Learning', 'icon': 'school'},
-        ];
-      case AgeGroup.teen:
-        return [
-          {'label': 'Focus', 'icon': 'center_focus_strong'},
-          {'label': 'Social', 'icon': 'people'},
-          {'label': 'Goals', 'icon': 'flag'},
-        ];
-      case AgeGroup.adult:
-        return [
-          {'label': 'Productivity', 'icon': 'trending_up'},
-          {'label': 'Analytics', 'icon': 'analytics'},
-          {'label': 'Wellness', 'icon': 'spa'},
-        ];
-    }
-  }
-
-  IconData _getFeatureIcon(String icon) {
-    switch (icon) {
-      case 'sports_esports':
-        return Icons.sports_esports_rounded;
-      case 'palette':
-        return Icons.palette_rounded;
-      case 'music_note':
-        return Icons.music_note_rounded;
-      case 'explore':
-        return Icons.explore_rounded;
-      case 'school':
-        return Icons.school_rounded;
-      case 'center_focus_strong':
-        return Icons.center_focus_strong_rounded;
-      case 'people':
-        return Icons.people_rounded;
-      case 'flag':
-        return Icons.flag_rounded;
-      case 'trending_up':
-        return Icons.trending_up_rounded;
-      case 'analytics':
-        return Icons.analytics_rounded;
-      case 'spa':
-        return Icons.spa_rounded;
-      default:
-        return Icons.star_rounded;
-    }
   }
 }

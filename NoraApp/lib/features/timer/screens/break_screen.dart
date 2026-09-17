@@ -4,7 +4,11 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/theme/persona_theme.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/timer_provider.dart';
+import '../../../providers/accountability_provider.dart';
+import '../../../providers/pomodoro_provider.dart';
+import '../../accountability/screens/accountability_verify_screen.dart';
 
 /// Break Screen — calming interlude between Pomodoro focus sessions.
 /// Shows a Lottie breathing animation, countdown timer, and session progress.
@@ -20,6 +24,7 @@ class _BreakScreenState extends State<BreakScreen>
   late AnimationController _breatheTextController;
   late Animation<double> _breatheTextOpacity;
   bool _showBreatheIn = true;
+  bool _breakCompleted = false;
 
   @override
   void initState() {
@@ -39,6 +44,14 @@ class _BreakScreenState extends State<BreakScreen>
       CurvedAnimation(parent: _breatheTextController, curve: Curves.easeInOut),
     );
     _breatheTextController.forward();
+
+    // Start the break timer when the screen appears
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final provider = context.read<TimerProvider>();
+        provider.startBreakTimer();
+      }
+    });
   }
 
   @override
@@ -49,9 +62,9 @@ class _BreakScreenState extends State<BreakScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, provider, _) {
-        final persona = provider.persona;
+    return Consumer2<PersonaProvider, TimerProvider>(
+      builder: (context, personaProvider, provider, _) {
+        final persona = personaProvider.persona;
         final isLongBreak = provider.isLongBreak;
         final minutes = provider.timerSeconds ~/ 60;
         final seconds = provider.timerSeconds % 60;
@@ -59,6 +72,16 @@ class _BreakScreenState extends State<BreakScreen>
         final progress = totalSeconds > 0
             ? 1.0 - (provider.timerSeconds / totalSeconds)
             : 0.0;
+
+        // Handle break completion (timer reached zero)
+        if (!provider.isBreakPhase && !_breakCompleted) {
+          _breakCompleted = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _handleBreakComplete(provider);
+            }
+          });
+        }
 
         return Scaffold(
           backgroundColor: DesignTokens.background,
@@ -95,7 +118,7 @@ class _BreakScreenState extends State<BreakScreen>
     );
   }
 
-  Widget _buildHeader(PersonaTheme persona, bool isLongBreak, AppProvider provider) {
+  Widget _buildHeader(PersonaTheme persona, bool isLongBreak, TimerProvider provider) {
     return Container(
       padding: const EdgeInsets.all(DesignTokens.spacing20),
       child: Row(
@@ -220,37 +243,50 @@ class _BreakScreenState extends State<BreakScreen>
       int minutes, int seconds, double progress, PersonaTheme persona) {
     return Column(
       children: [
-        // Timer display
-        Text(
-          '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-          style: TextStyle(
-            color: DesignTokens.textPrimary,
-            fontSize: 56,
-            fontWeight: DesignTokens.fontWeightBold,
-            fontFamily: DesignTokens.fontFamilyDisplay,
-            height: 1,
-          ),
+        // Timer display — Selector rebuilds only this on tick
+        Selector<TimerProvider, String>(
+          selector: (_, p) => p.timerDisplay,
+          builder: (context, display, _) {
+            return Text(
+              display,
+              style: TextStyle(
+                color: DesignTokens.textPrimary,
+                fontSize: DesignTokens.fontSizeTimer,
+                fontWeight: DesignTokens.fontWeightBold,
+                fontFamily: DesignTokens.fontFamilyDisplay,
+                height: 1,
+              ),
+            );
+          },
         ),
         const SizedBox(height: DesignTokens.spacing8),
-        // Progress bar
+        // Progress bar — Selector rebuilds only this on tick
         SizedBox(
           width: 200,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(DesignTokens.radiusRound),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: DesignTokens.border,
-              valueColor: AlwaysStoppedAnimation<Color>(persona.primary),
-            ),
+          child: Selector<TimerProvider, double>(
+            selector: (_, p) {
+              final total = p.breakDurationSeconds;
+              return total > 0 ? 1.0 - (p.timerSeconds / total) : 0.0;
+            },
+            builder: (context, prog, _) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(DesignTokens.radiusRound),
+                child: LinearProgressIndicator(
+                  value: prog,
+                  minHeight: 4,
+                  backgroundColor: DesignTokens.border,
+                  valueColor: AlwaysStoppedAnimation<Color>(persona.primary),
+                ),
+              );
+            },
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSessionDots(AppProvider provider, PersonaTheme persona) {
-    final total = provider.persona.ageGroup.pomodoroSessionsPerCycle;
+  Widget _buildSessionDots(TimerProvider provider, PersonaTheme persona) {
+    final total = persona.ageGroup.pomodoroSessionsPerCycle;
     final completed = provider.completedSessionsInCycle;
 
     return Row(
@@ -278,9 +314,17 @@ class _BreakScreenState extends State<BreakScreen>
     );
   }
 
-  Widget _buildSkipButton(AppProvider provider, PersonaTheme persona) {
+  Widget _buildSkipButton(TimerProvider provider, PersonaTheme persona) {
     return GestureDetector(
-      onTap: provider.skipBreak,
+      onTap: () {
+        // Check accountability lock before allowing skip
+        final accountability = context.read<AccountabilityProvider>();
+        if (accountability.isLockActive && !accountability.isVerified) {
+          _showAccountabilityVerify(reason: 'Enter guardian PIN to skip break');
+          return;
+        }
+        _handleBreakComplete(provider);
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
         decoration: BoxDecoration(
@@ -310,5 +354,52 @@ class _BreakScreenState extends State<BreakScreen>
         ),
       ),
     );
+  }
+
+  void _showAccountabilityVerify({required String reason}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        backgroundColor: DesignTokens.darkSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: AccountabilityVerifyScreen(
+          reason: reason,
+          onVerified: () {
+            Navigator.of(ctx).pop();
+            // After verification, proceed with the break completion
+            _handleBreakComplete(context.read<TimerProvider>());
+          },
+        ),
+      ),
+    );
+  }
+
+  void _handleBreakComplete(TimerProvider provider) {
+    final pomodoro = context.read<PomodoroProvider>();
+    final isLongBreak = provider.isLongBreak;
+
+    // Record cycle completion if this was a long break
+    if (isLongBreak) {
+      pomodoro.recordCycleCompleted();
+    }
+
+    // Complete the break in the provider
+    provider.skipBreak();
+
+    // Navigate back to timer screen
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+
+    // Check if auto-cycle is enabled and we haven't reached the target
+    if (pomodoro.autoCycleEnabled && !pomodoro.allCyclesCompleted) {
+      // Auto-start the next focus session after navigation
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          provider.startTimer();
+        }
+      });
+    }
   }
 }

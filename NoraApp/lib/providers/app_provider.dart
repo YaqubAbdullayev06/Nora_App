@@ -28,6 +28,7 @@ class AppProvider extends ChangeNotifier {
   final FocusProtectionService _focusProtection = FocusProtectionService();
   final ScreenTimeService _screenTimeService = ScreenTimeService();
   Timer? _screenTimeRefreshTimer;
+  bool _isInitialized = false;
 
   // ─── Persona State ───
   AgeGroup _ageGroup = AgeGroup.adult;
@@ -179,49 +180,16 @@ class AppProvider extends ChangeNotifier {
   int get sessionsCompleted => _sessionsCompleted;
   List<String> get achievements => _achievements;
 
-  // ─── Timer State ───
-  bool _isTimerRunning = false;
-  int _timerSeconds = 0;
-  int _totalTimerSeconds = 0;
-  Timer? _timer;
-
-  // ─── Pomodoro Cycle State ───
-  bool _isBreakPhase = false;
-  int _completedSessionsInCycle = 0;
-
-  bool get isTimerRunning => _isTimerRunning;
-  int get timerSeconds => _timerSeconds;
-  int get totalTimerSeconds => _totalTimerSeconds;
-  bool get isBreakPhase => _isBreakPhase;
-  int get completedSessionsInCycle => _completedSessionsInCycle;
-
-  bool get isLongBreak =>
-      _completedSessionsInCycle > 0 &&
-      _completedSessionsInCycle % _persona.ageGroup.pomodoroSessionsPerCycle ==
-          0;
-
-  int get breakDurationSeconds =>
-      (isLongBreak
-              ? _persona.ageGroup.longBreakMinutes
-              : _persona.ageGroup.breakMinutes) *
-          60;
-
-  String get timerDisplay {
-    int minutes = _timerSeconds ~/ 60;
-    int secs = _timerSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-  }
-
-  double get timerProgress =>
-      _totalTimerSeconds > 0 ? _timerSeconds / _totalTimerSeconds : 0;
-
   // ─── Sessions History ───
   List<FocusSession> _sessions = [];
   List<FocusSession> get sessions => _sessions;
 
   // ─── Screen Time Tracking ───
   int _screenTimeTodayMinutes = 0;
-  int get screenTimeTodayMinutes => _screenTimeTodayMinutes;
+  int get screenTimeTodayMinutes {
+    if (!_isInitialized) init(); // fire-and-forget
+    return _screenTimeTodayMinutes;
+  }
   bool get isScreenTimeExceeded {
     if (_persona.ageGroup.screenTimeLimitMinutes == 0) return false;
     return _screenTimeTodayMinutes >= _persona.ageGroup.screenTimeLimitMinutes;
@@ -550,6 +518,9 @@ class AppProvider extends ChangeNotifier {
   // ─── Initialization ───
 
   Future<void> init() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
     _totalTimerSeconds = _persona.ageGroup.defaultFocusMinutes * 60;
     _timerSeconds = _totalTimerSeconds;
 

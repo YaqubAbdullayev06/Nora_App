@@ -58,7 +58,7 @@ class HomeInsight extends StatelessWidget {
                       '${summary.focusScore}',
                       style: TextStyle(
                         color: _getScoreColor(summary.focusScore),
-                        fontSize: 12,
+                        fontSize: DesignTokens.fontSizeCaption,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -121,7 +121,7 @@ class HomeInsight extends StatelessWidget {
             label,
             style: TextStyle(
               color: DesignTokens.textMuted,
-              fontSize: 10,
+              fontSize: DesignTokens.fontSizeTiny,
             ),
           ),
         ],

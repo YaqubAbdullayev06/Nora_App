@@ -10,6 +10,7 @@ export 'loader_one.dart';
 
 /// Reusable Card component — adapts to current PersonaTheme.
 /// Background, border, radius all come from DesignTokens (which reads from persona).
+/// Set [glass] to true for glassmorphism effect (blur + translucent tint).
 class NoraCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -19,6 +20,9 @@ class NoraCard extends StatefulWidget {
   final Border? border;
   final Gradient? gradient;
   final VoidCallback? onTap;
+  final bool glass;
+  final double glassOpacity;
+  final double glassBlur;
 
   const NoraCard({
     super.key,
@@ -30,6 +34,9 @@ class NoraCard extends StatefulWidget {
     this.border,
     this.gradient,
     this.onTap,
+    this.glass = false,
+    this.glassOpacity = 0.85,
+    this.glassBlur = 20,
   });
 
   @override
@@ -41,44 +48,101 @@ class _NoraCardState extends State<NoraCard> {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveRadius = widget.radius ?? DesignTokens.cardRadius;
+
     final cardContent = Container(
       padding: widget.padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: widget.gradient == null ? (widget.backgroundColor ?? DesignTokens.surface) : null,
+        color: widget.gradient == null
+            ? (widget.backgroundColor ?? DesignTokens.surface)
+            : null,
         gradient: widget.gradient,
-        borderRadius: BorderRadius.circular(widget.radius ?? DesignTokens.cardRadius),
-        border: widget.border ?? Border.all(
-          color: DesignTokens.border,
-          width: DesignTokens.cardBorderWidth,
-        ),
-        boxShadow: widget.boxShadow ?? DesignTokens.shadowRaised,
+        borderRadius: BorderRadius.circular(effectiveRadius),
+        border: widget.border ??
+            Border.all(
+              color: widget.glass
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : DesignTokens.border,
+              width: widget.glass ? 1 : DesignTokens.cardBorderWidth,
+            ),
+        boxShadow: widget.boxShadow ??
+            [
+              BoxShadow(
+                color: widget.glass
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : DesignTokens.textPrimary.withValues(alpha: 0.08),
+                blurRadius: widget.glass ? 20 : 10,
+                offset: widget.glass
+                    ? const Offset(0, 8)
+                    : const Offset(0, 2),
+              ),
+            ],
       ),
       child: widget.child,
     );
 
-    if (widget.onTap == null) return cardContent;
+    Widget result = widget.glass
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(effectiveRadius),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: widget.glassBlur,
+                sigmaY: widget.glassBlur,
+              ),
+              child: Container(
+                padding: widget.padding ?? const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: (widget.backgroundColor ?? DesignTokens.surface)
+                      .withValues(alpha: widget.glassOpacity),
+                  borderRadius: BorderRadius.circular(effectiveRadius),
+                  border: widget.border ??
+                      Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1,
+                      ),
+                  boxShadow: widget.boxShadow ??
+                      [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                ),
+                child: widget.child,
+              ),
+            ),
+          )
+        : cardContent;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.98 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: cardContent,
+    if (widget.onTap == null) return result;
+
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _isPressed ? 0.98 : 1.0,
+          duration: const Duration(milliseconds: 100),
+          child: result,
+        ),
       ),
     );
   }
 }
 
 /// Stats Card — label muted, value colored, adapts to persona.
+/// Set [glass] to true for glassmorphism effect.
 class StatsCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
+  final bool glass;
 
   const StatsCard({
     super.key,
@@ -86,42 +150,50 @@ class StatsCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
+    this.glass = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return NoraCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
+    return Semantics(
+      label: '$label: $value',
+      child: NoraCard(
+        glass: glass,
+        backgroundColor: glass ? color.withValues(alpha: 0.15) : null,
+        padding: glass ? const EdgeInsets.all(14) : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 18),
             ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: DesignTokens.fontWeightBold,
-              fontFamily: DesignTokens.fontFamilyPrimary,
+            if (glass) const SizedBox(height: 10),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: DesignTokens.fontSizeH3,
+                fontWeight: DesignTokens.fontWeightBold,
+                fontFamily: DesignTokens.fontFamilyPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              color: DesignTokens.textMuted,
-              fontSize: DesignTokens.fontSizeCaption,
-              fontFamily: DesignTokens.fontFamilyPrimary,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: DesignTokens.textMuted,
+                fontSize: DesignTokens.fontSizeCaption,
+                fontFamily: DesignTokens.fontFamilyPrimary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -144,30 +216,33 @@ class NoraBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: outlined ? Colors.transparent : color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(999),
-        border: outlined ? Border.all(color: color, width: 1) : null,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, color: color, size: 14),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: DesignTokens.fontSizeCaption,
-              fontWeight: DesignTokens.fontWeightMedium,
-              fontFamily: DesignTokens.fontFamilyPrimary,
+    return Semantics(
+      label: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: outlined ? Colors.transparent : color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(999),
+          border: outlined ? Border.all(color: color, width: 1) : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: DesignTokens.fontSizeCaption,
+                fontWeight: DesignTokens.fontWeightMedium,
+                fontFamily: DesignTokens.fontFamilyPrimary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -253,16 +328,21 @@ class _NoraButtonState extends State<NoraButton> {
       ),
     );
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: widget.onPressed == null ? null : (_) => setState(() => _isPressed = true),
-      onTapUp: widget.onPressed == null ? null : (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onPressed,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: btn,
+    return Semantics(
+      button: true,
+      enabled: widget.onPressed != null,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: widget.onPressed == null ? null : (_) => setState(() => _isPressed = true),
+        onTapUp: widget.onPressed == null ? null : (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onPressed,
+        child: AnimatedScale(
+          scale: _isPressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 100),
+          child: btn,
+        ),
       ),
     );
   }
@@ -293,14 +373,17 @@ class NoraImageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NoraCard(
-      padding: EdgeInsets.zero,
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(DesignTokens.cardRadius),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Semantics(
+      button: onTap != null,
+      label: '$title, $category, $durationMinutes minutes',
+      child: NoraCard(
+        padding: EdgeInsets.zero,
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(DesignTokens.cardRadius),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Image section with gradient overlay
             Stack(
               children: [
@@ -384,7 +467,7 @@ class NoraImageCard extends StatelessWidget {
                           category,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: DesignTokens.fontSizeExtraSmall,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -411,7 +494,7 @@ class NoraImageCard extends StatelessWidget {
                           '+$points XP',
                           style: const TextStyle(
                             color: Colors.black,
-                            fontSize: 11,
+                            fontSize: DesignTokens.fontSizeExtraSmall,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -431,7 +514,7 @@ class NoraImageCard extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: DesignTokens.textPrimary,
-                      fontSize: 16,
+                      fontSize: DesignTokens.fontSizeBody,
                       fontWeight: DesignTokens.fontWeightBold,
                       fontFamily: DesignTokens.fontFamilyDisplay,
                     ),
@@ -443,7 +526,7 @@ class NoraImageCard extends StatelessWidget {
                     subtitle,
                     style: TextStyle(
                       color: DesignTokens.textMuted,
-                      fontSize: 13,
+                      fontSize: DesignTokens.fontSizeSmall,
                       height: 1.3,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
@@ -459,7 +542,7 @@ class NoraImageCard extends StatelessWidget {
                         '$durationMinutes min read',
                         style: TextStyle(
                           color: DesignTokens.textMuted,
-                          fontSize: 12,
+                          fontSize: DesignTokens.fontSizeCaption,
                         ),
                       ),
                       const Spacer(),
@@ -467,7 +550,7 @@ class NoraImageCard extends StatelessWidget {
                         'Read & Quiz →',
                         style: TextStyle(
                           color: DesignTokens.accent,
-                          fontSize: 12,
+                          fontSize: DesignTokens.fontSizeCaption,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -479,6 +562,7 @@ class NoraImageCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -552,30 +636,34 @@ class NoraMascot extends StatelessWidget {
     final persona = personaOverride ?? DesignTokens.current;
     final hasAsset = persona.mascotAssetPath != null;
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [persona.primary, persona.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Semantics(
+      label: '${persona.mascotName} mascot',
+      image: true,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [persona.primary, persona.secondary],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: showGlow
+              ? [
+                  BoxShadow(
+                    color: persona.primary.withValues(alpha: 0.4),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                  ),
+                ]
+              : null,
         ),
-        boxShadow: showGlow
-            ? [
-                BoxShadow(
-                  color: persona.primary.withValues(alpha: 0.4),
-                  blurRadius: 24,
-                  spreadRadius: 4,
-                ),
-              ]
-            : null,
-      ),
-      child: ClipOval(
-        child: SvgPicture.asset(
-          persona.mascotAssetPath,
-          fit: BoxFit.cover,
+        child: ClipOval(
+          child: SvgPicture.asset(
+            persona.mascotAssetPath,
+            fit: BoxFit.cover,
+          ),
         ),
       ),
     );
@@ -619,66 +707,75 @@ class PlanProgressRing extends StatelessWidget {
     final progress = total > 0 ? completed / total : 0.0;
     final persona = DesignTokens.current;
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Background circle
-          SizedBox(
-            width: size,
-            height: size,
-            child: CircularProgressIndicator(
-              value: 1.0,
-              strokeWidth: 6,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                DesignTokens.border,
+    return Semantics(
+      label: '$completed of $total tasks completed',
+      value: '${(progress * 100).round()}%',
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Background circle
+            SizedBox(
+              width: size,
+              height: size,
+              child: CircularProgressIndicator(
+                value: 1.0,
+                strokeWidth: 6,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  DesignTokens.border,
+                ),
               ),
             ),
-          ),
-          // Progress circle
-          SizedBox(
-            width: size,
-            height: size,
-            child: CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 6,
-              strokeCap: StrokeCap.round,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                completed == total && total > 0
-                    ? DesignTokens.success
-                    : persona.primary,
+            // Progress circle
+            SizedBox(
+              width: size,
+              height: size,
+              child: CircularProgressIndicator(
+                value: progress,
+                strokeWidth: 6,
+                strokeCap: StrokeCap.round,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  completed == total && total > 0
+                      ? DesignTokens.success
+                      : persona.primary,
+                ),
               ),
             ),
-          ),
-          // Center text
-          Text(
-            '$completed/$total',
-            style: TextStyle(
-              color: DesignTokens.textPrimary,
-              fontSize: size * 0.22,
-              fontWeight: DesignTokens.fontWeightBold,
-              fontFamily: DesignTokens.fontFamilyPrimary,
+            // Center text
+            Text(
+              '$completed/$total',
+              style: TextStyle(
+                color: DesignTokens.textPrimary,
+                fontSize: size * 0.22,
+                fontWeight: DesignTokens.fontWeightBold,
+                fontFamily: DesignTokens.fontFamilyPrimary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 /// A single task card with checkbox, priority indicator, and title.
+/// Set [glass] to true for glassmorphism effect.
 class PlanTaskCard extends StatefulWidget {
   final dynamic task; // PlanTask from models.dart
   final VoidCallback? onToggle;
   final bool interactive;
+  final bool glass;
+  final Color? accentColor;
 
   const PlanTaskCard({
     super.key,
     required this.task,
     this.onToggle,
     this.interactive = true,
+    this.glass = false,
+    this.accentColor,
   });
 
   @override
@@ -689,6 +786,8 @@ class _PlanTaskCardState extends State<PlanTaskCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
+  late AnimationController _checkController;
+  late Animation<double> _checkScale;
 
   @override
   void initState() {
@@ -700,11 +799,30 @@ class _PlanTaskCardState extends State<PlanTaskCard>
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
+    _checkController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+      value: widget.task.completed ? 1.0 : 0.0,
+    );
+    _checkScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _checkController, curve: Curves.elasticOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(PlanTaskCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.task.completed && !oldWidget.task.completed) {
+      _checkController.forward();
+    } else if (!widget.task.completed && oldWidget.task.completed) {
+      _checkController.reverse();
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _checkController.dispose();
     super.dispose();
   }
 
@@ -724,38 +842,46 @@ class _PlanTaskCardState extends State<PlanTaskCard>
   @override
   Widget build(BuildContext context) {
     final isCompleted = widget.task.completed;
-    final priorityColor = _getPriorityColor();
+    final priorityColor = widget.accentColor ?? _getPriorityColor();
 
     return AnimatedBuilder(
       animation: _scaleAnimation,
       builder: (context, child) {
         return Transform.scale(
           scale: _scaleAnimation.value,
-          child: child,
+          child: Semantics(
+            button: true,
+            label: '${widget.task.title}, priority ${widget.task.priorityLabel}${isCompleted ? ", completed" : ""}',
+            child: child,
+          ),
         );
       },
       child: GestureDetector(
         onTapDown: widget.interactive ? (_) => _controller.forward() : null,
-        onTapUp: widget.interactive ? (_) {
-          _controller.reverse();
-          // Haptic feedback on task toggle
-          if (!isCompleted) {
-            HapticFeedback.mediumImpact();
-          } else {
-            HapticFeedback.lightImpact();
-          }
-          widget.onToggle?.call();
-        } : null,
+        onTapUp: widget.interactive
+            ? (_) {
+                _controller.reverse();
+                if (!isCompleted) {
+                  HapticFeedback.mediumImpact();
+                } else {
+                  HapticFeedback.lightImpact();
+                }
+                widget.onToggle?.call();
+              }
+            : null,
         onTapCancel: widget.interactive ? () => _controller.reverse() : null,
         child: NoraCard(
+          glass: widget.glass,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           backgroundColor: isCompleted
               ? DesignTokens.success.withValues(alpha: 0.08)
-              : DesignTokens.surface,
+              : null,
           border: Border.all(
             color: isCompleted
                 ? DesignTokens.success.withValues(alpha: 0.3)
-                : DesignTokens.border,
+                : widget.glass
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : DesignTokens.border,
             width: 1,
           ),
           child: Row(
@@ -771,28 +897,44 @@ class _PlanTaskCardState extends State<PlanTaskCard>
               ),
               const SizedBox(width: 12),
               // Checkbox
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isCompleted
-                      ? DesignTokens.success
-                      : Colors.transparent,
-                  border: Border.all(
-                    color: isCompleted
-                        ? DesignTokens.success
-                        : DesignTokens.textMuted,
-                    width: 2,
-                  ),
-                ),
-                child: isCompleted
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      )
+              GestureDetector(
+                onTap: widget.interactive
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        widget.onToggle?.call();
+                      }
                     : null,
+                child: AnimatedBuilder(
+                  animation: _checkScale,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _checkScale.value,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isCompleted
+                              ? priorityColor
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: isCompleted
+                                ? priorityColor
+                                : DesignTokens.textMuted,
+                            width: 2,
+                          ),
+                        ),
+                        child: isCompleted
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              )
+                            : null,
+                      ),
+                    );
+                  },
+                ),
               ),
               const SizedBox(width: 12),
               // Title
@@ -812,6 +954,7 @@ class _PlanTaskCardState extends State<PlanTaskCard>
                         decoration: isCompleted
                             ? TextDecoration.lineThrough
                             : null,
+                        decorationColor: DesignTokens.textMuted,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -908,11 +1051,13 @@ class StatCardHorizontal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NoraCard(
-      backgroundColor: color.withValues(alpha: 0.08),
-      border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
+    return Semantics(
+      label: '$label: $value',
+      child: NoraCard(
+        backgroundColor: color.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           NoraIcon(
@@ -927,7 +1072,7 @@ class StatCardHorizontal extends StatelessWidget {
             value,
             style: TextStyle(
               color: color,
-              fontSize: 28,
+              fontSize: DesignTokens.fontSizeH1,
               fontWeight: DesignTokens.fontWeightBold,
               fontFamily: DesignTokens.fontFamilyDisplay,
               height: 1.0,
@@ -944,6 +1089,84 @@ class StatCardHorizontal extends StatelessWidget {
           ),
         ],
       ),
+    ),
+    );
+  }
+}
+
+/// Action card — icon + title + subtitle + chevron, with optional glass effect.
+class NoraActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool glass;
+
+  const NoraActionCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    this.onTap,
+    this.glass = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: onTap != null,
+      label: '$title: $subtitle',
+      child: NoraCard(
+        glass: glass,
+        onTap: onTap,
+        backgroundColor: glass ? color.withValues(alpha: 0.1) : null,
+        padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 22, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: DesignTokens.fontSizeBodySmall,
+                    fontWeight: DesignTokens.fontWeightSemiBold,
+                    color: DesignTokens.textPrimary,
+                    fontFamily: DesignTokens.fontFamilyPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: DesignTokens.fontSizeCaption,
+                    color: DesignTokens.textMuted,
+                    fontFamily: DesignTokens.fontFamilyPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            size: 18,
+            color: DesignTokens.textMuted,
+          ),
+        ],
+      ),
+    ),
     );
   }
 }
@@ -963,8 +1186,10 @@ class PlanPromptCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NoraCard(
-      gradient: LinearGradient(
+    return Semantics(
+      label: '$title: $subtitle',
+      child: NoraCard(
+        gradient: LinearGradient(
         colors: [
           DesignTokens.accent.withValues(alpha: 0.15),
           DesignTokens.accentSecondary.withValues(alpha: 0.15),
@@ -1015,6 +1240,7 @@ class PlanPromptCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

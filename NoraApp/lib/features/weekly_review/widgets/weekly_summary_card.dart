@@ -99,7 +99,7 @@ class WeeklySummaryCard extends StatelessWidget {
                   '$daysActive of 7 days active',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: DesignTokens.fontSizeCaption,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -131,7 +131,7 @@ class WeeklySummaryCard extends StatelessWidget {
           value,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 18,
+            fontSize: DesignTokens.fontSizeSubhead,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -140,7 +140,7 @@ class WeeklySummaryCard extends StatelessWidget {
           label,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.8),
-            fontSize: 11,
+            fontSize: DesignTokens.fontSizeExtraSmall,
           ),
         ),
       ],

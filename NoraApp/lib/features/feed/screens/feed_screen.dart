@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
@@ -7,11 +8,12 @@ import '../../../providers/app_provider.dart';
 import '../../../widgets/nora_components.dart';
 import '../../../models/models.dart';
 
-/// Feed Screen — age-adaptive content feed.
-/// Baby: colorful cards, large text, video thumbnails
-/// Kid: game cards, progress bars, achievement badges
-/// Teen: study articles, code snippets, social features
-/// Adult: productivity articles, career content, minimal design
+/// Feed Screen — age-adaptive content feed with smart categorization.
+/// Features:
+/// - "For You" personalized recommendations
+/// - "Quick Reads" for short sessions
+/// - Visual content type badges
+/// - Category filtering with counts
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -28,24 +30,127 @@ class _FeedScreenState extends State<FeedScreen> {
       builder: (context, provider, _) {
         final persona = provider.persona;
         final categories = _getCategoriesForAgeGroup(persona.ageGroup);
+        final allContent = provider.feedContent;
         final filteredContent = _selectedCategory == 'All'
-            ? provider.feedContent
-            : provider.feedContent
+            ? allContent
+            : allContent
                 .where((c) => c.category == _selectedCategory)
                 .toList();
+
+        // Smart sections
+        final recommended = _getRecommendedContent(allContent, persona);
+        final quickReads = allContent
+            .where((c) => c.durationMinutes <= 5)
+            .take(3)
+            .toList();
+        final trending = allContent.where((c) => c.points >= 20).toList();
 
         return Scaffold(
           backgroundColor: DesignTokens.background,
           body: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(persona),
-                _buildCategoryChips(categories, persona),
-                Expanded(
-                  child: filteredContent.isEmpty
-                      ? _buildEmptyState(persona)
-                      : _buildContentList(filteredContent, persona),
+            child: CustomScrollView(
+              slivers: [
+                // Header
+                SliverToBoxAdapter(
+                  child: _buildHeader(persona),
+                ),
+
+                // Category chips
+                SliverToBoxAdapter(
+                  child: _buildCategoryChips(categories, persona, allContent),
+                ),
+
+                // "For You" section
+                if (_selectedCategory == 'All' && recommended.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      'For You',
+                      'Recommended based on your interests',
+                      Icons.recommend_rounded,
+                      persona,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _buildRecommendedCarousel(recommended, persona),
+                  ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: DesignTokens.spacing16),
+                  ),
+                ],
+
+                // "Quick Reads" section
+                if (_selectedCategory == 'All' && quickReads.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      'Quick Reads',
+                      '5 minutes or less',
+                      Icons.timer_rounded,
+                      persona,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _buildQuickReadsRow(quickReads, persona),
+                  ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: DesignTokens.spacing16),
+                  ),
+                ],
+
+                // "Trending" section
+                if (_selectedCategory == 'All' && trending.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      'Trending',
+                      'Popular this week',
+                      Icons.trending_up_rounded,
+                      persona,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _buildTrendingList(trending, persona),
+                  ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: DesignTokens.spacing16),
+                  ),
+                ],
+
+                // All content header
+                SliverToBoxAdapter(
+                  child: _buildSectionHeader(
+                    _selectedCategory == 'All' ? 'All Content' : _selectedCategory,
+                    '${filteredContent.length} items',
+                    Icons.grid_view_rounded,
+                    persona,
+                  ),
+                ),
+
+                // Content list
+                if (filteredContent.isEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildEmptyState(persona),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: DesignTokens.spacing20),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final item = filteredContent[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                                bottom: DesignTokens.spacing12),
+                            child: _buildEnhancedContentCard(item, persona),
+                          );
+                        },
+                        childCount: filteredContent.length,
+                      ),
+                    ),
+                  ),
+
+                // Bottom padding
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: DesignTokens.spacing40),
                 ),
               ],
             ),
@@ -90,7 +195,8 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildCategoryChips(List<String> categories, PersonaTheme persona) {
+  Widget _buildCategoryChips(
+      List<String> categories, PersonaTheme persona, List<ContentItem> allContent) {
     return SizedBox(
       height: 40,
       child: ListView.separated(
@@ -102,6 +208,10 @@ class _FeedScreenState extends State<FeedScreen> {
         itemBuilder: (context, index) {
           final category = categories[index];
           final isSelected = _selectedCategory == category;
+          final count = category == 'All'
+              ? allContent.length
+              : allContent.where((c) => c.category == category).length;
+
           return GestureDetector(
             onTap: () => setState(() => _selectedCategory = category),
             child: AnimatedContainer(
@@ -115,18 +225,46 @@ class _FeedScreenState extends State<FeedScreen> {
                   width: 1,
                 ),
               ),
-              child: Text(
-                category,
-                style: TextStyle(
-                  color: isSelected
-                      ? (persona.isDark
-                          ? DesignTokens.background
-                          : Colors.white)
-                      : DesignTokens.textMuted,
-                  fontSize: DesignTokens.fontSizeCaption,
-                  fontWeight: DesignTokens.fontWeightMedium,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    category,
+                    style: TextStyle(
+                      color: isSelected
+                          ? (persona.isDark
+                              ? DesignTokens.background
+                              : Colors.white)
+                          : DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                      fontWeight: DesignTokens.fontWeightMedium,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
+                  if (count > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : DesignTokens.background,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeExtraSmall,
+                          fontWeight: DesignTokens.fontWeightMedium,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           );
@@ -135,30 +273,429 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildContentList(List<ContentItem> content, PersonaTheme persona) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(DesignTokens.spacing20),
-      itemCount: content.length,
-      separatorBuilder: (_, __) =>
-          const SizedBox(height: DesignTokens.spacing12),
-      itemBuilder: (context, index) {
-        final item = content[index];
-        return _buildContentCard(item, persona);
-      },
+  Widget _buildSectionHeader(
+      String title, String subtitle, IconData icon, PersonaTheme persona) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          DesignTokens.spacing20, DesignTokens.spacing20,
+          DesignTokens.spacing20, DesignTokens.spacing12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: DesignTokens.accent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(DesignTokens.radius10),
+            ),
+            child: Icon(icon, color: DesignTokens.accent, size: 18),
+          ),
+          const SizedBox(width: DesignTokens.spacing12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: DesignTokens.textPrimary,
+                    fontSize: DesignTokens.fontSizeH3,
+                    fontWeight: DesignTokens.fontWeightSemiBold,
+                    fontFamily: DesignTokens.fontFamilyDisplay,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: DesignTokens.textMuted,
+                    fontSize: DesignTokens.fontSizeCaption,
+                    fontFamily: DesignTokens.fontFamilyPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildContentCard(ContentItem item, PersonaTheme persona) {
-    return NoraImageCard(
-      imageUrl: item.imageUrl,
-      title: item.title,
-      subtitle: item.description,
-      category: item.category,
-      durationMinutes: item.durationMinutes,
-      points: item.points,
-      typeIcon: _getContentTypeIcon(item.contentType),
-      onTap: () => _showContentDetail(context, item),
+  Widget _buildRecommendedCarousel(
+      List<ContentItem> recommended, PersonaTheme persona) {
+    return SizedBox(
+      height: 180,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spacing20),
+        itemCount: recommended.length,
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: DesignTokens.spacing12),
+        itemBuilder: (context, index) {
+          final item = recommended[index];
+          return _buildRecommendedCard(item, persona);
+        },
+      ),
     );
+  }
+
+  Widget _buildRecommendedCard(ContentItem item, PersonaTheme persona) {
+    return GestureDetector(
+      onTap: () => _showContentDetail(context, item),
+      child: Container(
+        width: 280,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              persona.primary.withValues(alpha: 0.15),
+              persona.secondary.withValues(alpha: 0.1),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(DesignTokens.radius16),
+          border: Border.all(
+            color: persona.primary.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(DesignTokens.spacing16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildContentTypeBadge(item.contentType, persona),
+                  const Spacer(),
+                  _buildPointsBadge(item.points),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                item.title,
+                style: TextStyle(
+                  color: DesignTokens.textPrimary,
+                  fontSize: DesignTokens.fontSizeBody,
+                  fontWeight: DesignTokens.fontWeightSemiBold,
+                  fontFamily: DesignTokens.fontFamilyDisplay,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: DesignTokens.spacing4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.schedule_rounded,
+                    color: DesignTokens.textMuted,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${item.durationMinutes} min',
+                    style: TextStyle(
+                      color: DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spacing12),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: DesignTokens.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      item.category,
+                      style: TextStyle(
+                        color: DesignTokens.textMuted,
+                        fontSize: DesignTokens.fontSizeExtraSmall,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickReadsRow(List<ContentItem> quickReads, PersonaTheme persona) {
+    return SizedBox(
+      height: 100,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spacing20),
+        itemCount: quickReads.length,
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: DesignTokens.spacing12),
+        itemBuilder: (context, index) {
+          final item = quickReads[index];
+          return _buildQuickReadCard(item, persona);
+        },
+      ),
+    );
+  }
+
+  Widget _buildQuickReadCard(ContentItem item, PersonaTheme persona) {
+    return GestureDetector(
+      onTap: () => _showContentDetail(context, item),
+      child: Container(
+        width: 140,
+        padding: const EdgeInsets.all(DesignTokens.spacing12),
+        decoration: BoxDecoration(
+          color: DesignTokens.surface,
+          borderRadius: BorderRadius.circular(DesignTokens.radius12),
+          border: Border.all(color: DesignTokens.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildContentTypeBadge(item.contentType, persona),
+            const Spacer(),
+            Text(
+              item.title,
+              style: TextStyle(
+                color: DesignTokens.textPrimary,
+                fontSize: DesignTokens.fontSizeCaption,
+                fontWeight: DesignTokens.fontWeightMedium,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${item.durationMinutes} min',
+              style: TextStyle(
+                color: DesignTokens.textMuted,
+                fontSize: DesignTokens.fontSizeExtraSmall,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrendingList(List<ContentItem> trending, PersonaTheme persona) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spacing20),
+      child: Column(
+        children: trending.take(3).map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: DesignTokens.spacing8),
+            child: _buildTrendingCard(item, persona),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTrendingCard(ContentItem item, PersonaTheme persona) {
+    return GestureDetector(
+      onTap: () => _showContentDetail(context, item),
+      child: NoraCard(
+        padding: const EdgeInsets.all(DesignTokens.spacing12),
+        child: Row(
+          children: [
+            _buildContentTypeIcon(item.contentType, persona),
+            const SizedBox(width: DesignTokens.spacing12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: TextStyle(
+                      color: DesignTokens.textPrimary,
+                      fontSize: DesignTokens.fontSizeBodySmall,
+                      fontWeight: DesignTokens.fontWeightSemiBold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '${item.durationMinutes} min · ${item.category}',
+                    style: TextStyle(
+                      color: DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildPointsBadge(item.points),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedContentCard(ContentItem item, PersonaTheme persona) {
+    return GestureDetector(
+      onTap: () => _showContentDetail(context, item),
+      child: NoraCard(
+        padding: const EdgeInsets.all(DesignTokens.spacing16),
+        child: Row(
+          children: [
+            _buildContentTypeIcon(item.contentType, persona),
+            const SizedBox(width: DesignTokens.spacing12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: TextStyle(
+                            color: DesignTokens.textPrimary,
+                            fontSize: DesignTokens.fontSizeBody,
+                            fontWeight: DesignTokens.fontWeightSemiBold,
+                            fontFamily: DesignTokens.fontFamilyDisplay,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      _buildPointsBadge(item.points),
+                    ],
+                  ),
+                  const SizedBox(height: DesignTokens.spacing4),
+                  Text(
+                    item.description,
+                    style: TextStyle(
+                      color: DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: DesignTokens.spacing8),
+                  Row(
+                    children: [
+                      _buildContentTypeBadge(item.contentType, persona),
+                      const SizedBox(width: DesignTokens.spacing8),
+                      Icon(
+                        Icons.schedule_rounded,
+                        color: DesignTokens.textMuted,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${item.durationMinutes} min',
+                        style: TextStyle(
+                          color: DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeExtraSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContentTypeBadge(String type, PersonaTheme persona) {
+    final (icon, label, color) = switch (type) {
+      'video' => (Icons.play_circle_rounded, 'Video', DesignTokens.danger),
+      'article' => (Icons.article_rounded, 'Read', DesignTokens.accent),
+      'game' => (Icons.sports_esports_rounded, 'Play', DesignTokens.success),
+      'interactive' => (Icons.touch_app_rounded, 'Try', DesignTokens.warning),
+      'audio' => (Icons.headphones_rounded, 'Listen', DesignTokens.accentSecondary),
+      _ => (Icons.article_rounded, 'Read', DesignTokens.accent),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: DesignTokens.fontSizeExtraSmall,
+              fontWeight: DesignTokens.fontWeightMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentTypeIcon(String type, PersonaTheme persona) {
+    final (icon, color) = switch (type) {
+      'video' => (Icons.play_circle_filled_rounded, DesignTokens.danger),
+      'article' => (Icons.article_rounded, DesignTokens.accent),
+      'game' => (Icons.sports_esports_rounded, DesignTokens.success),
+      'interactive' => (Icons.touch_app_rounded, DesignTokens.warning),
+      'audio' => (Icons.headphones_rounded, DesignTokens.accentSecondary),
+      _ => (Icons.article_rounded, DesignTokens.accent),
+    };
+
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(DesignTokens.radius12),
+      ),
+      child: Icon(icon, color: color, size: 24),
+    );
+  }
+
+  Widget _buildPointsBadge(int points) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: DesignTokens.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.star_rounded, color: DesignTokens.warning, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            '$points XP',
+            style: TextStyle(
+              color: DesignTokens.warning,
+              fontSize: DesignTokens.fontSizeExtraSmall,
+              fontWeight: DesignTokens.fontWeightBold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Smart Content Selection ───
+
+  List<ContentItem> _getRecommendedContent(
+      List<ContentItem> allContent, PersonaTheme persona) {
+    // Simple recommendation: mix of high-point content and varied categories
+    final highPoint = allContent.where((c) => c.points >= 15).toList();
+    final shortContent = allContent.where((c) => c.durationMinutes <= 10).toList();
+
+    // Combine and deduplicate
+    final recommended = <ContentItem>{};
+    recommended.addAll(highPoint.take(2));
+    recommended.addAll(shortContent.take(2));
+
+    return recommended.toList().take(4).toList();
   }
 
   void _showContentDetail(BuildContext context, ContentItem item) {
@@ -191,21 +728,46 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
                 ),
-                Text(
-                  item.title,
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: DesignTokens.fontFamilyDisplay,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: TextStyle(
+                          color: DesignTokens.textPrimary,
+                          fontSize: DesignTokens.fontSizeH2,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: DesignTokens.fontFamilyDisplay,
+                        ),
+                      ),
+                    ),
+                    _buildPointsBadge(item.points),
+                  ],
                 ),
                 const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildContentTypeBadge(item.contentType,
+                        context.read<AppProvider>().persona),
+                    const SizedBox(width: DesignTokens.spacing8),
+                    Icon(Icons.schedule_rounded,
+                        color: DesignTokens.textMuted, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${item.durationMinutes} min',
+                      style: TextStyle(
+                        color: DesignTokens.textMuted,
+                        fontSize: DesignTokens.fontSizeCaption,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Text(
                   item.description,
                   style: TextStyle(
                     color: DesignTokens.textMuted,
-                    fontSize: 16,
+                    fontSize: DesignTokens.fontSizeBody,
                     height: 1.5,
                   ),
                 ),
@@ -258,34 +820,37 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Widget _buildEmptyState(PersonaTheme persona) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SvgPicture.asset(
-            persona.mascotAssetPath,
-            width: 64,
-            height: 64,
-          ),
-          const SizedBox(height: DesignTokens.spacing16),
-          Text(
-            _getEmptyTitle(persona.ageGroup),
-            style: TextStyle(
-              color: DesignTokens.textPrimary,
-              fontSize: DesignTokens.fontSizeH3,
-              fontWeight: DesignTokens.fontWeightSemiBold,
-              fontFamily: DesignTokens.fontFamilyDisplay,
+      child: Padding(
+        padding: const EdgeInsets.all(DesignTokens.spacing40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SvgPicture.asset(
+              persona.mascotAssetPath,
+              width: 64,
+              height: 64,
             ),
-          ),
-          const SizedBox(height: DesignTokens.spacing8),
-          Text(
-            _getEmptySubtitle(persona.ageGroup),
-            style: TextStyle(
-              color: DesignTokens.textMuted,
-              fontSize: DesignTokens.fontSizeBodySmall,
-              fontFamily: DesignTokens.fontFamilyPrimary,
+            const SizedBox(height: DesignTokens.spacing16),
+            Text(
+              _getEmptyTitle(persona.ageGroup),
+              style: TextStyle(
+                color: DesignTokens.textPrimary,
+                fontSize: DesignTokens.fontSizeH3,
+                fontWeight: DesignTokens.fontWeightSemiBold,
+                fontFamily: DesignTokens.fontFamilyDisplay,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: DesignTokens.spacing8),
+            Text(
+              _getEmptySubtitle(persona.ageGroup),
+              style: TextStyle(
+                color: DesignTokens.textMuted,
+                fontSize: DesignTokens.fontSizeBodySmall,
+                fontFamily: DesignTokens.fontFamilyPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -302,7 +867,7 @@ class _FeedScreenState extends State<FeedScreen> {
       case AgeGroup.teen:
         return 'Learn & Grow';
       case AgeGroup.adult:
-        return 'Content';
+        return 'Discover';
     }
   }
 
@@ -314,9 +879,9 @@ class _FeedScreenState extends State<FeedScreen> {
       case AgeGroup.kid:
         return 'Activities picked just for you';
       case AgeGroup.teen:
-        return 'Articles and resources for you';
+        return 'Resources to help you grow';
       case AgeGroup.adult:
-        return 'Curated content for your goals';
+        return 'Content for your goals';
     }
   }
 
@@ -359,23 +924,6 @@ class _FeedScreenState extends State<FeedScreen> {
         return ['All', 'Study', 'Programming', 'Wellness', 'Social'];
       case AgeGroup.adult:
         return ['All', 'Productivity', 'Business', 'Wellness', 'Tech'];
-    }
-  }
-
-  IconData _getContentTypeIcon(String type) {
-    switch (type) {
-      case 'video':
-        return Icons.play_circle_rounded;
-      case 'article':
-        return Icons.article_rounded;
-      case 'game':
-        return Icons.sports_esports_rounded;
-      case 'interactive':
-        return Icons.touch_app_rounded;
-      case 'audio':
-        return Icons.headphones_rounded;
-      default:
-        return Icons.article_rounded;
     }
   }
 }

@@ -195,18 +195,15 @@ class AppScannerService {
     }).toList();
   }
 
-  /// Get app icon as base64 string.
-  Future<String?> getAppIcon(String packageName) async {
+  /// Get app icon as raw PNG bytes.
+  Future<Uint8List?> getAppIcon(String packageName) async {
     if (kIsWeb || Platform.isIOS) return null;
     try {
-      final result = await _channel.invokeMapMethod<String, dynamic>(
+      final result = await _channel.invokeMethod<Uint8List>(
         'getAppIcon',
         packageName,
       );
-      if (result == null) return null;
-      final success = result['success'] == true;
-      if (!success) return null;
-      return result['icon'] as String?;
+      return result;
     } on PlatformException catch (e) {
       debugPrint('AppScanner getAppIcon failed: ${e.message}');
       return null;

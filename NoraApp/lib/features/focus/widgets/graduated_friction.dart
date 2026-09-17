@@ -38,6 +38,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+  Timer? _timer;
   int _secondsRemaining = 0;
   bool _canContinue = false;
   final _intentionController = TextEditingController();
@@ -59,7 +60,8 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
   }
 
   void _startTimer() {
-    Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -76,6 +78,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
 
   @override
   void dispose() {
+    _timer?.cancel();
     _controller.dispose();
     _intentionController.dispose();
     super.dispose();
@@ -102,7 +105,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
                 Text(
                   _canContinue ? 'Ready to proceed?' : 'Take a breath',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: DesignTokens.fontSizeH2,
                     fontWeight: FontWeight.bold,
                     color: DesignTokens.textPrimary,
                   ),
@@ -114,7 +117,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
                 Text(
                   'You\'re trying to open ${widget.appName}',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: DesignTokens.fontSizeBody,
                     color: DesignTokens.textMuted,
                   ),
                 ),
@@ -127,7 +130,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
                   Text(
                     '$_secondsRemaining seconds',
                     style: TextStyle(
-                      fontSize: 48,
+                      fontSize: DesignTokens.fontSizeDisplaySmall,
                       fontWeight: FontWeight.bold,
                       color: DesignTokens.primary,
                     ),
@@ -136,7 +139,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
                   Text(
                     'Focus on your breathing while you wait',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: DesignTokens.fontSizeBodySmall,
                       color: DesignTokens.textMuted,
                     ),
                   ),
@@ -164,7 +167,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
                         'Continue to ${widget.appName}',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: DesignTokens.fontSizeBody,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -181,7 +184,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
                     'Go back',
                     style: TextStyle(
                       color: DesignTokens.textMuted,
-                      fontSize: 14,
+                      fontSize: DesignTokens.fontSizeBodySmall,
                     ),
                   ),
                 ),
@@ -223,7 +226,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
         Text(
           'Why do you want to open this app?',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: DesignTokens.fontSizeBody,
             fontWeight: FontWeight.w600,
             color: DesignTokens.textPrimary,
           ),
@@ -255,7 +258,7 @@ class _GraduatedFrictionState extends State<GraduatedFriction>
             child: Text(
               'Please enter at least 5 characters',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: DesignTokens.fontSizeCaption,
                 color: DesignTokens.error,
               ),
             ),

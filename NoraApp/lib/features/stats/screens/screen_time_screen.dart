@@ -140,7 +140,7 @@ class _ScreenTimeScreenState extends State<ScreenTimeScreen> {
                 Text(
                   '$totalMinutes',
                   style: TextStyle(
-                    fontSize: 48,
+                    fontSize: DesignTokens.fontSizeDisplaySmall,
                     fontWeight: DesignTokens.fontWeightBold,
                     fontFamily: DesignTokens.fontFamilyDisplay,
                     color: DesignTokens.primary,
@@ -171,11 +171,11 @@ class _ScreenTimeScreenState extends State<ScreenTimeScreen> {
           ),
           const SizedBox(height: DesignTokens.spacing12),
           _buildCategoryBar('Social Media', socialMinutes, totalMinutes,
-              DesignTokens.danger),
-          _buildCategoryBar('Productivity', productMinutes, totalMinutes,
-              DesignTokens.success),
-          _buildCategoryBar('Entertainment', entertainMinutes, totalMinutes,
               DesignTokens.accentSecondary),
+          _buildCategoryBar('Productivity', productMinutes, totalMinutes,
+              DesignTokens.accent),
+          _buildCategoryBar('Entertainment', entertainMinutes, totalMinutes,
+              DesignTokens.success),
 
           const SizedBox(height: DesignTokens.spacing24),
 

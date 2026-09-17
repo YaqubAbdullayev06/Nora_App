@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Tracks usage against limits and enforces restrictions.
 class AppTimerProvider extends ChangeNotifier {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  bool _isInitialized = false;
 
   /// Map of packageName -> daily limit in minutes.
   final Map<String, int> _limits = {};
@@ -27,7 +28,10 @@ class AppTimerProvider extends ChangeNotifier {
   static const _usageDateKey = 'app_timer_usage_date';
 
   /// Get all configured limits.
-  Map<String, int> get limits => Map.unmodifiable(_limits);
+  Map<String, int> get limits {
+    if (!_isInitialized) initialize(); // fire-and-forget
+    return Map.unmodifiable(_limits);
+  }
 
   /// Get today's usage.
   Map<String, int> get usage => Map.unmodifiable(_usage);
@@ -41,6 +45,8 @@ class AppTimerProvider extends ChangeNotifier {
 
   /// Initialize the provider and load saved data.
   Future<void> initialize() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
     await _loadLimits();
     await _loadUsage();
     _startPeriodicCheck();

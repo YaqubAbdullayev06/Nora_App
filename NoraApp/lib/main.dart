@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'core/constants/design_tokens.dart';
 import 'core/enums/age_group.dart';
@@ -15,11 +16,11 @@ import 'features/stats/screens/screen_time_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
-import 'features/chat/screens/chat_screen.dart';
 import 'features/chat/screens/assistant_screen.dart';
 import 'features/scan/screens/app_scan_screen.dart';
 import 'features/access/screens/app_lock_screen.dart';
 import 'features/access/screens/app_timer_limits_screen.dart';
+import 'features/accountability/screens/accountability_setup_screen.dart';
 import 'features/weekly_review/screens/weekly_review_screen.dart';
 import 'features/plan/screens/plan_screen.dart';
 import 'providers/app_provider.dart';
@@ -32,7 +33,17 @@ import 'providers/weekly_review_provider.dart';
 import 'providers/agent_provider.dart';
 import 'providers/focus_protection_provider.dart';
 import 'providers/app_timer_provider.dart';
+import 'providers/accountability_provider.dart';
+import 'providers/hard_cap_provider.dart';
+import 'providers/pomodoro_provider.dart';
+import 'providers/habit_provider.dart';
+import 'features/hardcap/screens/hard_cap_setup_screen.dart';
+import 'features/hardcap/widgets/hard_cap_overlay.dart';
+import 'features/pomodoro/screens/pomodoro_setup_screen.dart';
+import 'features/habits/screens/habits_screen.dart';
 import 'services/api_service.dart';
+import 'services/connectivity_service.dart';
+import 'widgets/connectivity_banner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +52,7 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Load auth tokens from secure storage before app starts
+  // Load auth tokens BEFORE runApp so providers can use them immediately
   await ApiService().init();
 
   runApp(const NoraApp());
@@ -93,16 +104,31 @@ class NoraApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AgentProvider()),
         // Focus protection (standalone)
         ChangeNotifierProvider(create: (_) => FocusProtectionProvider()),
-        // App timer limits (standalone)
-        ChangeNotifierProvider(create: (_) => AppTimerProvider()..initialize()),
-        // Legacy provider for backward compatibility
-        ChangeNotifierProvider(create: (_) => AppProvider()..init()),
+        // App timer limits (standalone) — initialized lazily after first frame
+        ChangeNotifierProvider(create: (_) => AppTimerProvider()),
+        // Accountability lock — session-scoped, initialized lazily
+        ChangeNotifierProvider(create: (_) => AccountabilityProvider()),
+        // Hard cap — session-scoped, initialized lazily
+        ChangeNotifierProvider(create: (_) => HardCapProvider()),
+        // Pomodoro multi-cycle — session-scoped, initialized lazily
+        ChangeNotifierProvider(create: (_) => PomodoroProvider()),
+        // Habit tracking — session-scoped, initialized lazily
+        ChangeNotifierProvider(create: (_) => HabitProvider()),
+        // Connectivity monitoring — starts checking immediately
+        ChangeNotifierProvider(create: (_) => ConnectivityService()..startChecking()),
+        // Legacy provider for backward compatibility — initialized lazily after first frame
+        ChangeNotifierProvider(create: (_) => AppProvider()),
         ChangeNotifierProvider(create: (_) => BreathingProvider()),
       ],
       child: Consumer<PersonaProvider>(
         builder: (context, personaProvider, _) {
           // Update DesignTokens when persona changes
           DesignTokens.init(personaProvider.persona);
+
+          // Reset accountability session state on each app start
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<AccountabilityProvider>().resetSession();
+          });
 
           return MaterialApp(
             title: 'Nora',
@@ -113,10 +139,28 @@ class NoraApp extends StatelessWidget {
               final isLocked = context.select<AuthProvider, bool>(
                 (auth) => auth.isAppLocked,
               );
-              if (isLocked) {
-                return const AppLockScreen();
-              }
-              return child ?? const SizedBox.shrink();
+              final result = isLocked
+                  ? const AppLockScreen()
+                  : Column(
+                      children: [
+                        const ConnectivityBanner(),
+                        Expanded(
+                          child: HardCapOverlay(
+                            child: child ?? const SizedBox.shrink(),
+                          ),
+                        ),
+                      ],
+                    );
+              // Clamp system text scale to prevent UI overflow
+              final mediaQuery = MediaQuery.of(context);
+              final clampedScale = mediaQuery.textScaler.clamp(
+                minScaleFactor: 0.8,
+                maxScaleFactor: 2.0,
+              );
+              return MediaQuery(
+                data: mediaQuery.copyWith(textScaler: clampedScale),
+                child: result,
+              );
             },
             onGenerateRoute: (settings) {
               // Splash screen — no transition (first screen)
@@ -161,6 +205,18 @@ class NoraApp extends StatelessWidget {
                   break;
                 case '/app-timer-limits':
                   page = const AppTimerLimitsScreen();
+                  break;
+                case '/accountability-setup':
+                  page = const AccountabilitySetupScreen();
+                  break;
+                case '/hard-cap-setup':
+                  page = const HardCapSetupScreen();
+                  break;
+                case '/pomodoro-setup':
+                  page = const PomodoroSetupScreen();
+                  break;
+                case '/habits':
+                  page = const HabitsScreen();
                   break;
                 case '/timer':
                   page = const TimerScreen();
@@ -251,11 +307,11 @@ class _MainScreenState extends State<MainScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home_rounded, 'Home'),
-                _buildNavItem(1, Icons.timer_rounded, 'Timer'),
+                _buildNavItem(0, 'assets/images/icons/home.svg', 'Home'),
+                _buildNavItem(1, 'assets/images/icons/timer.svg', 'Timer'),
                 _buildCenterButton(),
-                _buildNavItem(2, Icons.analytics_rounded, 'Stats'),
-                _buildNavItem(3, Icons.person_rounded, 'Profile'),
+                _buildNavItem(2, 'assets/images/icons/stats.svg', 'Stats'),
+                _buildNavItem(3, 'assets/images/icons/user.svg', 'Profile'),
               ],
             ),
           ),
@@ -266,9 +322,13 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildCenterButton() {
     final isSelected = _currentIndex == 4;
-    return GestureDetector(
-      onTap: () => setState(() => _currentIndex = 4),
-      child: AnimatedContainer(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: 'Plan',
+      child: GestureDetector(
+        onTap: () => setState(() => _currentIndex = 4),
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -312,17 +372,21 @@ class _MainScreenState extends State<MainScreen> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.calendar_month_rounded,
-                  color: isSelected ? Colors.white : DesignTokens.textMuted,
-                  size: isSelected ? 26 : 22,
+                SvgPicture.asset(
+                  'assets/images/icons/calendar-check.svg',
+                  width: isSelected ? 26 : 22,
+                  height: isSelected ? 26 : 22,
+                  colorFilter: ColorFilter.mode(
+                    isSelected ? Colors.white : DesignTokens.textMuted,
+                    BlendMode.srcIn,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 200),
                   style: TextStyle(
                     color: isSelected ? Colors.white : DesignTokens.textMuted,
-                    fontSize: 10,
+                    fontSize: DesignTokens.fontSizeTiny,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   ),
                   child: const Text('Plan'),
@@ -331,15 +395,20 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(int index, String assetPath, String label) {
     final isSelected = _currentIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
-      child: AnimatedContainer(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: GestureDetector(
+        onTap: () => setState(() => _currentIndex = index),
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -349,22 +418,27 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? DesignTokens.accent : DesignTokens.textMuted,
-              size: isSelected ? 26 : 22,
+            SvgPicture.asset(
+              assetPath,
+              width: isSelected ? 26 : 22,
+              height: isSelected ? 26 : 22,
+              colorFilter: ColorFilter.mode(
+                isSelected ? DesignTokens.accent : DesignTokens.textMuted,
+                BlendMode.srcIn,
+              ),
             ),
             const SizedBox(height: 4),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 200),
               style: TextStyle(
                 color: isSelected ? DesignTokens.accent : DesignTokens.textMuted,
-                fontSize: 10,
+                fontSize: DesignTokens.fontSizeTiny,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
               child: Text(label),
             ),
           ],
+        ),
         ),
       ),
     );

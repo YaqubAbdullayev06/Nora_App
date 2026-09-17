@@ -39,20 +39,44 @@ class ApiService {
   // ─── Auto-Refresh on 401 ───
 
   /// Make an authenticated request. On 401, tries refresh token before failing.
+  /// Retries up to 2 times on network failures.
   Future<http.Response> _authenticatedRequest(
-    Future<http.Response> Function(String token) request,
-  ) async {
+    Future<http.Response> Function(String token) request, {
+    int maxRetries = 2,
+  }) async {
     if (_token == null) {
       throw Exception('Not authenticated');
     }
 
-    var response = await request(_token!);
+    http.Response? response;
+    Exception? lastException;
+
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        response = await request(_token!);
+        break; // Success, exit retry loop
+      } catch (e) {
+        lastException = e is Exception ? e : Exception(e.toString());
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff: 1s, 2s)
+          await Future.delayed(Duration(seconds: attempt + 1));
+        }
+      }
+    }
+
+    if (response == null) {
+      throw lastException ?? Exception('Network request failed');
+    }
 
     if (response.statusCode == 401 && !_isRefreshing) {
       // Token expired — try refresh
       final refreshed = await _tryRefreshToken();
       if (refreshed) {
         response = await request(_token!);
+      } else {
+        // Refresh failed — clear stale tokens so UI forces re-login
+        await clearAuth();
+        throw Exception('Session expired. Please log in again.');
       }
     }
 
@@ -80,8 +104,8 @@ class ApiService {
         );
         return true;
       } else {
-        // Refresh failed — user must re-login
-        await clearAuth();
+        // Refresh failed — tokens are stale, user must re-login
+        // Don't clear here; let the UI handle the re-login prompt
         return false;
       }
     } catch (e) {
@@ -161,6 +185,24 @@ class ApiService {
       return data;
     }
     throw Exception(jsonDecode(response.body)['detail'] ?? 'Login failed');
+  }
+
+  /// Get current user profile from /auth/me.
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await _authenticatedRequest(
+      (token) => http.get(
+        Uri.parse('$baseUrl/auth/me'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception(
+        jsonDecode(response.body)['detail'] ?? 'Failed to get user profile');
   }
 
   // ─── Users ───
@@ -441,5 +483,114 @@ class ApiService {
       'task': task,
       'age_group': ageGroup,
     });
+  }
+
+  // ─── Accountability Lock ───
+
+  Future<Map<String, dynamic>> setupAccountabilityLock({
+    required String pin,
+    required String guardianName,
+    int? lockDurationDays,
+  }) async {
+    return _postJson('/accountability/setup', {
+      'pin': pin,
+      'guardian_name': guardianName,
+      'lock_duration_days': lockDurationDays,
+    });
+  }
+
+  Future<Map<String, dynamic>> verifyAccountabilityLock({
+    required String pin,
+  }) async {
+    return _postJson('/accountability/verify', {
+      'pin': pin,
+    });
+  }
+
+  Future<Map<String, dynamic>> getAccountabilityStatus() async {
+    return _getJson('/accountability/status');
+  }
+
+  Future<Map<String, dynamic>> unlinkAccountabilityLock({
+    required String pin,
+  }) async {
+    return _postJson('/accountability/unlink', {
+      'pin': pin,
+    });
+  }
+
+  // ─── Hard Cap ───
+
+  Future<Map<String, dynamic>> setupHardCap({
+    required int capMinutes,
+    int softWarningPercent = 80,
+    int hardWarningPercent = 90,
+    bool requirePinToOverride = false,
+  }) async {
+    return _postJson('/hardcap/setup', {
+      'cap_minutes': capMinutes,
+      'soft_warning_percent': softWarningPercent,
+      'hard_warning_percent': hardWarningPercent,
+      'require_pin_to_override': requirePinToOverride,
+    });
+  }
+
+  Future<Map<String, dynamic>> getHardCapStatus() async {
+    return _getJson('/hardcap/status');
+  }
+
+  Future<Map<String, dynamic>> deactivateHardCap() async {
+    return _postJson('/hardcap/deactivate', {});
+  }
+
+  // ─── Habits ───
+
+  Future<Map<String, dynamic>> createHabit({
+    required String name,
+    String category = 'general',
+    String icon = 'check_circle',
+    String color = '#4CAF50',
+    int screenTimeMinutes = 15,
+    int targetPerDay = 1,
+  }) async {
+    return _postJson('/habits', {
+      'name': name,
+      'category': category,
+      'icon': icon,
+      'color': color,
+      'screen_time_minutes': screenTimeMinutes,
+      'target_per_day': targetPerDay,
+    });
+  }
+
+  Future<Map<String, dynamic>> listHabits() async {
+    return _getJson('/habits');
+  }
+
+  Future<Map<String, dynamic>> completeHabit({
+    required int habitId,
+    int durationMinutes = 0,
+  }) async {
+    return _postJson('/habits/complete', {
+      'habit_id': habitId,
+      'duration_minutes': durationMinutes,
+    });
+  }
+
+  Future<Map<String, dynamic>> deleteHabit(int habitId) async {
+    final response = await _authenticatedRequest(
+      (token) => http.delete(
+        Uri.parse('$baseUrl/habits/$habitId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+    return _decodeAgentResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getHabitStats() async {
+    return _getJson('/habits/stats');
   }
 }

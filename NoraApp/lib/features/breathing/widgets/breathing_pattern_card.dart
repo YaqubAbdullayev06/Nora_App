@@ -97,7 +97,7 @@ class BreathingPatternCard extends StatelessWidget {
                 pattern.cycleDurationLabel,
                 style: TextStyle(
                   color: pattern.color,
-                  fontSize: 12,
+                  fontSize: DesignTokens.fontSizeCaption,
                   fontWeight: FontWeight.w600,
                 ),
               ),

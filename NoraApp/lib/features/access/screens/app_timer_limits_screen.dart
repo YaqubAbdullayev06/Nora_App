@@ -202,9 +202,9 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
         Expanded(
           child: _buildMiniStat(
             '$exceededCount',
-            'Exceeded',
-            Icons.warning_rounded,
-            exceededCount > 0 ? DesignTokens.danger : DesignTokens.textMuted,
+            'Goals Met',
+            Icons.check_circle_outline_rounded,
+            exceededCount > 0 ? DesignTokens.accent : DesignTokens.textMuted,
           ),
         ),
       ],
@@ -224,7 +224,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
             value,
             style: TextStyle(
               color: color,
-              fontSize: 22,
+              fontSize: DesignTokens.fontSizeTitleMedium,
               fontWeight: DesignTokens.fontWeightBold,
               fontFamily: DesignTokens.fontFamilyDisplay,
             ),
@@ -234,7 +234,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
             label,
             style: TextStyle(
               color: DesignTokens.textMuted,
-              fontSize: 10,
+              fontSize: DesignTokens.fontSizeTiny,
               fontFamily: DesignTokens.fontFamilyPrimary,
             ),
             textAlign: TextAlign.center,
@@ -246,29 +246,29 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
 
   Widget _buildExceededWarning(AppTimerProvider timer) {
     return NoraCard(
-      backgroundColor: DesignTokens.danger.withValues(alpha: 0.08),
-      border: Border.all(color: DesignTokens.danger.withValues(alpha: 0.3)),
+      backgroundColor: DesignTokens.accent.withValues(alpha: 0.08),
+      border: Border.all(color: DesignTokens.accent.withValues(alpha: 0.3)),
       child: Row(
         children: [
-          Icon(Icons.warning_rounded, color: DesignTokens.danger, size: 24),
+          Icon(Icons.info_outline_rounded, color: DesignTokens.accent, size: 24),
           const SizedBox(width: DesignTokens.spacing12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${timer.exceeded.length} app(s) over limit',
+                  '${timer.exceeded.length} app(s) reached your goal',
                   style: TextStyle(
-                    color: DesignTokens.danger,
+                    color: DesignTokens.accent,
                     fontSize: DesignTokens.fontSizeBody,
                     fontWeight: DesignTokens.fontWeightSemiBold,
                     fontFamily: DesignTokens.fontFamilyPrimary,
                   ),
                 ),
                 Text(
-                  'These apps have exceeded their daily time limits',
+                  'These apps have reached their daily time goals',
                   style: TextStyle(
-                    color: DesignTokens.danger.withValues(alpha: 0.8),
+                    color: DesignTokens.accent.withValues(alpha: 0.8),
                     fontSize: DesignTokens.fontSizeCaption,
                     fontFamily: DesignTokens.fontFamilyPrimary,
                   ),
@@ -291,18 +291,18 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
   ) {
     final remaining = (limitMinutes - usedMinutes).clamp(0, limitMinutes);
     final color = exceeded
-        ? DesignTokens.danger
+        ? DesignTokens.accent
         : progress > 0.8
-            ? DesignTokens.warning
+            ? DesignTokens.accentSecondary
             : DesignTokens.accent;
 
     return NoraCard(
       backgroundColor: exceeded
-          ? DesignTokens.danger.withValues(alpha: 0.04)
+          ? DesignTokens.accent.withValues(alpha: 0.04)
           : DesignTokens.surface,
       border: Border.all(
         color: exceeded
-            ? DesignTokens.danger.withValues(alpha: 0.3)
+            ? DesignTokens.accent.withValues(alpha: 0.3)
             : DesignTokens.border,
       ),
       padding: const EdgeInsets.all(14),
@@ -342,7 +342,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                     Text(
                       '$usedMinutes / $limitMinutes min today',
                       style: TextStyle(
-                        color: exceeded ? DesignTokens.danger : DesignTokens.textMuted,
+                        color: DesignTokens.textMuted,
                         fontSize: DesignTokens.fontSizeCaption,
                         fontFamily: DesignTokens.fontFamilyPrimary,
                       ),
@@ -358,10 +358,10 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                   borderRadius: BorderRadius.circular(DesignTokens.radius8),
                 ),
                 child: Text(
-                  exceeded ? 'OVER' : '${remaining}m left',
+                  exceeded ? 'GOAL MET' : '${remaining}m left',
                   style: TextStyle(
                     color: color,
-                    fontSize: 11,
+                    fontSize: DesignTokens.fontSizeExtraSmall,
                     fontWeight: DesignTokens.fontWeightBold,
                     fontFamily: DesignTokens.fontFamilyPrimary,
                   ),
@@ -398,7 +398,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                     'Edit',
                     style: TextStyle(
                       color: DesignTokens.textMuted,
-                      fontSize: 11,
+                      fontSize: DesignTokens.fontSizeExtraSmall,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
                   ),
@@ -419,7 +419,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                     'Remove',
                     style: TextStyle(
                       color: DesignTokens.danger,
-                      fontSize: 11,
+                      fontSize: DesignTokens.fontSizeExtraSmall,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
                   ),
@@ -569,7 +569,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                         app.$1,
                         style: TextStyle(
                           color: DesignTokens.textMuted,
-                          fontSize: 10,
+                          fontSize: DesignTokens.fontSizeTiny,
                           fontFamily: DesignTokens.fontFamilyPrimary,
                         ),
                       ),
@@ -615,7 +615,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                     '5m',
                     style: TextStyle(
                       color: DesignTokens.textMuted,
-                      fontSize: 10,
+                      fontSize: DesignTokens.fontSizeTiny,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
                   ),
@@ -623,7 +623,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                     '4h',
                     style: TextStyle(
                       color: DesignTokens.textMuted,
-                      fontSize: 10,
+                      fontSize: DesignTokens.fontSizeTiny,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
                   ),
@@ -731,7 +731,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                     '5m',
                     style: TextStyle(
                       color: DesignTokens.textMuted,
-                      fontSize: 10,
+                      fontSize: DesignTokens.fontSizeTiny,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
                   ),
@@ -739,7 +739,7 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
                     '4h',
                     style: TextStyle(
                       color: DesignTokens.textMuted,
-                      fontSize: 10,
+                      fontSize: DesignTokens.fontSizeTiny,
                       fontFamily: DesignTokens.fontFamilyPrimary,
                     ),
                   ),

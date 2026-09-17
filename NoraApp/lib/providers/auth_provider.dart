@@ -26,6 +26,20 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _currentUser != null;
   bool get isAppLocked => _isAppLocked;
 
+  /// Restore user session from stored token on app start.
+  Future<void> initialize() async {
+    try {
+      final data = await _api.getMe();
+      _currentUser = User.fromJson(data);
+      _personaProvider.setAgeGroup(_currentUser!.ageGroup);
+      notifyListeners();
+    } catch (e) {
+      // Token invalid or expired — user must log in
+      _currentUser = null;
+      notifyListeners();
+    }
+  }
+
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     _error = null;

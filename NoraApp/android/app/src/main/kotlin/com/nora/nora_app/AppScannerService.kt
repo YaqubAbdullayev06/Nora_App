@@ -217,10 +217,10 @@ class AppScannerService(private val context: Context) {
     }
 
     /**
-     * Get an app's icon as a base64-encoded PNG string.
+     * Get an app's icon as raw PNG bytes.
      * Returns null if the icon can't be loaded.
      */
-    fun getAppIconBase64(packageName: String): String? {
+    fun getAppIconBytes(packageName: String): ByteArray? {
         return try {
             val icon = packageManager.getApplicationIcon(packageName)
             // Convert Drawable to Bitmap
@@ -240,9 +240,7 @@ class AppScannerService(private val context: Context) {
             // Compress to PNG bytes
             val stream = java.io.ByteArrayOutputStream()
             resized.compress(android.graphics.Bitmap.CompressFormat.PNG, 80, stream)
-            val bytes = stream.toByteArray()
-            // Encode to base64
-            android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            stream.toByteArray()
         } catch (_: Exception) {
             null
         }

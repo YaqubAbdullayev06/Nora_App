@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
 import '../../../widgets/nora_components.dart';
 
 /// Compact motivation strip — SVG icon + motivational text.
 class HomeMotivation extends StatelessWidget {
-  final AppProvider provider;
+  final PersonaProvider personaProvider;
 
-  const HomeMotivation({super.key, required this.provider});
+  const HomeMotivation({super.key, required this.personaProvider});
 
   @override
   Widget build(BuildContext context) {
-    final persona = provider.persona;
+    final persona = personaProvider.persona;
     final message = _getMotivationalMessage(persona.ageGroup);
 
     return NoraCard(

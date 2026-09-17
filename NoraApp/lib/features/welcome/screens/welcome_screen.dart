@@ -3,7 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/theme/persona_theme.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
 import '../../../widgets/nora_components.dart';
 
 /// Welcome Screen — introduces Nora before asking for customization.
@@ -67,7 +67,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final persona = context.watch<AppProvider>().persona;
+    final persona = context.watch<PersonaProvider>().persona;
     final page = _pages[_currentPage];
     final isLast = _currentPage == _pages.length - 1;
 

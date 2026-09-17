@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
 import '../../../services/app_scanner_service.dart';
 import '../../../services/screentime_service.dart';
 import '../../../services/api_service.dart';
@@ -28,7 +27,7 @@ class _AppScanScreenState extends State<AppScanScreen>
   bool _isScanning = false;
   String _selectedCategory = 'all';
   String _searchQuery = '';
-  final Map<String, String> _appIcons = {};
+  final Map<String, Uint8List> _appIcons = {};
 
   late TabController _tabController;
 
@@ -72,7 +71,7 @@ class _AppScanScreenState extends State<AppScanScreen>
       }).toList();
 
       // Get AI classification
-      final provider = context.read<AppProvider>();
+      final personaProvider = context.read<PersonaProvider>();
       final appMaps = appsWithUsage
           .where((a) => !a.isSystemApp)
           .map((a) => a.toMap())
@@ -80,7 +79,7 @@ class _AppScanScreenState extends State<AppScanScreen>
 
       final classification = await _apiService.classifyApps(
         apps: appMaps,
-        ageGroup: provider.ageGroup.name,
+        ageGroup: personaProvider.ageGroup.name,
       );
 
       // Merge AI recommendations
@@ -227,7 +226,7 @@ class _AppScanScreenState extends State<AppScanScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
+    return Consumer<PersonaProvider>(
       builder: (context, provider, _) {
         final persona = provider.persona;
 
@@ -360,7 +359,7 @@ class _AppScanScreenState extends State<AppScanScreen>
           const SizedBox(height: 12),
           Text(
             _classification!['summary'] ?? '',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+            style: const TextStyle(color: Colors.white70, fontSize: DesignTokens.fontSizeCaption),
           ),
         ],
       ),
@@ -374,13 +373,13 @@ class _AppScanScreenState extends State<AppScanScreen>
           value,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 24,
+            fontSize: DesignTokens.fontSizeH2,
             fontWeight: DesignTokens.fontWeightBold,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
+          style: const TextStyle(color: Colors.white70, fontSize: DesignTokens.fontSizeExtraSmall),
         ),
       ],
     );
@@ -391,7 +390,7 @@ class _AppScanScreenState extends State<AppScanScreen>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: TextField(
         onChanged: (value) => setState(() => _searchQuery = value),
-        style: TextStyle(color: DesignTokens.textPrimary, fontSize: 14),
+        style: TextStyle(color: DesignTokens.textPrimary, fontSize: DesignTokens.fontSizeBodySmall),
         decoration: InputDecoration(
           hintText: 'Search apps...',
           hintStyle: TextStyle(color: DesignTokens.textMuted),
@@ -460,7 +459,7 @@ class _AppScanScreenState extends State<AppScanScreen>
                         color: isSelected
                             ? DesignTokens.accent
                             : DesignTokens.textMuted,
-                        fontSize: 12,
+                        fontSize: DesignTokens.fontSizeCaption,
                         fontWeight: DesignTokens.fontWeightMedium,
                       ),
                     ),
@@ -471,7 +470,7 @@ class _AppScanScreenState extends State<AppScanScreen>
                         color: isSelected
                             ? DesignTokens.accent
                             : DesignTokens.textMuted,
-                        fontSize: 10,
+                        fontSize: DesignTokens.fontSizeTiny,
                       ),
                     ),
                   ],
@@ -604,7 +603,7 @@ class _AppScanScreenState extends State<AppScanScreen>
                 'AI: Block',
                 style: TextStyle(
                   color: DesignTokens.warning,
-                  fontSize: 10,
+                  fontSize: DesignTokens.fontSizeTiny,
                   fontWeight: DesignTokens.fontWeightSemiBold,
                 ),
               ),
@@ -655,7 +654,7 @@ class _AppScanScreenState extends State<AppScanScreen>
                 Text(
                   'Apply AI Recommendations ($count apps)',
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: DesignTokens.fontSizeBody,
                     fontWeight: DesignTokens.fontWeightSemiBold,
                   ),
                 ),
@@ -730,27 +729,27 @@ class _AppScanScreenState extends State<AppScanScreen>
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'social_media':
-        return const Color(0xFFE91E63);
+        return DesignTokens.categorySocial;
       case 'entertainment':
-        return const Color(0xFF9C27B0);
+        return DesignTokens.categoryEntertainment;
       case 'games':
-        return const Color(0xFFFF5722);
+        return DesignTokens.categoryProductivity;
       case 'productivity':
-        return const Color(0xFF4CAF50);
+        return DesignTokens.categoryGames;
       case 'messaging':
-        return const Color(0xFF2196F3);
+        return DesignTokens.categoryEducation;
       case 'education':
-        return const Color(0xFF00BCD4);
+        return DesignTokens.categoryHealth;
       case 'finance':
-        return const Color(0xFFFF9800);
+        return DesignTokens.categoryFinance;
       case 'health':
-        return const Color(0xFF4CAF50);
+        return DesignTokens.categoryNews;
       case 'navigation':
-        return const Color(0xFF3F51B5);
+        return DesignTokens.categoryShopping;
       case 'shopping':
-        return const Color(0xFFE91E63);
+        return DesignTokens.categoryCreativity;
       case 'news':
-        return const Color(0xFF795548);
+        return DesignTokens.categoryCommunication;
       default:
         return DesignTokens.textMuted;
     }
@@ -761,11 +760,10 @@ class _AppScanScreenState extends State<AppScanScreen>
     final icon = _appIcons[app.packageName];
     if (icon != null && icon.isNotEmpty) {
       try {
-        final bytes = base64Decode(icon);
         return ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: Image.memory(
-            bytes,
+            icon,
             width: 44,
             height: 44,
             fit: BoxFit.cover,

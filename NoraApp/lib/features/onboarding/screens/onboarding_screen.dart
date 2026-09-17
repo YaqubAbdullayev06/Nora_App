@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/theme/persona_theme.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../widgets/nora_components.dart';
 
 /// Onboarding Screen — two-step: name + account creation.
@@ -79,7 +80,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _finish() async {
-    final provider = context.read<AppProvider>();
+    final personaProvider = context.read<PersonaProvider>();
+    final authProvider = context.read<AuthProvider>();
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -103,10 +105,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
 
     // Set persona (default adult)
-    provider.setAgeGroup(_selectedGroup);
+    personaProvider.setAgeGroup(_selectedGroup);
 
     // Register
-    final success = await provider.register(
+    final success = await authProvider.register(
       email,
       name,
       password,
@@ -116,7 +118,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (success && mounted) {
       Navigator.pushReplacementNamed(context, '/main');
     } else if (mounted) {
-      _showError(provider.error ?? 'Registration failed. Please try again.');
+      _showError(authProvider.error ?? 'Registration failed. Please try again.');
     }
   }
 
@@ -442,7 +444,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         onPressed = null;
     }
 
-    return Consumer<AppProvider>(
+    return Consumer<AuthProvider>(
       builder: (context, provider, _) {
         return SizedBox(
           height: 56,

@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/theme/persona_theme.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/focus_provider.dart';
 import '../../../widgets/nora_components.dart';
 import '../../breathing/providers/breathing_provider.dart';
 
@@ -18,9 +19,9 @@ class StatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, provider, _) {
-        final persona = provider.persona;
+    return Consumer2<PersonaProvider, FocusProvider>(
+      builder: (context, personaProvider, focusProvider, _) {
+        final persona = personaProvider.persona;
 
         return Scaffold(
           backgroundColor: DesignTokens.background,
@@ -32,16 +33,16 @@ class StatsScreen extends StatelessWidget {
                 children: [
                   _buildHeader(persona),
                   const SizedBox(height: DesignTokens.spacing24),
-                  _buildWeeklyChart(provider, persona),
+                  _buildWeeklyChart(focusProvider, persona),
                   const SizedBox(height: DesignTokens.spacing24),
-                  _buildDetailedStats(context, provider, persona),
+                  _buildDetailedStats(context, focusProvider, persona),
                   const SizedBox(height: DesignTokens.spacing24),
                   _buildBreathingStats(context, persona),
                   const SizedBox(height: DesignTokens.spacing24),
-                  _buildAchievements(provider, persona),
+                  _buildAchievements(focusProvider, persona),
                   if (persona.ageGroup != AgeGroup.baby) ...[
                     const SizedBox(height: DesignTokens.spacing24),
-                    _buildInsights(provider, persona),
+                    _buildInsights(focusProvider, persona),
                   ],
                   const SizedBox(height: DesignTokens.spacing24),
                   _buildScreenTimeButton(context, persona),
@@ -88,7 +89,7 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWeeklyChart(AppProvider provider, PersonaTheme persona) {
+  Widget _buildWeeklyChart(FocusProvider provider, PersonaTheme persona) {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final appUsage = provider.weeklyAppUsage;
     final maxMinutes = appUsage.map((e) => e.minutes).reduce((a, b) => a > b ? a : b).toDouble();
@@ -154,7 +155,7 @@ class StatsScreen extends StatelessWidget {
                                   usage.appName,
                                   style: TextStyle(
                                     color: isToday ? persona.primary : DesignTokens.textMuted,
-                                    fontSize: 8,
+                                    fontSize: DesignTokens.fontSizeNano,
                                     fontWeight: isToday ? DesignTokens.fontWeightSemiBold : DesignTokens.fontWeightRegular,
                                     fontFamily: DesignTokens.fontFamilyPrimary,
                                   ),
@@ -166,7 +167,7 @@ class StatsScreen extends StatelessWidget {
                                   usage.displayTime,
                                   style: TextStyle(
                                     color: isToday ? persona.primary : DesignTokens.textMuted,
-                                    fontSize: 9,
+                                    fontSize: DesignTokens.fontSizeMicro,
                                     fontWeight: DesignTokens.fontWeightBold,
                                     fontFamily: DesignTokens.fontFamilyPrimary,
                                   ),
@@ -200,7 +201,7 @@ class StatsScreen extends StatelessWidget {
                                 days[index],
                                 style: TextStyle(
                                   color: isToday ? persona.primary : DesignTokens.textMuted,
-                                  fontSize: 10,
+                                  fontSize: DesignTokens.fontSizeTiny,
                                   fontWeight: isToday ? DesignTokens.fontWeightSemiBold : DesignTokens.fontWeightRegular,
                                   fontFamily: DesignTokens.fontFamilyPrimary,
                                 ),
@@ -217,7 +218,7 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailedStats(BuildContext context, AppProvider provider, PersonaTheme persona) {
+  Widget _buildDetailedStats(BuildContext context, FocusProvider provider, PersonaTheme persona) {
     final stats = _getDetailedStats(provider, persona);
 
     return Column(
@@ -329,7 +330,7 @@ class StatsScreen extends StatelessWidget {
           label,
           style: TextStyle(
             color: DesignTokens.textMuted,
-            fontSize: 10,
+            fontSize: DesignTokens.fontSizeTiny,
             fontFamily: DesignTokens.fontFamilyPrimary,
           ),
         ),
@@ -337,7 +338,7 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAchievements(AppProvider provider, PersonaTheme persona) {
+  Widget _buildAchievements(FocusProvider provider, PersonaTheme persona) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -392,13 +393,13 @@ class StatsScreen extends StatelessWidget {
                   ),
           ),
           const SizedBox(height: DesignTokens.spacing4),
-          Text(
-            achievement,
-            style: TextStyle(
-              color: DesignTokens.textMuted,
-              fontSize: 10,
-              fontFamily: DesignTokens.fontFamilyPrimary,
-            ),
+            Text(
+              achievement,
+              style: TextStyle(
+                color: DesignTokens.textMuted,
+                fontSize: DesignTokens.fontSizeTiny,
+                fontFamily: DesignTokens.fontFamilyPrimary,
+              ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -408,7 +409,7 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInsights(AppProvider provider, PersonaTheme persona) {
+  Widget _buildInsights(FocusProvider provider, PersonaTheme persona) {
     final insights = _getInsightsForAgeGroup(persona.ageGroup);
 
     return Column(
@@ -425,7 +426,7 @@ class StatsScreen extends StatelessWidget {
           child: NoraCard(
             child: Row(
               children: [
-                Text(insight['emoji']!, style: const TextStyle(fontSize: 24)),
+                Icon(insight['icon'] as IconData, size: 24, color: DesignTokens.accent),
                 const SizedBox(width: DesignTokens.spacing12),
                 Expanded(
                   child: Column(
@@ -665,7 +666,7 @@ class StatsScreen extends StatelessWidget {
     }
   }
 
-  List<Map<String, String>> _getDetailedStats(AppProvider provider, PersonaTheme persona) {
+  List<Map<String, String>> _getDetailedStats(FocusProvider provider, PersonaTheme persona) {
     return [
       {'label': 'Total Focus', 'value': '${provider.totalFocusMinutes}m', 'icon': 'schedule', 'color': 'primary'},
       {'label': 'Sessions', 'value': '${provider.sessionsCompleted}', 'icon': 'check_circle', 'color': 'success'},

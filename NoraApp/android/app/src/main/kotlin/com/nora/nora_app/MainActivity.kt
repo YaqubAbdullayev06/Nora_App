@@ -141,10 +141,14 @@ class MainActivity : FlutterActivity() {
 					"getAppIcon" -> {
 						val packageName = call.arguments as? String
 						if (packageName != null) {
-							val iconBase64 = appScanner.getAppIconBase64(packageName)
-							result.success(mapOf("success" to true, "icon" to iconBase64))
+							val iconBytes = appScanner.getAppIconBytes(packageName)
+							if (iconBytes != null) {
+								result.success(iconBytes)
+							} else {
+								result.success(null)
+							}
 						} else {
-							result.success(mapOf("success" to false, "error" to "Package name required"))
+							result.success(null)
 						}
 					}
 					else -> result.notImplemented()

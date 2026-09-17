@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/persona_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -81,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
           'NORA',
           style: TextStyle(
             color: DesignTokens.textPrimary,
-            fontSize: 32,
+            fontSize: DesignTokens.fontSizeTitleLarge,
             fontWeight: DesignTokens.fontWeightBold,
             letterSpacing: 8,
             fontFamily: DesignTokens.fontFamilyDisplay,
@@ -134,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginButton() {
-    return Consumer<AppProvider>(
+    return Consumer<AuthProvider>(
       builder: (context, provider, _) {
         return SizedBox(
           height: DesignTokens.buttonHeightLarge,
@@ -188,8 +189,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         GestureDetector(
           onTap: () {
-            final provider = context.read<AppProvider>();
-            Navigator.pushNamed(context, '/register', arguments: provider.ageGroup);
+            final personaProvider = context.read<PersonaProvider>();
+            Navigator.pushNamed(context, '/register', arguments: personaProvider.ageGroup);
           },
           child: Text(
             'Sign Up',
@@ -218,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final provider = context.read<AppProvider>();
+    final provider = context.read<AuthProvider>();
     final success = await provider.login(email, password);
 
     if (success && mounted) {

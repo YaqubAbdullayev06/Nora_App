@@ -98,8 +98,8 @@ goto MENU
 
 :ANDROID_RELEASE
 echo.
-echo Building Android Release APK...
-call flutter build apk --release
+echo Building Android Release APK (split per ABI + debug info)...
+call flutter build apk --release --split-per-abi --split-debug-info=build/app/outputs/symbols
 echo.
 if exist "%PROJECT%\build\app\outputs\flutter-apk\app-release.apk" (
     echo BUILD OK: build\app\outputs\flutter-apk\app-release.apk

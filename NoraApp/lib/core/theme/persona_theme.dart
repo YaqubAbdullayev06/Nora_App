@@ -240,6 +240,7 @@ class PersonaTheme {
   ThemeData toThemeData() {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: fontFamily,
       brightness: isDark ? Brightness.dark : Brightness.light,
       primaryColor: primary,
       scaffoldBackgroundColor: background,
@@ -259,10 +260,10 @@ class PersonaTheme {
         elevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
+          fontFamily: fontFamily,
           color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          fontFamily: fontFamily,
         ),
       ),
       cardTheme: CardThemeData(
@@ -310,42 +311,36 @@ class PersonaTheme {
           color: textPrimary,
           fontSize: 28,
           fontWeight: FontWeight.w700,
-          fontFamily: fontFamily,
           height: 1.2,
         ),
         headlineMedium: TextStyle(
           color: textPrimary,
           fontSize: 24,
           fontWeight: FontWeight.w600,
-          fontFamily: fontFamily,
           height: 1.2,
         ),
         headlineSmall: TextStyle(
           color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          fontFamily: fontFamily,
           height: 1.2,
         ),
         bodyLarge: TextStyle(
           color: textPrimary,
           fontSize: 16,
           fontWeight: FontWeight.w400,
-          fontFamily: fontFamily,
           height: 1.5,
         ),
         bodyMedium: TextStyle(
           color: textMuted,
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          fontFamily: fontFamily,
           height: 1.5,
         ),
         bodySmall: TextStyle(
           color: textMuted,
           fontSize: 12,
           fontWeight: FontWeight.w400,
-          fontFamily: fontFamily,
           height: 1.5,
         ),
       ),

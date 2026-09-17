@@ -44,6 +44,7 @@ class _IntentGatewayState extends State<IntentGateway>
   late Animation<double> _fadeAnimation;
   late Animation<double> _pulseAnimation;
 
+  Timer? _timer;
   int _secondsRemaining = 5;
   bool _canProceed = false;
   bool _showInput = false;
@@ -86,7 +87,8 @@ class _IntentGatewayState extends State<IntentGateway>
   }
 
   void _startCountdown() {
-    Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -105,6 +107,7 @@ class _IntentGatewayState extends State<IntentGateway>
 
   @override
   void dispose() {
+    _timer?.cancel();
     _fadeController.dispose();
     _pulseController.dispose();
     _countdownController.dispose();
@@ -238,7 +241,7 @@ class _IntentGatewayState extends State<IntentGateway>
     return Text(
       _canProceed ? 'What\'s your intention?' : 'Pause and reflect',
       style: TextStyle(
-        fontSize: 24,
+        fontSize: DesignTokens.fontSizeH2,
         fontWeight: FontWeight.bold,
         color: DesignTokens.textPrimary,
         letterSpacing: -0.5,
@@ -252,7 +255,7 @@ class _IntentGatewayState extends State<IntentGateway>
           ? 'Type your reason to open ${widget.appName}'
           : 'You\'re about to open ${widget.appName}',
       style: TextStyle(
-        fontSize: 15,
+        fontSize: DesignTokens.fontSizeBodyMedium,
         color: DesignTokens.textMuted,
       ),
       textAlign: TextAlign.center,
@@ -265,7 +268,7 @@ class _IntentGatewayState extends State<IntentGateway>
         Text(
           '$_secondsRemaining',
           style: TextStyle(
-            fontSize: 64,
+            fontSize: DesignTokens.fontSizeDisplayLarge,
             fontWeight: FontWeight.bold,
             color: DesignTokens.primary,
             height: 1,
@@ -275,7 +278,7 @@ class _IntentGatewayState extends State<IntentGateway>
         Text(
           'seconds before you can proceed',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: DesignTokens.fontSizeSmall,
             color: DesignTokens.textMuted,
           ),
         ),
@@ -312,7 +315,7 @@ class _IntentGatewayState extends State<IntentGateway>
             },
             style: TextStyle(
               color: DesignTokens.textPrimary,
-              fontSize: 15,
+              fontSize: DesignTokens.fontSizeBodyMedium,
             ),
             decoration: InputDecoration(
               hintText: 'e.g., Check work message from Slack...',
@@ -340,7 +343,7 @@ class _IntentGatewayState extends State<IntentGateway>
                   ? 'Good reason — tap below to proceed'
                   : 'At least 10 characters to confirm',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: DesignTokens.fontSizeCaption,
                 color: _intentionValid ? DesignTokens.success : DesignTokens.textMuted,
               ),
             ),
@@ -381,7 +384,7 @@ class _IntentGatewayState extends State<IntentGateway>
                       Text(
                         'Open for 3 minutes',
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: DesignTokens.fontSizeBodyMedium,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -400,7 +403,7 @@ class _IntentGatewayState extends State<IntentGateway>
         'Go back to my task',
         style: TextStyle(
           color: DesignTokens.primary,
-          fontSize: 14,
+          fontSize: DesignTokens.fontSizeBodySmall,
           fontWeight: FontWeight.w500,
         ),
       ),

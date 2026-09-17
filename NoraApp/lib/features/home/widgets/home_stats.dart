@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
-import '../../../providers/app_provider.dart';
+import '../../../providers/persona_provider.dart';
+import '../../../providers/focus_provider.dart';
 import '../../../widgets/nora_components.dart';
 
 /// Horizontal scrollable stats cards — score, streak, focus time.
 class HomeStats extends StatelessWidget {
-  final AppProvider provider;
+  final PersonaProvider personaProvider;
+  final FocusProvider focusProvider;
 
-  const HomeStats({super.key, required this.provider});
+  const HomeStats({super.key, required this.personaProvider, required this.focusProvider});
 
   @override
   Widget build(BuildContext context) {
-    final persona = provider.persona;
+    final persona = personaProvider.persona;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,7 +35,7 @@ class HomeStats extends StatelessWidget {
                 width: 140,
                 child: StatCardHorizontal(
                   label: _getScoreLabel(persona.ageGroup),
-                  value: '${provider.focusScore}',
+                  value: '${focusProvider.focusScore}',
                   iconAsset: 'assets/images/icons/star.svg',
                   color: DesignTokens.accent,
                 ),
@@ -43,7 +45,7 @@ class HomeStats extends StatelessWidget {
                 width: 140,
                 child: StatCardHorizontal(
                   label: _getStreakLabel(persona.ageGroup),
-                  value: '${provider.streakDays}',
+                  value: '${focusProvider.streakDays}',
                   iconAsset: 'assets/images/icons/fire.svg',
                   color: DesignTokens.warning,
                 ),
@@ -53,7 +55,7 @@ class HomeStats extends StatelessWidget {
                 width: 140,
                 child: StatCardHorizontal(
                   label: _getTimeLabel(persona.ageGroup),
-                  value: '${provider.totalFocusMinutes}m',
+                  value: '${focusProvider.totalFocusMinutes}m',
                   iconAsset: 'assets/images/icons/target.svg',
                   color: DesignTokens.accentSecondary,
                 ),
@@ -63,7 +65,7 @@ class HomeStats extends StatelessWidget {
                 width: 140,
                 child: StatCardHorizontal(
                   label: _getSessionsLabel(persona.ageGroup),
-                  value: '${provider.sessionsCompleted}',
+                  value: '${focusProvider.sessionsCompleted}',
                   iconAsset: 'assets/images/icons/circle-check-big.svg',
                   color: DesignTokens.success,
                 ),

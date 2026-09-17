@@ -41,7 +41,7 @@ class VoiceCommandService {
       if (_initialized) {
         debugPrint('VoiceCommandService: initialized successfully');
       } else {
-        debugPrint('VoiceCommandService: initialization failed');
+        debugPrint('VoiceCommandService: initialization failed — speech service may not be installed');
       }
 
       return _initialized;
@@ -57,18 +57,24 @@ class VoiceCommandService {
 
     final available = await initialize();
     if (!available) {
-      onError?.call('Speech recognition not available');
+      onError?.call(
+        'Speech recognition is not available. '
+        'Make sure your device has Google Speech Services installed '
+        'and microphone permission is granted.',
+      );
       return;
     }
 
     try {
       await _speech.listen(
         onResult: _onResult,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
-        localeId: 'en_US',
-        cancelOnError: true,
-        partialResults: true,
+        listenOptions: SpeechListenOptions(
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 3),
+          localeId: 'en_US',
+          cancelOnError: true,
+          partialResults: true,
+        ),
       );
 
       _isListening = true;

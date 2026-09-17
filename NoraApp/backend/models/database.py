@@ -2,10 +2,11 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from datetime import datetime
+import os
 
-DATABASE_URL = "postgresql://user:password@localhost:5432/nora_db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./nora.db")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
@@ -30,12 +31,12 @@ class FocusSession(Base):
     __tablename__ = "focus_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     duration_minutes = Column(Integer, nullable=False)
     completed = Column(Boolean, default=False)
     points_earned = Column(Integer, default=0)
-    session_type = Column(String, default="pomodoro")  # pomodoro, deep_work, break
-    started_at = Column(DateTime, default=datetime.now)
+    session_type = Column(String, default="pomodoro", index=True)  # pomodoro, deep_work, break
+    started_at = Column(DateTime, default=datetime.now, index=True)
     ended_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -48,8 +49,8 @@ class Content(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    category = Column(String, nullable=False)
-    content_type = Column(String, nullable=False)  # video, article, flashcard
+    category = Column(String, nullable=False, index=True)
+    content_type = Column(String, nullable=False, index=True)  # video, article, flashcard
     duration_minutes = Column(Integer, nullable=False)
     points = Column(Integer, default=0)
     url = Column(String, nullable=True)
@@ -74,8 +75,8 @@ class UserAchievement(Base):
     __tablename__ = "user_achievements"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False, index=True)
     earned_at = Column(DateTime, default=datetime.now)
 
     # Relationships
@@ -102,8 +103,8 @@ class AIRecommendation(Base):
     __tablename__ = "ai_recommendations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    content_id = Column(Integer, ForeignKey("content.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey("content.id"), nullable=False, index=True)
     reason = Column(Text, nullable=False)
     confidence_score = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.now)
