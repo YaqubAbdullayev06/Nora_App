@@ -1,12 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/enums/age_group.dart';
 import '../models/models.dart';
 import '../services/notification_service.dart';
 import 'persona_provider.dart';
 
 /// Manages focus scores, sessions history, streaks, and achievements.
+/// Sessions are persisted to secure storage so they survive app restarts.
 class FocusProvider extends ChangeNotifier {
   final PersonaProvider _personaProvider;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  static const _sessionsKey = 'nora_focus_sessions';
+  static const _statsKey = 'nora_focus_stats';
 
   int _focusScore = 0;
   int _totalFocusMinutes = 0;
@@ -24,6 +30,57 @@ class FocusProvider extends ChangeNotifier {
   int get sessionsCompleted => _sessionsCompleted;
   List<String> get achievements => _achievements;
   List<FocusSession> get sessions => _sessions;
+
+  /// Load persisted sessions and stats from secure storage.
+  Future<void> load() async {
+    // Load sessions
+    final sessionsJson = await _storage.read(key: _sessionsKey);
+    if (sessionsJson != null && sessionsJson.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = jsonDecode(sessionsJson);
+        _sessions = decoded.map((e) => FocusSession.fromJson(e)).toList();
+      } catch (_) {
+        _sessions = [];
+      }
+    }
+
+    // Load aggregated stats
+    final statsJson = await _storage.read(key: _statsKey);
+    if (statsJson != null && statsJson.isNotEmpty) {
+      try {
+        final stats = jsonDecode(statsJson) as Map<String, dynamic>;
+        _focusScore = stats['focusScore'] ?? 0;
+        _totalFocusMinutes = stats['totalFocusMinutes'] ?? 0;
+        _sessionsCompleted = stats['sessionsCompleted'] ?? 0;
+        _achievements = List<String>.from(stats['achievements'] ?? []);
+      } catch (_) {}
+    }
+
+    // Recompute streak from persisted sessions
+    _streakDays = computedStreakDays;
+    notifyListeners();
+  }
+
+  /// Persist sessions and stats to secure storage.
+  Future<void> _persist() async {
+    // Cap stored sessions to last 200 to avoid storage limits
+    final toStore = _sessions.length > 200
+        ? _sessions.sublist(_sessions.length - 200)
+        : _sessions;
+    await _storage.write(
+      key: _sessionsKey,
+      value: jsonEncode(toStore.map((s) => s.toJson()).toList()),
+    );
+    await _storage.write(
+      key: _statsKey,
+      value: jsonEncode({
+        'focusScore': _focusScore,
+        'totalFocusMinutes': _totalFocusMinutes,
+        'sessionsCompleted': _sessionsCompleted,
+        'achievements': _achievements,
+      }),
+    );
+  }
 
   List<int> get weeklyFocusMinutes {
     final now = DateTime.now();
@@ -84,6 +141,7 @@ class FocusProvider extends ChangeNotifier {
     _streakDays = computedStreakDays;
 
     _checkAchievements();
+    _persist(); // persist asynchronously — don't block UI
     notifyListeners();
 
     // Send AI notification for session complete
@@ -115,6 +173,7 @@ class FocusProvider extends ChangeNotifier {
     _sessionsCompleted++;
     _streakDays = computedStreakDays;
     _checkAchievements();
+    _persist();
     notifyListeners();
 
     // Send AI notification for session complete
@@ -165,6 +224,7 @@ class FocusProvider extends ChangeNotifier {
     _sessionsCompleted = 0;
     _achievements = [];
     _sessions = [];
+    _persist();
     notifyListeners();
   }
 }

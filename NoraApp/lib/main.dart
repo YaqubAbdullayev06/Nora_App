@@ -138,6 +138,11 @@ class NoraApp extends StatelessWidget {
           // Reset accountability session state on each app start
           WidgetsBinding.instance.addPostFrameCallback((_) {
             context.read<AccountabilityProvider>().resetSession();
+            // Load persisted focus sessions and wire completion callback
+            context.read<FocusProvider>().load();
+            context.read<TimerProvider>().onSessionCompleted = (session) {
+              context.read<FocusProvider>().recordSession(session);
+            };
           });
 
           return MaterialApp(
