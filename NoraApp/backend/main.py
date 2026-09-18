@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Any, List, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Text, func
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Text, func, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
 import jwt
@@ -556,7 +556,16 @@ def seed_content(db: Session):
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    # ─── Migrations for existing databases ───
+    # SQLite (create_all handles new tables), but PostgreSQL needs ALTER TABLE.
     db = SessionLocal()
+    try:
+        db.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token_family VARCHAR(36)"
+        ))
+        db.commit()
+    except Exception:
+        pass  # Column already exists or dialect doesn't support IF NOT EXISTS
     seed_content(db)
     db.close()
 

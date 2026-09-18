@@ -96,7 +96,7 @@ class _TimerScreenState extends State<TimerScreen>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               final pomodoro = context.read<PomodoroProvider>();
-              pomodoro.recordSession(timerProvider.totalTimerSeconds ~/ 60);
+              pomodoro.recordSession(timerProvider.lastFocusDurationSeconds ~/ 60);
 
               Navigator.of(context).push(
                 FadePageRoute(

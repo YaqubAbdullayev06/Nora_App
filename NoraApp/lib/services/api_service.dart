@@ -160,8 +160,14 @@ class ApiService {
       await _authStorage.saveAuthResponse(data);
       return data;
     }
-    throw Exception(
-        jsonDecode(response.body)['detail'] ?? 'Registration failed');
+    // Handle non-JSON error responses (e.g. HTML 500 pages)
+    String detail;
+    try {
+      detail = jsonDecode(response.body)['detail'] ?? 'Registration failed';
+    } catch (_) {
+      detail = 'Registration failed (server error ${response.statusCode})';
+    }
+    throw Exception(detail);
   }
 
   Future<Map<String, dynamic>> login({
@@ -184,7 +190,14 @@ class ApiService {
       await _authStorage.saveAuthResponse(data);
       return data;
     }
-    throw Exception(jsonDecode(response.body)['detail'] ?? 'Login failed');
+    // Handle non-JSON error responses (e.g. HTML 500 pages)
+    String detail;
+    try {
+      detail = jsonDecode(response.body)['detail'] ?? 'Login failed';
+    } catch (_) {
+      detail = 'Login failed (server error ${response.statusCode})';
+    }
+    throw Exception(detail);
   }
 
   /// Get current user profile from /auth/me.
@@ -431,12 +444,17 @@ class ApiService {
   }
 
   Map<String, dynamic> _decodeAgentResponse(http.Response response) {
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return decoded;
+    try {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return decoded;
+      }
+      throw Exception(
+          decoded['detail'] ?? decoded['error'] ?? 'Agent request failed');
+    } catch (e) {
+      if (e is Exception && e.toString().contains('Agent request')) rethrow;
+      throw Exception('Server error (${response.statusCode})');
     }
-    throw Exception(
-        decoded['detail'] ?? decoded['error'] ?? 'Agent request failed');
   }
 
   // ─── AI App Classification ───

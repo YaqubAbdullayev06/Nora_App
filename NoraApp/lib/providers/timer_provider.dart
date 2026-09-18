@@ -19,6 +19,9 @@ class TimerProvider extends ChangeNotifier {
   int _totalTimerSeconds = 0;
   bool _isBreakPhase = false;
   int _completedSessionsInCycle = 0;
+  /// Duration of the last completed focus session (in seconds).
+  /// Saved before _totalTimerSeconds is overwritten by break duration.
+  int _lastFocusDurationSeconds = 0;
 
   TimerProvider({required PersonaProvider personaProvider})
       : _personaProvider = personaProvider {
@@ -31,6 +34,8 @@ class TimerProvider extends ChangeNotifier {
   int get totalTimerSeconds => _totalTimerSeconds;
   bool get isBreakPhase => _isBreakPhase;
   int get completedSessionsInCycle => _completedSessionsInCycle;
+  /// Duration of the last completed focus session (in seconds).
+  int get lastFocusDurationSeconds => _lastFocusDurationSeconds;
 
   bool get isLongBreak =>
       _completedSessionsInCycle > 0 &&
@@ -123,6 +128,9 @@ class TimerProvider extends ChangeNotifier {
     );
 
     onSessionCompleted?.call(session);
+
+    // Save focus duration before transitioning to break
+    _lastFocusDurationSeconds = _totalTimerSeconds;
 
     _vibrate();
 
