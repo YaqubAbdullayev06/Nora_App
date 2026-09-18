@@ -150,8 +150,18 @@ import UIKit
             DeviceActivityMonitor.DailyUsageSummary.self,
             from: data
           ) else {
-      // Return simulated data for demo
-      return getDemoUsageStats(daysBack: daysBack)
+      // No real data available yet — return empty, not fake data
+      return [
+        "success": true,
+        "daysBack": daysBack,
+        "totalScreenTimeMinutes": 0,
+        "socialMediaMinutes": 0,
+        "entertainmentMinutes": 0,
+        "productivityMinutes": 0,
+        "appCount": 0,
+        "apps": [] as [[String: Any]],
+        "isDemo": true,
+      ]
     }
 
     // Calculate totals from summary
@@ -180,7 +190,15 @@ import UIKit
             DeviceActivityMonitor.DailyUsageSummary.self,
             from: data
           ) else {
-      return getDemoTodayUsage()
+      // No real data available yet — return empty, not fake data
+      return [
+        "success": true,
+        "totalScreenTimeMinutes": 0,
+        "socialMediaMinutes": 0,
+        "appCount": 0,
+        "apps": [] as [[String: Any]],
+        "isDemo": true,
+      ]
     }
 
     return [
@@ -201,8 +219,12 @@ import UIKit
             [DeviceActivityMonitor.UsageRecord].self,
             from: recordsData
           ) else {
-      // Fall back to demo data
-      return getDemoWeeklyAppUsage()
+      // No real data available yet — return empty, not fake data
+      return [
+        "success": true,
+        "days": [] as [[String: Any]],
+        "isDemo": true,
+      ]
     }
 
     let calendar = Calendar.current
@@ -217,7 +239,11 @@ import UIKit
       value: -(todayIndex),
       to: calendar.startOfDay(for: now)
     ) else {
-      return getDemoWeeklyAppUsage()
+      return [
+        "success": true,
+        "days": [] as [[String: Any]],
+        "isDemo": true,
+      ]
     }
 
     // Group records by day index
