@@ -333,12 +333,13 @@ void showLogoutConfirmation(
           ),
         ),
         TextButton(
-          onPressed: () {
-            authProvider.logout();
-            // Also clear AuthProvider (already handled above)
+          onPressed: () async {
+            await authProvider.logout();
+            if (!context.mounted) return;
             try {
-              context.read<AuthProvider>().logout();
+              await context.read<AuthProvider>().logout();
             } catch (_) {}
+            if (!context.mounted) return;
             Navigator.pop(context);
             Navigator.pushReplacementNamed(context, '/login');
           },

@@ -90,10 +90,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     _currentUser = null;
-    _api.setToken(null);
     _isAppLocked = false;
+    _isLoading = false;
+    _error = null;
+    await _api.clearAuth();
     notifyListeners();
   }
 

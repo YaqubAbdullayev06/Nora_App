@@ -574,10 +574,9 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     unlockApp();
     _currentUser = null;
-    _api.setToken(null);
     _focusScore = 0;
     _totalFocusMinutes = 0;
     _streakDays = 0;
@@ -586,6 +585,7 @@ class AppProvider extends ChangeNotifier {
     _sessions = [];
     _screenTimeRefreshTimer?.cancel();
     _screenTimeTodayMinutes = 0;
+    await _api.clearAuth();
     notifyListeners();
   }
 
