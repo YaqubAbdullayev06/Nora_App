@@ -269,21 +269,21 @@ class PersonaTheme {
   // ─────────────────────────────────────────────
   static const adultTheme = PersonaTheme(
     ageGroup: AgeGroup.adult,
-    primary: Color(0xFF5FA88E), // Considered sage-teal
-    primaryLight: Color(0xFF9BCBB8),
-    secondary: Color(0xFFB08968), // Warm bronze, used sparingly
-    secondaryLight: Color(0xFFD9BFA6),
-    accent: Color(0xFF5FA88E),
-    background: Color(0xFF1B1C1E), // Warm near-black, not blue-black
-    surface: Color(0xFF242527),
-    surfaceRaised: Color(0xFF2C2D30),
-    textPrimary: Color(0xFFF3F1EC),
-    textSecondary: Color(0xFFB8B5AE),
-    textMuted: Color(0xFF7E7B75),
-    border: Color(0xFF3A3B3D),
-    success: Color(0xFF6FBF8B),
-    warning: Color(0xFFE0B65C),
-    danger: Color(0xFFD97066),
+    primary: Color(0xFF00C896), // Neptun Green — active states, CTAs, success
+    primaryLight: Color(0xFF33D4A8),
+    secondary: Color(0xFF7B61FF), // Purple Neon — AI features, badges
+    secondaryLight: Color(0xFF9B85FF),
+    accent: Color(0xFF00C896),
+    background: Color(0xFF0A0E1A), // Deep dark — low eye strain
+    surface: Color(0xFF141927), // Card surfaces
+    surfaceRaised: Color(0xFF1C2235), // Elevated cards
+    textPrimary: Color(0xFFE8ECF4), // High-contrast light
+    textSecondary: Color(0xFF8A92A6), // Muted blue-gray
+    textMuted: Color(0xFF4E5670),
+    border: Color(0xFF1E2740), // Subtle blue-gray border
+    success: Color(0xFF00C896),
+    warning: Color(0xFFD4A359), // Gold/Amber — streaks, achievements
+    danger: Color(0xFFE05252),
     mascotName: 'Nora',
     tagline: 'Focus. Learn. Grow.',
     fontFamily: 'Inter',

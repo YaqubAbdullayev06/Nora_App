@@ -157,8 +157,8 @@ class UsageTrackerService(private val context: Context) {
             val packageName = topEntry.key
             val minutes = topEntry.value
 
-            val appName: String
-            val category: String
+            var appName: String
+            var category: String
             try {
                 val appInfo = packageManager.getApplicationInfo(packageName, 0)
                 appName = packageManager.getApplicationLabel(appInfo).toString()

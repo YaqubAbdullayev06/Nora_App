@@ -116,7 +116,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/main');
+      Navigator.pushReplacementNamed(context, '/setup-wizard');
     } else if (mounted) {
       _showError(authProvider.error ?? 'Registration failed. Please try again.');
     }

@@ -23,6 +23,7 @@ import 'features/access/screens/app_timer_limits_screen.dart';
 import 'features/accountability/screens/accountability_setup_screen.dart';
 import 'features/weekly_review/screens/weekly_review_screen.dart';
 import 'features/plan/screens/plan_screen.dart';
+import 'features/test/screens/palette_picker_screen.dart';
 import 'providers/app_provider.dart';
 import 'providers/persona_provider.dart';
 import 'providers/auth_provider.dart';
@@ -37,10 +38,12 @@ import 'providers/accountability_provider.dart';
 import 'providers/hard_cap_provider.dart';
 import 'providers/pomodoro_provider.dart';
 import 'providers/habit_provider.dart';
+import 'providers/setup_provider.dart';
 import 'features/hardcap/screens/hard_cap_setup_screen.dart';
 import 'features/hardcap/widgets/hard_cap_overlay.dart';
 import 'features/pomodoro/screens/pomodoro_setup_screen.dart';
 import 'features/habits/screens/habits_screen.dart';
+import 'features/onboarding/screens/setup_wizard_screen.dart';
 import 'services/api_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
@@ -119,6 +122,8 @@ class NoraApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PomodoroProvider()),
         // Habit tracking — session-scoped, initialized lazily
         ChangeNotifierProvider(create: (_) => HabitProvider()),
+        // Setup wizard state — persisted across sessions
+        ChangeNotifierProvider(create: (_) => SetupProvider()..load()),
         // Connectivity monitoring — starts checking immediately
         ChangeNotifierProvider(create: (_) => ConnectivityService()..startChecking()),
         // Legacy provider for backward compatibility — initialized lazily after first frame
@@ -228,6 +233,12 @@ class NoraApp extends StatelessWidget {
                   break;
                 case '/screen-time':
                   page = const ScreenTimeScreen();
+                  break;
+                case '/palette-picker':
+                  page = const PalettePickerScreen();
+                  break;
+                case '/setup-wizard':
+                  page = const SetupWizardScreen();
                   break;
                 default:
                   return null;

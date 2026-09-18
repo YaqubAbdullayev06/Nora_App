@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/design_tokens.dart';
+import '../../../core/router/slide_route.dart';
 import '../../../providers/persona_provider.dart';
 import '../../../widgets/nora_components.dart';
+import '../../scan/screens/app_scan_screen.dart';
+import '../../timer/screens/timer_screen.dart';
+import '../../chat/screens/assistant_screen.dart';
+import '../../weekly_review/screens/weekly_review_screen.dart';
+import '../../access/screens/app_timer_limits_screen.dart';
 
 /// Hero actions — prominent scanner card + one-tap focus button + secondary actions.
-class HomeActions extends StatelessWidget {
+/// Each card slides in with a staggered animation on build.
+class HomeActions extends StatefulWidget {
   final PersonaProvider personaProvider;
   final VoidCallback? onPlanTap;
 
@@ -15,34 +22,113 @@ class HomeActions extends StatelessWidget {
   });
 
   @override
+  State<HomeActions> createState() => _HomeActionsState();
+}
+
+class _HomeActionsState extends State<HomeActions>
+    with TickerProviderStateMixin {
+  late final List<AnimationController> _controllers;
+  late final List<Animation<double>> _slideAnimations;
+  late final List<Animation<double>> _fadeAnimations;
+
+  static const _itemCount = 7; // scanner, focus, "More" header, 4 action cards
+  static const _staggerDelay = 80; // ms between each item
+  static const _slideDuration = 400; // ms per item
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = List.generate(_itemCount, (i) {
+      return AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: _slideDuration + (i * _staggerDelay)),
+      );
+    });
+
+    _slideAnimations = List.generate(_itemCount, (i) {
+      final start = (i * _staggerDelay) / (_slideDuration + (i * _staggerDelay));
+      return Tween<double>(begin: 30, end: 0).animate(
+        CurvedAnimation(
+          parent: _controllers[i],
+          curve: Interval(start, 1.0, curve: Curves.easeOutCubic),
+        ),
+      );
+    });
+
+    _fadeAnimations = List.generate(_itemCount, (i) {
+      final start = (i * _staggerDelay) / (_slideDuration + (i * _staggerDelay));
+      return Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(
+          parent: _controllers[i],
+          curve: Interval(start, 1.0, curve: Curves.easeOut),
+        ),
+      );
+    });
+
+    // Stagger-start each controller
+    for (int i = 0; i < _itemCount; i++) {
+      Future.delayed(Duration(milliseconds: i * _staggerDelay), () {
+        if (mounted) _controllers[i].forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Widget _buildAnimatedItem(int index, Widget child) {
+    return AnimatedBuilder(
+      animation: _controllers[index],
+      builder: (_, __) => Transform.translate(
+        offset: Offset(0, _slideAnimations[index].value),
+        child: Opacity(
+          opacity: _fadeAnimations[index].value,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final persona = personaProvider.persona;
+    final persona = widget.personaProvider.persona;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── HERO: App Scanner card (full width, prominent) ──
-        _HeroScannerCard(
+        // ── HERO: App Scanner card ──
+        _buildAnimatedItem(0, _HeroScannerCard(
           gradient: [persona.primary, persona.secondary],
-          onTap: () => Navigator.pushNamed(context, '/app-scan'),
-        ),
+          onTap: () => Navigator.of(context).push(SlideUpRoute(
+            pageBuilder: (_, __, ___) => const AppScanScreen(),
+          )),
+        )),
         const SizedBox(height: DesignTokens.spacing12),
 
         // ── One-tap Focus button ──
-        _FocusButton(
+        _buildAnimatedItem(1, _FocusButton(
           accentColor: persona.primary,
-          onTap: () => Navigator.pushNamed(context, '/timer'),
-        ),
+          onTap: () => Navigator.of(context).push(SlideUpRoute(
+            pageBuilder: (_, __, ___) => const TimerScreen(),
+          )),
+        )),
         const SizedBox(height: DesignTokens.spacing16),
 
-        // ── Secondary actions row ──
-        SectionHeader(
+        // ── "More" header ──
+        _buildAnimatedItem(2, SectionHeader(
           title: "More",
           icon: Icons.grid_view_rounded,
           iconColor: DesignTokens.textMuted,
-        ),
+        )),
         const SizedBox(height: DesignTokens.spacing12),
-        Row(
+
+        // ── Row 1: AI Chat + Weekly Review ──
+        _buildAnimatedItem(3, Row(
           children: [
             Expanded(
               child: _ActionCard(
@@ -50,7 +136,9 @@ class HomeActions extends StatelessWidget {
                 title: 'AI Chat',
                 subtitle: 'Ask Nora anything',
                 color: persona.primary,
-                onTap: () => Navigator.pushNamed(context, '/chat'),
+                onTap: () => Navigator.of(context).push(SlideRightRoute(
+                  pageBuilder: (_, __, ___) => const AssistantScreen(),
+                )),
               ),
             ),
             const SizedBox(width: DesignTokens.spacing12),
@@ -60,13 +148,17 @@ class HomeActions extends StatelessWidget {
                 title: 'Weekly Review',
                 subtitle: 'Reflect & set goals',
                 color: DesignTokens.accentSecondary,
-                onTap: () => Navigator.pushNamed(context, '/weekly-review'),
+                onTap: () => Navigator.of(context).push(SlideRightRoute(
+                  pageBuilder: (_, __, ___) => const WeeklyReviewScreen(),
+                )),
               ),
             ),
           ],
-        ),
+        )),
         const SizedBox(height: DesignTokens.spacing12),
-        Row(
+
+        // ── Row 2: Daily Plan + App Timer ──
+        _buildAnimatedItem(4, Row(
           children: [
             Expanded(
               child: _ActionCard(
@@ -74,7 +166,7 @@ class HomeActions extends StatelessWidget {
                 title: 'Daily Plan',
                 subtitle: 'Structure your day',
                 color: DesignTokens.success,
-                onTap: onPlanTap ?? () {},
+                onTap: widget.onPlanTap ?? () {},
               ),
             ),
             const SizedBox(width: DesignTokens.spacing12),
@@ -84,11 +176,13 @@ class HomeActions extends StatelessWidget {
                 title: 'App Timer',
                 subtitle: 'Set daily app limits',
                 color: DesignTokens.warning,
-                onTap: () => Navigator.pushNamed(context, '/app-timer-limits'),
+                onTap: () => Navigator.of(context).push(SlideRightRoute(
+                  pageBuilder: (_, __, ___) => const AppTimerLimitsScreen(),
+                )),
               ),
             ),
           ],
-        ),
+        )),
       ],
     );
   }
