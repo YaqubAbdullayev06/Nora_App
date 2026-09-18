@@ -239,7 +239,7 @@ class ApiService {
 
   Future<List<FocusSession>> getUserSessions(String userId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/sessions/$userId'),
+      Uri.parse('$baseUrl/sessions/'),
       headers: _headers,
     );
     if (response.statusCode == 200) {
@@ -291,7 +291,7 @@ class ApiService {
 
   Future<List<AIRecommendation>> getRecommendations(String userId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/recommendations/$userId'),
+      Uri.parse('$baseUrl/recommendations/'),
       headers: _headers,
     );
     if (response.statusCode == 200) {
@@ -305,7 +305,7 @@ class ApiService {
 
   Future<FocusScore> getFocusScore(String userId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/focus-score/$userId'),
+      Uri.parse('$baseUrl/focus-score/'),
       headers: _headers,
     );
     if (response.statusCode == 200) {

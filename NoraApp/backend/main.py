@@ -1316,7 +1316,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 # ─── Focus Sessions ───
 
-@app.post("/sessions/", response_model=SessionResponse)
+@app.post("/sessions/", response_model=SessionResponse, status_code=201)
 def create_session(
     session: SessionCreate,
     db: Session = Depends(get_db),
@@ -1372,8 +1372,12 @@ def get_content(category: Optional[str] = None, db: Session = Depends(get_db)):
         query = query.filter(ContentModel.category == category)
     return [ContentResponse.model_validate(c) for c in query.all()]
 
-@app.post("/content/", response_model=ContentResponse)
-def create_content(content: ContentCreate, db: Session = Depends(get_db)):
+@app.post("/content/", response_model=ContentResponse, status_code=201)
+def create_content(
+    content: ContentCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
     new_content = ContentModel(
         title=content.title,
         description=content.description,
