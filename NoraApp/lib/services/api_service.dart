@@ -104,8 +104,8 @@ class ApiService {
         );
         return true;
       } else {
-        // Refresh failed — tokens are stale, user must re-login
-        // Don't clear here; let the UI handle the re-login prompt
+        // Refresh failed (expired, reused, or revoked) — clear stale tokens
+        await clearAuth();
         return false;
       }
     } catch (e) {

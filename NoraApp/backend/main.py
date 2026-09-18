@@ -13,6 +13,7 @@ import uvicorn
 import os
 import bcrypt
 from dotenv import load_dotenv
+import uuid
 
 # ─── Load .env BEFORE importing AI modules (they read env vars at import time) ───
 load_dotenv()
@@ -70,6 +71,7 @@ class UserModel(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True)
+    refresh_token_family = Column(String(36), nullable=True, index=True)
 
     sessions = relationship("SessionModel", back_populates="user")
     achievements = relationship("UserAchievementModel", back_populates="user")
@@ -504,6 +506,9 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        # Enforce token type — refresh tokens must NOT be used as access tokens
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Invalid token type")
         user_id = int(payload.get("sub"))
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -522,11 +527,13 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def create_refresh_token(data: dict):
+def create_refresh_token(data: dict, family: str | None = None):
     to_encode = data.copy()
     to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
+    if family:
+        to_encode["family"] = family
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # ─── Seed Data ───
@@ -572,14 +579,15 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     new_user = UserModel(
         email=user.email,
         name=user.name,
-        password_hash=hash_password(user.password)
+        password_hash=hash_password(user.password),
+        refresh_token_family=str(uuid.uuid4()),
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
     token = create_access_token({"sub": new_user.id})
-    refresh = create_refresh_token({"sub": new_user.id})
+    refresh = create_refresh_token({"sub": new_user.id}, family=new_user.refresh_token_family)
     return {"user": UserResponse.model_validate(new_user), "token": token, "refresh_token": refresh}
 
 @app.post("/auth/login")
@@ -589,12 +597,20 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token({"sub": user.id})
-    refresh = create_refresh_token({"sub": user.id})
+    # Rotate refresh token family on login — invalidates any previously issued refresh token
+    new_family = str(uuid.uuid4())
+    user.refresh_token_family = new_family
+    db.commit()
+    refresh = create_refresh_token({"sub": user.id}, family=new_family)
     return {"user": UserResponse.model_validate(user), "token": token, "refresh_token": refresh}
 
 @app.post("/auth/refresh")
 def refresh_token(refresh_req: dict, db: Session = Depends(get_db)):
-    """Exchange a valid refresh token for a new access + refresh token pair."""
+    """Exchange a valid refresh token for a new access + refresh token pair.
+    
+    Validates token family to detect refresh token reuse (theft).
+    On successful rotation, the old refresh token is invalidated.
+    """
     token_str = refresh_req.get("refresh_token")
     if not token_str:
         raise HTTPException(status_code=400, detail="refresh_token required")
@@ -606,6 +622,7 @@ def refresh_token(refresh_req: dict, db: Session = Depends(get_db)):
         user_id = int(payload.get("sub"))
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
+        token_family = payload.get("family")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
@@ -613,8 +630,20 @@ def refresh_token(refresh_req: dict, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
 
+    # Validate token family — if it doesn't match, the token was reused (stolen)
+    if token_family and user.refresh_token_family and token_family != user.refresh_token_family:
+        # Family mismatch = token reuse detected. Invalidate all sessions for this user.
+        user.refresh_token_family = str(uuid.uuid4())
+        db.commit()
+        raise HTTPException(status_code=401, detail="Refresh token reuse detected — all sessions invalidated")
+
+    # Rotate: issue new family so the old refresh token is now invalid
+    new_family = str(uuid.uuid4())
+    user.refresh_token_family = new_family
+    db.commit()
+
     new_access = create_access_token({"sub": user.id})
-    new_refresh = create_refresh_token({"sub": user.id})
+    new_refresh = create_refresh_token({"sub": user.id}, family=new_family)
     return {"token": new_access, "refresh_token": new_refresh}
 
 @app.get("/auth/me", response_model=UserResponse)
