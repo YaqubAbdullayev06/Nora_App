@@ -11,12 +11,12 @@ import '../../../providers/timer_provider.dart';
 import '../../../providers/pomodoro_provider.dart';
 import '../../../services/flow_state_sounds.dart';
 import '../../../services/haptic_service.dart';
-
-final FlowStateSoundService _soundService = FlowStateSoundService();
 import '../../../widgets/flow_state_sound_player.dart';
 import '../../../widgets/nora_components.dart';
 import '../widgets/breathe_tab.dart';
 import 'break_screen.dart';
+
+final FlowStateSoundService _soundService = FlowStateSoundService();
 
 /// Timer Screen — Pomodoro with AI "interrupter" feature.
 /// Adapts based on age group:

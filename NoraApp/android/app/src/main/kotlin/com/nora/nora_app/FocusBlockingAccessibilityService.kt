@@ -25,9 +25,17 @@ class FocusBlockingAccessibilityService : AccessibilityService() {
 
     private fun syncFromPreferences() {
         val prefs = preferences ?: return
+        val wasEnabled = blockingEnabled
         blockingEnabled = prefs.getBoolean(MainActivity.BLOCKING_ENABLED_KEY, false)
         blockedApps.clear()
         prefs.getStringSet(MainActivity.BLOCKED_PACKAGES_KEY, emptySet())?.let { blockedApps.addAll(it) }
+
+        // Start / stop foreground notification so user knows protection state
+        if (blockingEnabled && !wasEnabled) {
+            FocusProtectionForegroundService.start(this)
+        } else if (!blockingEnabled && wasEnabled) {
+            FocusProtectionForegroundService.stop(this)
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -50,6 +58,10 @@ class FocusBlockingAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        // Stop foreground notification if service is killed
+        if (FocusProtectionForegroundService.isRunning()) {
+            FocusProtectionForegroundService.stop(this)
+        }
         preferences?.unregisterOnSharedPreferenceChangeListener(preferenceListener)
         preferenceListener = null
         super.onDestroy()

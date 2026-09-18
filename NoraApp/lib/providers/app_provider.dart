@@ -764,56 +764,10 @@ class AppProvider extends ChangeNotifier {
   }
 
   void loadPlanHistory() {
-    final now = DateTime.now();
-    final history = <DailyPlan>[];
-
-    for (var i = 1; i <= 7; i++) {
-      final date = now.subtract(Duration(days: i));
-      final dayOnly = DateTime(date.year, date.month, date.day);
-      final completedCount = (i % 3) + 1;
-      final totalTasks = 3;
-      final points = completedCount * _ageGroup.pointsPerTask;
-
-      final tasks = List.generate(totalTasks, (index) {
-        final isCompleted = index < completedCount;
-        return PlanTask(
-          id: 'history_task_${dayOnly.millisecondsSinceEpoch}_$index',
-          title: _getMockTaskTitle(index),
-          priority: index + 1,
-          completed: isCompleted,
-          completedAt:
-              isCompleted ? dayOnly.add(const Duration(hours: 12)) : null,
-        );
-      });
-
-      history.add(DailyPlan(
-        id: 'plan_${dayOnly.millisecondsSinceEpoch}',
-        userId: _currentUser?.id ?? '1',
-        date: dayOnly,
-        tasks: tasks,
-        morningPlanned: true,
-        eveningReflected: i % 2 == 0,
-        pointsEarned: points,
-      ));
-    }
-
-    _planHistory = history;
+    // TODO: Fetch real plan history from backend when endpoint is available.
+    // Previously returned fabricated fake history — now returns empty.
+    _planHistory = [];
     notifyListeners();
-  }
-
-  String _getMockTaskTitle(int index) {
-    switch (_ageGroup) {
-      case AgeGroup.baby:
-        return ['Color time', 'Story time', 'Play time'][index % 3];
-      case AgeGroup.child:
-        return ['Color time', 'Story time', 'Play time'][index % 3];
-      case AgeGroup.kid:
-        return ['Math homework', 'Read a chapter', 'Practice guitar'][index % 3];
-      case AgeGroup.teen:
-        return ['Study for test', 'Finish project', 'Go for a run'][index % 3];
-      case AgeGroup.adult:
-        return ['Finish report', 'Exercise', 'Meal prep'][index % 3];
-    }
   }
 
   // ─── Cleanup ───

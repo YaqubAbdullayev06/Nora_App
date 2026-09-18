@@ -294,7 +294,7 @@ class _SoundToggleButton extends StatelessWidget {
               child: Text(
                 isPlaying ? "Stop $soundName" : "Play $soundName",
                 key: ValueKey(isPlaying),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: DesignTokens.fontSizeBody,
                   fontWeight: DesignTokens.fontWeightSemiBold,

@@ -34,7 +34,12 @@ Base = declarative_base()
 
 # ─── JWT Config ───
 
-SECRET_KEY = os.getenv("SECRET_KEY", "nora-secret-key-change-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is required. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+    )
 ALGORITHM = "HS256"
 
 # SECURITY: Access tokens expire in 15 minutes (not 7 days).

@@ -52,7 +52,7 @@ class FlowStateSoundService {
 
     // Write to temp file
     final tempDir = await getTemporaryDirectory();
-    _tempFilePath = '${tempDir.id}_${sound.name}.wav';
+    _tempFilePath = '${tempDir.path.hashCode}_${sound.name}.wav';
     final file = File('${tempDir.path}/$_tempFilePath');
     await file.writeAsBytes(wavData);
 
