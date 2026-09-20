@@ -34,7 +34,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
   bool _isScanning = false;
   bool _isVoiceListening = false;
   Map<String, dynamic>? _lastScanResults;
-  UsageStatsSummary? _lastUsageSummary;
 
   bool _welcomeAdded = false;
 
@@ -381,7 +380,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
       });
 
       // Add scan results to chat
-      final totalApps = classification['totalApps'] ?? 0;
       final distractionCount = classification['distractionAppsCount'] ?? 0;
       final blockingCount =
           (classification['aiRecommendedBlock'] as List?)?.length ?? 0;
@@ -1057,25 +1055,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
         ),
       ),
     );
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'social_media':
-        return Icons.chat_rounded;
-      case 'entertainment':
-        return Icons.movie_rounded;
-      case 'games':
-        return Icons.sports_esports_rounded;
-      case 'productivity':
-        return Icons.work_rounded;
-      case 'messaging':
-        return Icons.forum_rounded;
-      case 'education':
-        return Icons.auto_stories_rounded;
-      default:
-        return Icons.apps_rounded;
-    }
   }
 }
 

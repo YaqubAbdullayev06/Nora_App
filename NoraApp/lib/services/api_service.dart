@@ -327,95 +327,8 @@ class ApiService {
     throw Exception('Failed to get focus score');
   }
 
-  // ─── Agent Capabilities ───
-
-  Future<Map<String, dynamic>> getAgentCapabilities() async {
-    return _getJson('/agent/capabilities');
-  }
-
-  Future<Map<String, dynamic>> getAgentFocusStatus() async {
-    return _getJson('/agent/focus/status');
-  }
-
-  Future<Map<String, dynamic>> scheduleAgentFocus({
-    required String startTime,
-    required int durationMinutes,
-    String label = 'Focus session',
-  }) async {
-    return _postJson('/agent/focus/schedule', {
-      'start_time': startTime,
-      'duration_minutes': durationMinutes,
-      'label': label,
-    });
-  }
-
-  Future<Map<String, dynamic>> startAgentFocus({
-    required int durationMinutes,
-    String label = 'Focus session',
-  }) async {
-    return _postJson('/agent/focus/start', {
-      'duration_minutes': durationMinutes,
-      'label': label,
-    });
-  }
-
-  Future<Map<String, dynamic>> stopAgentFocus() async {
-    return _postJson('/agent/focus/stop', {});
-  }
-
-  Future<Map<String, dynamic>> readAgentDeviceSetting(String setting) async {
-    return _getJson('/agent/device/settings/$setting');
-  }
-
-  Future<Map<String, dynamic>> updateAgentDeviceSetting({
-    required String setting,
-    required dynamic value,
-    required bool userApproved,
-  }) async {
-    return _postJson('/agent/device/settings', {
-      'setting': setting,
-      'value': value,
-      'user_approved': userApproved,
-    });
-  }
-
-  Future<Map<String, dynamic>> getAgentSocialPlatforms() async {
-    return _getJson('/agent/social/platforms');
-  }
-
-  Future<Map<String, dynamic>> startAgentSocialOAuth({
-    required String platform,
-    required String redirectUri,
-  }) async {
-    return _postJson('/agent/social/oauth/start', {
-      'platform': platform,
-      'redirect_uri': redirectUri,
-    });
-  }
-
-  Future<Map<String, dynamic>> connectAgentSocialAccount({
-    required String platform,
-    required String accountId,
-  }) async {
-    return _postJson('/agent/social/connect', {
-      'platform': platform,
-      'account_id': accountId,
-    });
-  }
-
-  Future<Map<String, dynamic>> postAgentSocialContent({
-    required String platform,
-    required String accountId,
-    required String text,
-  }) async {
-    return _postJson('/agent/social/post', {
-      'platform': platform,
-      'account_id': accountId,
-      'text': text,
-    });
-  }
-
-  Future<Map<String, dynamic>> _getJson(String path) async {
+  /// Authenticated GET returning decoded JSON.
+  Future<Map<String, dynamic>> getJson(String path) async {
     final response = await _authenticatedRequest(
       (token) => http.get(
         Uri.parse('$baseUrl$path'),
@@ -425,10 +338,11 @@ class ApiService {
         },
       ),
     );
-    return _decodeAgentResponse(response);
+    return decodeJsonResponse(response);
   }
 
-  Future<Map<String, dynamic>> _postJson(
+  /// Authenticated POST returning decoded JSON.
+  Future<Map<String, dynamic>> postJson(
       String path, Map<String, dynamic> body) async {
     final response = await _authenticatedRequest(
       (token) => http.post(
@@ -440,10 +354,11 @@ class ApiService {
         body: jsonEncode(body),
       ),
     );
-    return _decodeAgentResponse(response);
+    return decodeJsonResponse(response);
   }
 
-  Map<String, dynamic> _decodeAgentResponse(http.Response response) {
+  /// Decode a JSON response, throwing on non-2xx.
+  Map<String, dynamic> decodeJsonResponse(http.Response response) {
     try {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -463,7 +378,7 @@ class ApiService {
     required List<Map<String, dynamic>> apps,
     String ageGroup = 'adult',
   }) async {
-    return _postJson('/ai/classify-apps', {
+    return postJson('/ai/classify-apps', {
       'apps': apps,
       'age_group': ageGroup,
     });
@@ -473,7 +388,7 @@ class ApiService {
     required Map<String, dynamic> usageData,
     String ageGroup = 'adult',
   }) async {
-    return _postJson('/ai/analyze-usage', {
+    return postJson('/ai/analyze-usage', {
       'usage_data': usageData,
       'age_group': ageGroup,
     });
@@ -485,7 +400,7 @@ class ApiService {
     Map<String, dynamic>? context,
     List<Map<String, dynamic>>? conversationHistory,
   }) async {
-    return _postJson('/ai/command', {
+    return postJson('/ai/command', {
       'command': command,
       'age_group': ageGroup,
       'context': context ?? {},
@@ -497,7 +412,7 @@ class ApiService {
     String task, {
     String ageGroup = 'adult',
   }) async {
-    return _postJson('/ai/decompose-task', {
+    return postJson('/ai/decompose-task', {
       'task': task,
       'age_group': ageGroup,
     });
@@ -510,7 +425,7 @@ class ApiService {
     required String guardianName,
     int? lockDurationDays,
   }) async {
-    return _postJson('/accountability/setup', {
+    return postJson('/accountability/setup', {
       'pin': pin,
       'guardian_name': guardianName,
       'lock_duration_days': lockDurationDays,
@@ -520,19 +435,19 @@ class ApiService {
   Future<Map<String, dynamic>> verifyAccountabilityLock({
     required String pin,
   }) async {
-    return _postJson('/accountability/verify', {
+    return postJson('/accountability/verify', {
       'pin': pin,
     });
   }
 
   Future<Map<String, dynamic>> getAccountabilityStatus() async {
-    return _getJson('/accountability/status');
+    return getJson('/accountability/status');
   }
 
   Future<Map<String, dynamic>> unlinkAccountabilityLock({
     required String pin,
   }) async {
-    return _postJson('/accountability/unlink', {
+    return postJson('/accountability/unlink', {
       'pin': pin,
     });
   }
@@ -545,7 +460,7 @@ class ApiService {
     int hardWarningPercent = 90,
     bool requirePinToOverride = false,
   }) async {
-    return _postJson('/hardcap/setup', {
+    return postJson('/hardcap/setup', {
       'cap_minutes': capMinutes,
       'soft_warning_percent': softWarningPercent,
       'hard_warning_percent': hardWarningPercent,
@@ -554,11 +469,11 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getHardCapStatus() async {
-    return _getJson('/hardcap/status');
+    return getJson('/hardcap/status');
   }
 
   Future<Map<String, dynamic>> deactivateHardCap() async {
-    return _postJson('/hardcap/deactivate', {});
+    return postJson('/hardcap/deactivate', {});
   }
 
   // ─── Habits ───
@@ -571,7 +486,7 @@ class ApiService {
     int screenTimeMinutes = 15,
     int targetPerDay = 1,
   }) async {
-    return _postJson('/habits', {
+    return postJson('/habits', {
       'name': name,
       'category': category,
       'icon': icon,
@@ -582,14 +497,14 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> listHabits() async {
-    return _getJson('/habits');
+    return getJson('/habits');
   }
 
   Future<Map<String, dynamic>> completeHabit({
     required int habitId,
     int durationMinutes = 0,
   }) async {
-    return _postJson('/habits/complete', {
+    return postJson('/habits/complete', {
       'habit_id': habitId,
       'duration_minutes': durationMinutes,
     });
@@ -605,11 +520,11 @@ class ApiService {
         },
       ),
     );
-    return _decodeAgentResponse(response);
+    return decodeJsonResponse(response);
   }
 
   Future<Map<String, dynamic>> getHabitStats() async {
-    return _getJson('/habits/stats');
+    return getJson('/habits/stats');
   }
 
   // ─── AI Notification Text ───
@@ -620,7 +535,7 @@ class ApiService {
     String ageGroup = 'adult',
     Map<String, dynamic>? context,
   }) async {
-    return _postJson('/ai/notification-text', {
+    return postJson('/ai/notification-text', {
       'event_type': eventType,
       'age_group': ageGroup,
       'context': context ?? {},

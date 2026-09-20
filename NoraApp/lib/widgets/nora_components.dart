@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/constants/design_tokens.dart';
 import '../core/theme/persona_theme.dart';
-import 'loader_one.dart';
 
 export 'loader_one.dart';
 
@@ -634,7 +633,6 @@ class NoraMascot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final persona = personaOverride ?? DesignTokens.current;
-    final hasAsset = persona.mascotAssetPath != null;
 
     return Semantics(
       label: '${persona.mascotName} mascot',

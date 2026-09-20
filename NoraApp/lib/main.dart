@@ -39,6 +39,7 @@ import 'providers/hard_cap_provider.dart';
 import 'providers/pomodoro_provider.dart';
 import 'providers/habit_provider.dart';
 import 'providers/setup_provider.dart';
+import 'providers/design_tokens_provider.dart';
 import 'features/hardcap/screens/hard_cap_setup_screen.dart';
 import 'features/hardcap/widgets/hard_cap_overlay.dart';
 import 'features/pomodoro/screens/pomodoro_setup_screen.dart';
@@ -77,6 +78,8 @@ class NoraApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => PersonaProvider(initialAgeGroup: AgeGroup.adult),
         ),
+        // DesignTokens — wraps PersonaTheme for reactive token access
+        ChangeNotifierProvider(create: (_) => DesignTokensProvider()),
         // Auth depends on Persona
         ChangeNotifierProvider(
           create: (ctx) => AuthProvider(
@@ -132,18 +135,10 @@ class NoraApp extends StatelessWidget {
       ],
       child: Consumer<PersonaProvider>(
         builder: (context, personaProvider, _) {
-          // Update DesignTokens when persona changes
+          // Sync DesignTokensProvider with persona changes
+          context.read<DesignTokensProvider>().setPersona(personaProvider.persona);
+          // Legacy static accessor for non-widget code
           DesignTokens.init(personaProvider.persona);
-
-          // Reset accountability session state on each app start
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.read<AccountabilityProvider>().resetSession();
-            // Load persisted focus sessions and wire completion callback
-            context.read<FocusProvider>().load();
-            context.read<TimerProvider>().onSessionCompleted = (session) {
-              context.read<FocusProvider>().recordSession(session);
-            };
-          });
 
           return MaterialApp(
             title: 'Nora',

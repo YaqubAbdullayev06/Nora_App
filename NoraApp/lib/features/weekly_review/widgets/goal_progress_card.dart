@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../widgets/nora_components.dart';
 import '../../../models/models.dart';

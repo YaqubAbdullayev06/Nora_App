@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../core/enums/age_group.dart';
 import '../../../models/models.dart';
 import '../../../providers/focus_provider.dart';
 import '../../../widgets/nora_components.dart';

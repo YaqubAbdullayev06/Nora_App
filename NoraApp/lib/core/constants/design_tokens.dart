@@ -1,52 +1,55 @@
 import 'package:flutter/material.dart';
 import '../enums/age_group.dart';
 import '../theme/persona_theme.dart';
+import '../../providers/design_tokens_provider.dart';
 
 /// Design Tokens that adapt based on the current PersonaTheme.
 ///
 /// All UI components reference these tokens. When the user's age group changes,
 /// the tokens update automatically and the entire UI adapts.
+///
+/// Tokens now delegate to [DesignTokensScope], which is updated by
+/// [DesignTokensProvider]. Legacy [init] calls still work but should migrate
+/// to `Provider.of<DesignTokensProvider>(context).setPersona(theme)`.
 class DesignTokens {
   DesignTokens._();
 
   // ─────────────────────────────────────────────
-  // CURRENT PERSONA (set at runtime)
+  // CURRENT PERSONA (delegates to scope)
   // ─────────────────────────────────────────────
 
-  static PersonaTheme _current = PersonaTheme.adultTheme;
-
-  /// Initialize tokens with a specific persona.
+  /// Legacy init — prefer [DesignTokensProvider.setPersona] instead.
   static void init(PersonaTheme theme) {
-    _current = theme;
+    DesignTokensScope.init(theme);
   }
 
   /// Get current persona.
-  static PersonaTheme get current => _current;
+  static PersonaTheme get current => DesignTokensScope.current;
 
   /// Get current age group.
-  static AgeGroup get ageGroup => _current.ageGroup;
+  static AgeGroup get ageGroup => DesignTokensScope.current.ageGroup;
 
   // ─────────────────────────────────────────────
   // COLOR ROLES (from persona)
   // ─────────────────────────────────────────────
 
-  static Color get background => _current.background;
-  static Color get surface => _current.surface;
-  static Color get surfaceRaised => _current.surfaceRaised;
-  static Color get textPrimary => _current.textPrimary;
-  static Color get textSecondary => _current.textSecondary;
-  static Color get textMuted => _current.textMuted;
-  static Color get border => _current.border;
-  static Color get accent => _current.primary;
-  static Color get primary => _current.primary;
-  static Color get accentLight => _current.primaryLight;
-  static Color get accentSecondary => _current.secondary;
-  static Color get accentSecondaryLight => _current.secondaryLight;
-  static Color get accentTertiary => _current.accent;
-  static Color get success => _current.success;
-  static Color get warning => _current.warning;
-  static Color get danger => _current.danger;
-  static Color get error => _current.danger;
+  static Color get background => DesignTokensScope.current.background;
+  static Color get surface => DesignTokensScope.current.surface;
+  static Color get surfaceRaised => DesignTokensScope.current.surfaceRaised;
+  static Color get textPrimary => DesignTokensScope.current.textPrimary;
+  static Color get textSecondary => DesignTokensScope.current.textSecondary;
+  static Color get textMuted => DesignTokensScope.current.textMuted;
+  static Color get border => DesignTokensScope.current.border;
+  static Color get accent => DesignTokensScope.current.primary;
+  static Color get primary => DesignTokensScope.current.primary;
+  static Color get accentLight => DesignTokensScope.current.primaryLight;
+  static Color get accentSecondary => DesignTokensScope.current.secondary;
+  static Color get accentSecondaryLight => DesignTokensScope.current.secondaryLight;
+  static Color get accentTertiary => DesignTokensScope.current.accent;
+  static Color get success => DesignTokensScope.current.success;
+  static Color get warning => DesignTokensScope.current.warning;
+  static Color get danger => DesignTokensScope.current.danger;
+  static Color get error => DesignTokensScope.current.danger;
 
   // ─────────────────────────────────────────────
   // SPACING (4px base grid — universal)
@@ -85,7 +88,7 @@ class DesignTokens {
   static double get radius12 => 12;
   static double get radius14 => 14;
   static double get radius16 => 16;
-  static double get radius20 => _current.radiusCard;
+  static double get radius20 => DesignTokensScope.current.radiusCard;
   static double get radius24 => 24;
   static double get radius40 => 40;
   static double get radiusRound => 999;
@@ -93,14 +96,14 @@ class DesignTokens {
   /// The persona's most rounded, most "friendly" radius — for mascot
   /// cards, hero CTAs, and celebratory moments. Deliberately not used
   /// for everyday content surfaces; see [radius20] / [cardRadius] for that.
-  static double get radiusExpressive => _current.radiusExpressive;
+  static double get radiusExpressive => DesignTokensScope.current.radiusExpressive;
 
   // ─────────────────────────────────────────────
   // TYPOGRAPHY
   // ─────────────────────────────────────────────
 
-  static String get fontFamilyPrimary => _current.fontFamily;
-  static String get fontFamilyDisplay => _current.displayFontFamily;
+  static String get fontFamilyPrimary => DesignTokensScope.current.fontFamily;
+  static String get fontFamilyDisplay => DesignTokensScope.current.displayFontFamily;
 
   static const double fontSizeH1 = 28;
   static const double fontSizeH2 = 24;
@@ -167,7 +170,7 @@ class DesignTokens {
   static List<BoxShadow> get shadowFlat => [];
 
   static List<BoxShadow> get shadowRaised {
-    if (_current.isDark) {
+    if (DesignTokensScope.current.isDark) {
       return const [
         BoxShadow(color: Color(0x0F000000), offset: Offset(0, 2), blurRadius: 4),
         BoxShadow(color: Color(0x08000000), offset: Offset(0, 1), blurRadius: 0),
@@ -180,7 +183,7 @@ class DesignTokens {
   }
 
   static List<BoxShadow> get shadowFloating {
-    if (_current.isDark) {
+    if (DesignTokensScope.current.isDark) {
       return const [
         BoxShadow(color: Color(0x1A000000), offset: Offset(0, 1), blurRadius: 10),
         BoxShadow(color: Color(0x0D000000), offset: Offset(0, 2), blurRadius: 15),
@@ -194,7 +197,7 @@ class DesignTokens {
 
   static List<BoxShadow> get shadowOverlay => [
     BoxShadow(
-      color: _current.isDark
+      color: DesignTokensScope.current.isDark
           ? const Color(0x1A000000)
           : const Color(0x33000000),
       offset: const Offset(0, 10),
@@ -230,7 +233,7 @@ class DesignTokens {
   // ─────────────────────────────────────────────
 
   static double get cardPadding => 16;
-  static double get cardRadius => _current.radiusCard;
+  static double get cardRadius => DesignTokensScope.current.radiusCard;
   static double get cardBorderWidth => 1;
 
   static double get buttonPaddingH => 16;
@@ -238,15 +241,15 @@ class DesignTokens {
   // Buttons sit in the "dense control" tier, not the card tier — this is
   // what makes a button read as a different kind of surface than the
   // card it sits inside, instead of the same rounding stamped on both.
-  static double get buttonRadius => _current.radiusChip;
-  static double get buttonHeight => _current.ageGroup == AgeGroup.baby ? 56 : 40;
-  static double get buttonHeightLarge => _current.ageGroup == AgeGroup.baby ? 64 : 48;
+  static double get buttonRadius => DesignTokensScope.current.radiusChip;
+  static double get buttonHeight => DesignTokensScope.current.ageGroup == AgeGroup.baby ? 56 : 40;
+  static double get buttonHeightLarge => DesignTokensScope.current.ageGroup == AgeGroup.baby ? 64 : 48;
 
   static double get inputPaddingH => 12;
   static double get inputPaddingV => 8;
-  static double get inputRadius => _current.radiusInput;
+  static double get inputRadius => DesignTokensScope.current.radiusInput;
   static double get inputBorderWidth => 1;
-  static double get inputHeight => _current.ageGroup == AgeGroup.baby ? 48 : 40;
+  static double get inputHeight => DesignTokensScope.current.ageGroup == AgeGroup.baby ? 48 : 40;
 
   static double get badgePaddingH => 8;
   static double get badgePaddingV => 4;

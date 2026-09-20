@@ -20,11 +20,18 @@ class FocusProvider extends ChangeNotifier {
   int _sessionsCompleted = 0;
   List<String> _achievements = [];
   List<FocusSession> _sessions = [];
+  bool _isInitialized = false;
 
   FocusProvider({required PersonaProvider personaProvider})
       : _personaProvider = personaProvider;
 
-  int get focusScore => _focusScore;
+  int get focusScore {
+    if (!_isInitialized) {
+      _isInitialized = true;
+      load(); // fire-and-forget
+    }
+    return _focusScore;
+  }
   int get totalFocusMinutes => _totalFocusMinutes;
   int get streakDays => _streakDays;
   int get sessionsCompleted => _sessionsCompleted;

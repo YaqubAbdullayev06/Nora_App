@@ -47,6 +47,21 @@ extension AgeGroupHelpers on AgeGroup {
     }
   }
 
+  String get timeLabel {
+    switch (this) {
+      case AgeGroup.baby:
+        return 'Play Time';
+      case AgeGroup.child:
+        return 'Play Time';
+      case AgeGroup.kid:
+        return 'Focus Time';
+      case AgeGroup.teen:
+        return 'Study Time';
+      case AgeGroup.adult:
+        return 'Deep Work';
+    }
+  }
+
   String get settingsTitle {
     switch (this) {
       case AgeGroup.baby:

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
+import '../services/agent_api.dart';
 
 /// Manages AI agent capabilities, social platform integration, and device settings.
 class AgentProvider extends ChangeNotifier {

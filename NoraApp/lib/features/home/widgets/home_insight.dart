@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/design_tokens.dart';
-import '../../../providers/app_provider.dart';
 import '../../../services/proactive_assist_service.dart';
 import '../../../widgets/nora_components.dart';
 

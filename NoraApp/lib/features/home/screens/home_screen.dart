@@ -5,7 +5,6 @@ import '../../../providers/persona_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/focus_provider.dart';
 import '../../../services/proactive_assist_service.dart';
-import '../../../models/app_info.dart';
 import '../widgets/home_header.dart';
 import '../widgets/home_insight.dart';
 import '../widgets/home_stats.dart';

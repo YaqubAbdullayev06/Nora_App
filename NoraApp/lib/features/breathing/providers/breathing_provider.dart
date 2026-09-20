@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../../../core/enums/age_group.dart';
 import '../models/breathing_pattern.dart';
 
 /// Manages breathing exercise state: session lifecycle, phase timing, stats.

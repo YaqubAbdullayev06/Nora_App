@@ -360,9 +360,6 @@ class ScreenTimeService {
     // Calculate distraction ratio
     final distractionRatio = weekUsage.distractionRatio;
 
-    // Detect peak usage day (simplified)
-    final isWeekendDetected = DateTime.now().weekday > 5;
-
     return ScreenTimeInsights(
       dailyAverageMinutes: dailyAverage.round(),
       todayMinutes: todayUsage.totalScreenTimeMinutes,

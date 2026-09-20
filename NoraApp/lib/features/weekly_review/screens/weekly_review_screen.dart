@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../providers/app_provider.dart';

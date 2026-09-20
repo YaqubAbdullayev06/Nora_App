@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../widgets/nora_components.dart';
-import '../../../models/models.dart';
 
 /// Reflection Card for Weekly Review.
 /// Displays a reflection question and answer, or allows entering a new one.

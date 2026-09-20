@@ -5,6 +5,7 @@ import '../core/constants/design_tokens.dart';
 import '../core/theme/persona_theme.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/agent_api.dart';
 import '../services/focus_protection_service.dart';
 import '../services/screentime_service.dart';
 
@@ -431,7 +432,6 @@ class AppProvider extends ChangeNotifier {
   List<int> get weeklyFocusMinutes {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final today = DateTime(now.year, now.month, now.day);
 
     final List<int> minutes = List.filled(7, 0);
     for (final session in _sessions) {

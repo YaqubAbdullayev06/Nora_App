@@ -15,7 +15,7 @@ import '../../../widgets/nora_components.dart';
 import '../utils/age_group_helpers.dart';
 import '../widgets/profile_dialogs.dart';
 import '../../accountability/screens/accountability_setup_screen.dart';
-import '../../planning/screens/calendar_screen.dart';
+import '../../plan/screens/calendar_screen.dart';
 
 /// Profile Screen — age-adaptive settings and user info.
 /// Baby: Parent controls, simple UI

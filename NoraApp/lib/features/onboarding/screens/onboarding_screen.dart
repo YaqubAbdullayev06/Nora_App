@@ -190,9 +190,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // ─── Step Indicator ───
 
   Widget _buildStepIndicator() {
-    final theme = _selectedGroup != null
-        ? PersonaTheme.forAgeGroup(_selectedGroup!)
-        : PersonaTheme.adultTheme;
+    final theme = PersonaTheme.forAgeGroup(_selectedGroup);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,

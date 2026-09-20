@@ -338,7 +338,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
           const Spacer(),
           // Animated breathing guide
           AnimatedBreathingGuide(
-            mascotAssetPath: persona.mascotAssetPath ?? 'assets/images/mascots/adult_brain.svg',
+            mascotAssetPath: persona.mascotAssetPath,
             color: provider.selectedPattern?.color ?? persona.primary,
             phase: provider.currentPhase,
             phaseProgress: provider.phaseProgress,

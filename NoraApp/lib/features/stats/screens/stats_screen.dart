@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
 import '../../../core/theme/persona_theme.dart';
+import '../../../features/profile/utils/age_group_helpers.dart';
 import '../../../providers/app_provider.dart';
 import '../../../providers/persona_provider.dart';
 import '../../../providers/focus_provider.dart';
@@ -675,18 +676,8 @@ class StatsScreen extends StatelessWidget {
       {'label': 'Total Focus', 'value': '${provider.totalFocusMinutes}m', 'icon': 'schedule', 'color': 'primary'},
       {'label': 'Sessions', 'value': '${provider.sessionsCompleted}', 'icon': 'check_circle', 'color': 'success'},
       {'label': 'Streak', 'value': '${provider.streakDays} days', 'icon': 'local_fire_department', 'color': 'warning'},
-      {'label': _getScoreLabel(persona.ageGroup), 'value': '${provider.focusScore}', 'icon': 'star', 'color': 'secondary'},
+      {'label': persona.ageGroup.scoreLabel, 'value': '${provider.focusScore}', 'icon': 'star', 'color': 'secondary'},
     ];
-  }
-
-  String _getScoreLabel(AgeGroup group) {
-    switch (group) {
-      case AgeGroup.baby: return 'Stars';
-      case AgeGroup.child: return 'Stars';
-      case AgeGroup.kid: return 'Points';
-      case AgeGroup.teen: return 'XP';
-      case AgeGroup.adult: return 'Score';
-    }
   }
 
   IconData _getAchievementIcon(String achievement) {

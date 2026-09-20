@@ -30,7 +30,6 @@ class _AppTimerLimitsScreenState extends State<AppTimerLimitsScreen> {
       body: SafeArea(
         child: Consumer2<AppProvider, AppTimerProvider>(
           builder: (context, appProvider, timer, _) {
-            final persona = appProvider.persona;
 
             return CustomScrollView(
               slivers: [
