@@ -78,6 +78,7 @@ class TimerProvider extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timerSeconds > 0) {
         _timerSeconds--;
+        // Throttle: only notify once per second (consumers should use Selector)
         notifyListeners();
       } else {
         _timerComplete();

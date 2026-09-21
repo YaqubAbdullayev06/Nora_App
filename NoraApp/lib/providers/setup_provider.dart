@@ -84,14 +84,16 @@ class SetupProvider extends ChangeNotifier {
 
   /// Save all choices and mark wizard as completed.
   Future<void> complete() async {
-    await _storage.write(key: _keyCompleted, value: 'true');
-    await _storage.write(key: _keyAccountability, value: _accountabilityEnabled.toString());
-    await _storage.write(key: _keyHardCap, value: _hardCapEnabled.toString());
-    await _storage.write(key: _keyHardCapMinutes, value: _hardCapMinutes.toString());
-    await _storage.write(key: _keyPomodoro, value: _pomodoroEnabled.toString());
-    await _storage.write(key: _keyPomodoroCycles, value: _pomodoroCycles.toString());
-    await _storage.write(key: _keyEarnScreenTime, value: _earnScreenTimeEnabled.toString());
-    await _storage.write(key: _keyPermissions, value: _permissionsGranted.toString());
+    await Future.wait([
+      _storage.write(key: _keyCompleted, value: 'true'),
+      _storage.write(key: _keyAccountability, value: _accountabilityEnabled.toString()),
+      _storage.write(key: _keyHardCap, value: _hardCapEnabled.toString()),
+      _storage.write(key: _keyHardCapMinutes, value: _hardCapMinutes.toString()),
+      _storage.write(key: _keyPomodoro, value: _pomodoroEnabled.toString()),
+      _storage.write(key: _keyPomodoroCycles, value: _pomodoroCycles.toString()),
+      _storage.write(key: _keyEarnScreenTime, value: _earnScreenTimeEnabled.toString()),
+      _storage.write(key: _keyPermissions, value: _permissionsGranted.toString()),
+    ]);
     _isCompleted = true;
     notifyListeners();
   }

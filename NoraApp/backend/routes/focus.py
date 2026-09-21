@@ -58,6 +58,8 @@ def create_session(
 
 @router.get("/sessions/", response_model=List[SessionResponse])
 def get_user_sessions(
+    limit: int = 50,
+    offset: int = 0,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -65,6 +67,8 @@ def get_user_sessions(
         db.query(SessionModel)
         .filter(SessionModel.user_id == current_user.id)
         .order_by(SessionModel.started_at.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return [SessionResponse.model_validate(s) for s in sessions]

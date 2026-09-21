@@ -102,8 +102,13 @@ OLLAMA_MODELS = {
 
 
 def _cache_key(messages: list[dict], provider: str) -> str:
-    """Generate a deterministic cache key from messages + provider."""
-    raw = json.dumps({"msgs": messages, "prov": provider}, sort_keys=True)
+    """Generate a deterministic cache key from messages + provider.
+
+    Uses str() instead of json.dumps(sort_keys=True) — faster for simple message
+    dicts and avoids the overhead of full JSON serialization on every cache lookup.
+    Messages are typically plain dicts with 'role' and 'content' keys.
+    """
+    raw = f"{provider}:{str(messages)}"
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
@@ -444,9 +449,12 @@ class UnifiedLLMProvider:
                 else:
                     continue
 
-                # Check if this was served from cache
-                cached = self._get_cached(messages, provider.value) is not None
-                return self._validate_response(result, provider.value, cached)
+                # Check if this was served from cache (provider methods return
+                # a dict when cached, a string when fresh — avoid re-reading disk)
+                if isinstance(result, dict):
+                    # Already a validated dict from cache — return directly
+                    return result
+                return self._validate_response(result, provider.value, False)
 
             except Exception as e:
                 errors.append(f"{provider.value}: {str(e)[:80]}")

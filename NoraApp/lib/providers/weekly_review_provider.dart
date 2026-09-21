@@ -36,6 +36,15 @@ class WeeklyReviewProvider extends ChangeNotifier {
       return _currentWeeklyReview!;
     }
 
+    // Filter sessions once for both totalSessions and totalPointsEarned
+    final weekEnd = _currentWeekEnd.add(const Duration(days: 1));
+    final weekSessions = _focusProvider.sessions
+        .where((s) =>
+            s.startTime.isAfter(_currentWeekStart) &&
+            s.startTime.isBefore(weekEnd) &&
+            s.completed)
+        .toList();
+
     _currentWeeklyReview = WeeklyReview(
       id: 'review_${_currentWeekStart.millisecondsSinceEpoch}',
       weekStart: _currentWeekStart,
@@ -44,20 +53,9 @@ class WeeklyReviewProvider extends ChangeNotifier {
       goals: WeeklyReview.getDefaultGoals(_personaProvider.ageGroup),
       totalFocusMinutes:
           _focusProvider.weeklyFocusMinutes.fold(0, (a, b) => a + b),
-      totalSessions: _focusProvider.sessions
-          .where((s) =>
-              s.startTime.isAfter(_currentWeekStart) &&
-              s.startTime
-                  .isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
-              s.completed)
-          .length,
-      totalPointsEarned: _focusProvider.sessions
-          .where((s) =>
-              s.startTime.isAfter(_currentWeekStart) &&
-              s.startTime
-                  .isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
-              s.completed)
-          .fold(0, (a, b) => a + b.pointsEarned),
+      totalSessions: weekSessions.length,
+      totalPointsEarned:
+          weekSessions.fold(0, (a, b) => a + b.pointsEarned),
       streakDays: _focusProvider.computedStreakDays,
       createdAt: DateTime.now(),
     );

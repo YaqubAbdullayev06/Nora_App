@@ -83,9 +83,9 @@ class HabitProvider extends ChangeNotifier {
       );
 
       if (response['success'] == true) {
+        // refreshHabits() calls _saveLocal + notifyListeners — no extra call needed
         await refreshHabits();
         _isLoading = false;
-        notifyListeners();
         return true;
       }
 
@@ -119,9 +119,9 @@ class HabitProvider extends ChangeNotifier {
         _weekScreenTimeEarned += screenTimeEarned;
         _todayCompletions = (response['completions_today'] ?? _todayCompletions) as int;
         await _saveLocal();
+        // refreshHabits() calls _saveLocal + notifyListeners — no extra call needed
         await refreshHabits();
         _isLoading = false;
-        notifyListeners();
         return screenTimeEarned;
       }
 
@@ -221,12 +221,14 @@ class HabitProvider extends ChangeNotifier {
 
   Future<void> _saveLocal() async {
     try {
-      await _storage.write(
-          key: _todayCompletionsKey, value: _todayCompletions.toString());
-      await _storage.write(
-          key: _todayEarnedKey, value: _todayScreenTimeEarned.toString());
-      await _storage.write(
-          key: _weekEarnedKey, value: _weekScreenTimeEarned.toString());
+      await Future.wait([
+        _storage.write(
+            key: _todayCompletionsKey, value: _todayCompletions.toString()),
+        _storage.write(
+            key: _todayEarnedKey, value: _todayScreenTimeEarned.toString()),
+        _storage.write(
+            key: _weekEarnedKey, value: _weekScreenTimeEarned.toString()),
+      ]);
     } catch (e) {
       debugPrint('HabitProvider: failed to save: $e');
     }

@@ -256,20 +256,18 @@ class HardCapProvider extends ChangeNotifier {
 
   Future<void> _loadLocalCap() async {
     try {
-      final isActive = await _storage.read(key: _isActiveKey);
-      _isActive = isActive == 'true';
-
-      final capStr = await _storage.read(key: _capMinutesKey);
-      if (capStr != null) _capMinutes = int.tryParse(capStr) ?? 120;
-
-      final softStr = await _storage.read(key: _softWarningKey);
-      if (softStr != null) _softWarningPercent = int.tryParse(softStr) ?? 80;
-
-      final hardStr = await _storage.read(key: _hardWarningKey);
-      if (hardStr != null) _hardWarningPercent = int.tryParse(hardStr) ?? 90;
-
-      final pinStr = await _storage.read(key: _requirePinKey);
-      _requirePinToOverride = pinStr == 'true';
+      final results = await Future.wait([
+        _storage.read(key: _isActiveKey),
+        _storage.read(key: _capMinutesKey),
+        _storage.read(key: _softWarningKey),
+        _storage.read(key: _hardWarningKey),
+        _storage.read(key: _requirePinKey),
+      ]);
+      _isActive = results[0] == 'true';
+      if (results[1] != null) _capMinutes = int.tryParse(results[1]!) ?? 120;
+      if (results[2] != null) _softWarningPercent = int.tryParse(results[2]!) ?? 80;
+      if (results[3] != null) _hardWarningPercent = int.tryParse(results[3]!) ?? 90;
+      _requirePinToOverride = results[4] == 'true';
 
       await _loadLocalUsage();
     } catch (e) {
@@ -279,20 +277,18 @@ class HardCapProvider extends ChangeNotifier {
 
   Future<void> _loadLocalUsage() async {
     try {
-      final usageStr = await _storage.read(key: _todayUsageKey);
-      if (usageStr != null) _todayUsageMinutes = int.tryParse(usageStr) ?? 0;
-
-      final bonusStr = await _storage.read(key: _bonusMinutesKey);
-      if (bonusStr != null) _bonusMinutesToday = int.tryParse(bonusStr) ?? 0;
-
-      final softShown = await _storage.read(key: _softShownKey);
-      _softWarningShown = softShown == 'true';
-
-      final hardShown = await _storage.read(key: _hardShownKey);
-      _hardWarningShown = hardShown == 'true';
-
-      final blockedShown = await _storage.read(key: _blockedShownKey);
-      _blockedShown = blockedShown == 'true';
+      final results = await Future.wait([
+        _storage.read(key: _todayUsageKey),
+        _storage.read(key: _bonusMinutesKey),
+        _storage.read(key: _softShownKey),
+        _storage.read(key: _hardShownKey),
+        _storage.read(key: _blockedShownKey),
+      ]);
+      if (results[0] != null) _todayUsageMinutes = int.tryParse(results[0]!) ?? 0;
+      if (results[1] != null) _bonusMinutesToday = int.tryParse(results[1]!) ?? 0;
+      _softWarningShown = results[2] == 'true';
+      _hardWarningShown = results[3] == 'true';
+      _blockedShown = results[4] == 'true';
     } catch (e) {
       debugPrint('HardCapProvider: failed to load usage: $e');
     }
@@ -300,14 +296,16 @@ class HardCapProvider extends ChangeNotifier {
 
   Future<void> _saveLocalCap() async {
     try {
-      await _storage.write(key: _isActiveKey, value: _isActive.toString());
-      await _storage.write(key: _capMinutesKey, value: _capMinutes.toString());
-      await _storage.write(
-          key: _softWarningKey, value: _softWarningPercent.toString());
-      await _storage.write(
-          key: _hardWarningKey, value: _hardWarningPercent.toString());
-      await _storage.write(
-          key: _requirePinKey, value: _requirePinToOverride.toString());
+      await Future.wait([
+        _storage.write(key: _isActiveKey, value: _isActive.toString()),
+        _storage.write(key: _capMinutesKey, value: _capMinutes.toString()),
+        _storage.write(
+            key: _softWarningKey, value: _softWarningPercent.toString()),
+        _storage.write(
+            key: _hardWarningKey, value: _hardWarningPercent.toString()),
+        _storage.write(
+            key: _requirePinKey, value: _requirePinToOverride.toString()),
+      ]);
     } catch (e) {
       debugPrint('HardCapProvider: failed to save cap: $e');
     }
@@ -315,16 +313,18 @@ class HardCapProvider extends ChangeNotifier {
 
   Future<void> _saveLocalUsage() async {
     try {
-      await _storage.write(
-          key: _todayUsageKey, value: _todayUsageMinutes.toString());
-      await _storage.write(
-          key: _bonusMinutesKey, value: _bonusMinutesToday.toString());
-      await _storage.write(
-          key: _softShownKey, value: _softWarningShown.toString());
-      await _storage.write(
-          key: _hardShownKey, value: _hardWarningShown.toString());
-      await _storage.write(
-          key: _blockedShownKey, value: _blockedShown.toString());
+      await Future.wait([
+        _storage.write(
+            key: _todayUsageKey, value: _todayUsageMinutes.toString()),
+        _storage.write(
+            key: _bonusMinutesKey, value: _bonusMinutesToday.toString()),
+        _storage.write(
+            key: _softShownKey, value: _softWarningShown.toString()),
+        _storage.write(
+            key: _hardShownKey, value: _hardWarningShown.toString()),
+        _storage.write(
+            key: _blockedShownKey, value: _blockedShown.toString()),
+      ]);
     } catch (e) {
       debugPrint('HardCapProvider: failed to save usage: $e');
     }
@@ -332,11 +332,13 @@ class HardCapProvider extends ChangeNotifier {
 
   Future<void> _clearLocalCap() async {
     try {
-      await _storage.delete(key: _isActiveKey);
-      await _storage.delete(key: _capMinutesKey);
-      await _storage.delete(key: _softWarningKey);
-      await _storage.delete(key: _hardWarningKey);
-      await _storage.delete(key: _requirePinKey);
+      await Future.wait([
+        _storage.delete(key: _isActiveKey),
+        _storage.delete(key: _capMinutesKey),
+        _storage.delete(key: _softWarningKey),
+        _storage.delete(key: _hardWarningKey),
+        _storage.delete(key: _requirePinKey),
+      ]);
     } catch (e) {
       debugPrint('HardCapProvider: failed to clear cap: $e');
     }

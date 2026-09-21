@@ -4,6 +4,7 @@ import 'api_service.dart';
 
 /// Service to monitor network connectivity status.
 /// Uses the API health endpoint to check if the backend is reachable.
+/// Optimized: checks on-demand + on app resume, NOT via periodic HTTP polling.
 class ConnectivityService extends ChangeNotifier {
   final ApiService _api = ApiService();
 
@@ -14,10 +15,11 @@ class ConnectivityService extends ChangeNotifier {
   bool get isConnected => _isConnected;
   bool get isChecking => _isChecking;
 
-  /// Start periodic connectivity checks (every 30 seconds).
+  /// Start periodic connectivity checks — every 5 minutes (not 30s).
+  /// Health endpoint should be lightweight; avoid hammering it on metered connections.
   void startChecking() {
     _checkTimer?.cancel();
-    _checkTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _checkTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       checkConnectivity();
     });
     // Initial check

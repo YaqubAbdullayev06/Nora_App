@@ -19,6 +19,13 @@ class ApiService {
   String? _refreshToken;
   final AuthStorage _authStorage = AuthStorage();
   bool _isRefreshing = false;
+  http.Client? _httpClient;
+
+  /// Persistent HTTP client — reuses TCP/TLS connections across requests.
+  http.Client get _client {
+    _httpClient ??= http.Client();
+    return _httpClient!;
+  }
 
   /// Initialize from secure storage on app start.
   Future<void> init() async {
@@ -88,7 +95,7 @@ class ApiService {
     _isRefreshing = true;
 
     try {
-      final response = await http.post(
+      final response = await _client.post(
         Uri.parse('$baseUrl/auth/refresh'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refresh_token': _refreshToken}),
@@ -122,11 +129,17 @@ class ApiService {
     await _authStorage.clearAll();
   }
 
+  /// Dispose the HTTP client (call on app shutdown).
+  void dispose() {
+    _httpClient?.close();
+    _httpClient = null;
+  }
+
   // ─── Health ───
 
   Future<bool> checkHealth() async {
     try {
-      final response = await http.get(
+      final response = await _client.get(
         Uri.parse('$baseUrl/health'),
         headers: _headers,
       );
@@ -143,7 +156,7 @@ class ApiService {
     required String name,
     required String password,
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$baseUrl/auth/register'),
       headers: _headers,
       body: jsonEncode({
@@ -174,7 +187,7 @@ class ApiService {
     required String email,
     required String password,
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: _headers,
       body: jsonEncode({
@@ -203,7 +216,7 @@ class ApiService {
   /// Get current user profile from /auth/me.
   Future<Map<String, dynamic>> getMe() async {
     final response = await _authenticatedRequest(
-      (token) => http.get(
+      (token) => _client.get(
         Uri.parse('$baseUrl/auth/me'),
         headers: {
           'Content-Type': 'application/json',
@@ -222,7 +235,7 @@ class ApiService {
 
   Future<User> getUser(String userId) async {
     final response = await _authenticatedRequest(
-      (token) => http.get(
+      (token) => _client.get(
         Uri.parse('$baseUrl/users/$userId'),
         headers: {
           'Content-Type': 'application/json',
@@ -239,7 +252,7 @@ class ApiService {
   // ─── Focus Sessions ───
 
   Future<FocusSession> createSession(FocusSession session) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$baseUrl/sessions/'),
       headers: _headers,
       body: jsonEncode(session.toJson()),
@@ -251,7 +264,7 @@ class ApiService {
   }
 
   Future<List<FocusSession>> getUserSessions(String userId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$baseUrl/sessions/'),
       headers: _headers,
     );
@@ -263,7 +276,7 @@ class ApiService {
   }
 
   Future<int> completeSession(String sessionId) async {
-    final response = await http.put(
+    final response = await _client.put(
       Uri.parse('$baseUrl/sessions/$sessionId/complete'),
       headers: _headers,
     );
@@ -280,7 +293,7 @@ class ApiService {
     final uri = category != null
         ? Uri.parse('$baseUrl/content/?category=$category')
         : Uri.parse('$baseUrl/content/');
-    final response = await http.get(uri, headers: _headers);
+    final response = await _client.get(uri, headers: _headers);
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((c) => ContentItem.fromJson(c)).toList();
@@ -289,7 +302,7 @@ class ApiService {
   }
 
   Future<ContentItem> createContent(ContentItem content) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$baseUrl/content/'),
       headers: _headers,
       body: jsonEncode(content.toJson()),
@@ -303,7 +316,7 @@ class ApiService {
   // ─── Recommendations ───
 
   Future<List<AIRecommendation>> getRecommendations(String userId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$baseUrl/recommendations/'),
       headers: _headers,
     );
@@ -317,7 +330,7 @@ class ApiService {
   // ─── Focus Score ───
 
   Future<FocusScore> getFocusScore(String userId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$baseUrl/focus-score/'),
       headers: _headers,
     );
@@ -330,7 +343,7 @@ class ApiService {
   /// Authenticated GET returning decoded JSON.
   Future<Map<String, dynamic>> getJson(String path) async {
     final response = await _authenticatedRequest(
-      (token) => http.get(
+      (token) => _client.get(
         Uri.parse('$baseUrl$path'),
         headers: {
           'Content-Type': 'application/json',
@@ -345,7 +358,7 @@ class ApiService {
   Future<Map<String, dynamic>> postJson(
       String path, Map<String, dynamic> body) async {
     final response = await _authenticatedRequest(
-      (token) => http.post(
+      (token) => _client.post(
         Uri.parse('$baseUrl$path'),
         headers: {
           'Content-Type': 'application/json',
@@ -512,7 +525,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> deleteHabit(int habitId) async {
     final response = await _authenticatedRequest(
-      (token) => http.delete(
+      (token) => _client.delete(
         Uri.parse('$baseUrl/habits/$habitId'),
         headers: {
           'Content-Type': 'application/json',
