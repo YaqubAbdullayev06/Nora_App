@@ -144,6 +144,13 @@ def startup():
         db.commit()
     except Exception:
         pass  # Column already exists or dialect doesn't support IF NOT EXISTS
+    try:
+        db.execute(text(
+            "ALTER TABLE accountability_locks DROP CONSTRAINT IF EXISTS accountability_locks_user_id_key"
+        ))
+        db.commit()
+    except Exception:
+        pass  # Constraint doesn't exist or dialect doesn't support DROP CONSTRAINT IF EXISTS
     seed_content(db)
     db.close()
 
