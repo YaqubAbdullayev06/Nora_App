@@ -63,9 +63,11 @@ void main() async {
   // Load auth tokens BEFORE runApp so providers can use them immediately
   await ApiService().init();
 
-  // Initialize notification service
-  await NotificationService().init();
-  await NotificationService().requestPermission();
+  // Defer notification init + permission to after first frame (non-blocking)
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await NotificationService().init();
+    await NotificationService().requestPermission();
+  });
 
   runApp(const NoraApp());
 }
@@ -128,11 +130,11 @@ class NoraApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PomodoroProvider()),
         // Habit tracking — session-scoped, initialized lazily
         ChangeNotifierProvider(create: (_) => HabitProvider()),
-        // Setup wizard state — persisted across sessions
-        ChangeNotifierProvider(create: (_) => SetupProvider()..load()),
-        // Connectivity monitoring — starts checking immediately
-        ChangeNotifierProvider(create: (_) => ConnectivityService()..startChecking()),
-        // Legacy provider for backward compatibility — initialized lazily after first frame
+        // Setup wizard state — loaded lazily on first getter access
+        ChangeNotifierProvider(create: (_) => SetupProvider()),
+        // Connectivity monitoring — checks lazily on first getter access
+        ChangeNotifierProvider(create: (_) => ConnectivityService()),
+        // Legacy provider for backward compatibility — initialized lazily on first getter access
         ChangeNotifierProvider(create: (_) => AppProvider()),
         ChangeNotifierProvider(create: (_) => BreathingProvider()),
       ],

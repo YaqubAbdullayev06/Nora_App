@@ -22,8 +22,12 @@ class SetupProvider extends ChangeNotifier {
   int _pomodoroCycles = 3;
   bool _earnScreenTimeEnabled = false;
   bool _permissionsGranted = false;
+  bool _isInitialized = false;
 
-  bool get isCompleted => _isCompleted;
+  bool get isCompleted {
+    if (!_isInitialized) initialize(); // fire-and-forget
+    return _isCompleted;
+  }
   bool get accountabilityEnabled => _accountabilityEnabled;
   bool get hardCapEnabled => _hardCapEnabled;
   int get hardCapMinutes => _hardCapMinutes;
@@ -33,6 +37,12 @@ class SetupProvider extends ChangeNotifier {
   bool get permissionsGranted => _permissionsGranted;
 
   /// Load saved state from secure storage.
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
+    await load();
+  }
+
   Future<void> load() async {
     _isCompleted = (await _storage.read(key: _keyCompleted)) == 'true';
     _accountabilityEnabled = (await _storage.read(key: _keyAccountability)) == 'true';

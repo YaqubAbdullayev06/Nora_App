@@ -21,6 +21,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  bool _authChecked = false;
 
   @override
   void initState() {
@@ -46,14 +47,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        _navigateAfterSplash();
-      }
+    // Start auth check EARLY (after 1s) — don't wait for full 3s animation
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted || _authChecked) return;
+      _authChecked = true;
+      _navigateAfterSplash();
     });
   }
 
   /// Determine where to route after splash: check auth state first.
+  /// Navigates as soon as auth resolves — no fixed 3s wait.
   void _navigateAfterSplash() {
     final authProvider = context.read<AuthProvider>();
     authProvider.initialize().then((_) {
