@@ -32,7 +32,9 @@ def setup_accountability_lock(
     ).first()
 
     if existing:
-        raise HTTPException(status_code=400, detail="An active lock already exists. Unlink it first.")
+        # Deactivate the old lock so a new one can be created
+        existing.is_active = False
+        db.commit()
 
     pin_hash = hash_password(request.pin)
     expires_at = None

@@ -108,7 +108,7 @@ class AccountabilityLockModel(Base):
     __tablename__ = "accountability_locks"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     pin_hash = Column(String(255), nullable=False)
     guardian_name = Column(String(255), nullable=True)
     lock_duration_days = Column(Integer, nullable=True)
