@@ -154,12 +154,12 @@ async def ai_chat(request: ChatRequest):
             model="none",
         )
 
+    # Pick best model for age group (call once, reuse)
+    model = ollama.get_model_for_age_group(request.age_group)
+
     # CRISIS DETECTION: Check user input for crisis keywords
     if check_crisis(request.message):
-        return ChatResponse(
-            response=CRISIS_RESPONSE,
-            model=ollama.get_model_for_age_group(request.age_group),
-        )
+        return ChatResponse(response=CRISIS_RESPONSE, model=model)
 
     # Build messages with age-appropriate system prompt
     system_prompt = get_system_prompt(request.age_group)
@@ -171,9 +171,6 @@ async def ai_chat(request: ChatRequest):
 
     # Add current user message
     messages.append({"role": "user", "content": request.message})
-
-    # Pick best model for age group
-    model = ollama.get_model_for_age_group(request.age_group)
 
     # Get response from Ollama
     try:
@@ -207,11 +204,14 @@ async def ai_command(request: AICommandRequest):
             "actions": [],
         }
 
+    # Pick best model for age group (call once, reuse)
+    model = ollama.get_model_for_age_group(request.age_group)
+
     # CRISIS DETECTION: Check user input for crisis keywords
     if check_crisis(request.command):
         return {
             "response": CRISIS_RESPONSE,
-            "model": ollama.get_model_for_age_group(request.age_group),
+            "model": model,
             "actions": [],
             "crisis_detected": True,
         }
@@ -231,7 +231,7 @@ async def ai_command(request: AICommandRequest):
         if check_crisis(response):
             return {
                 "response": CRISIS_RESPONSE,
-                "model": ollama.get_model_for_age_group(request.age_group),
+                "model": model,
                 "actions": [],
                 "crisis_detected": True,
             }
@@ -244,13 +244,13 @@ async def ai_command(request: AICommandRequest):
 
         return {
             "response": response,
-            "model": ollama.get_model_for_age_group(request.age_group),
+            "model": model,
             "actions": validated_actions,
         }
     except Exception as e:
         return {
             "response": f"I had trouble processing that. Error: {str(e)}",
-            "model": ollama.get_model_for_age_group(request.age_group),
+            "model": model,
             "actions": [],
         }
 
@@ -518,12 +518,18 @@ def _generate_fallback_plan(available_hours: float, energy_pattern: str) -> list
     while elapsed < total_minutes - 25:
         focus_duration = min(25, total_minutes - elapsed - 5)
         break_duration = 5
-        hour = start_hour + (elapsed // 60)
-        minute = elapsed % 60
+
+        # Properly compute start time
+        start_h = start_hour + (elapsed // 60)
+        start_m = elapsed % 60
+        # Properly compute end time (handles minute overflow)
+        end_total = elapsed + focus_duration
+        end_h = start_hour + (end_total // 60)
+        end_m = end_total % 60
 
         blocks.append({
-            "time": f"{hour:02d}:{minute:02d}",
-            "end_time": f"{hour:02d}:{(minute + focus_duration):02d}",
+            "time": f"{start_h:02d}:{start_m:02d}",
+            "end_time": f"{end_h:02d}:{end_m:02d}",
             "type": "focus",
             "title": "Focus Session",
             "description": f"Pomodoro block — {focus_duration} minutes",
@@ -532,9 +538,15 @@ def _generate_fallback_plan(available_hours: float, energy_pattern: str) -> list
         elapsed += focus_duration
 
         if elapsed < total_minutes - 10:
+            break_start_h = start_hour + (elapsed // 60)
+            break_start_m = elapsed % 60
+            break_end = elapsed + break_duration
+            break_end_h = start_hour + (break_end // 60)
+            break_end_m = break_end % 60
+
             blocks.append({
-                "time": f"{hour:02d}:{(minute + focus_duration):02d}",
-                "end_time": f"{hour:02d}:{(minute + focus_duration + break_duration):02d}",
+                "time": f"{break_start_h:02d}:{break_start_m:02d}",
+                "end_time": f"{break_end_h:02d}:{break_end_m:02d}",
                 "type": "break",
                 "title": "Short Break",
                 "description": "Stretch and recharge",

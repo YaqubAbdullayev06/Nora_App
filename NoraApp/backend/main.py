@@ -14,6 +14,7 @@ dependencies live under their own modules:
 
 from datetime import datetime
 
+import os
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -103,7 +104,7 @@ app = FastAPI(
 )
 
 # CORS: allow your Flutter app domains + localhost for dev
-CORS_ORIGINS = __import__("os").getenv("CORS_ORIGINS", "*").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,

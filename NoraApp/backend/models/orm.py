@@ -39,7 +39,7 @@ class SessionModel(Base):
     __tablename__ = "focus_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     duration_minutes = Column(Integer, nullable=False)
     completed = Column(Boolean, default=False)
     points_earned = Column(Integer, default=0)
@@ -84,8 +84,8 @@ class UserAchievementModel(Base):
     __tablename__ = "user_achievements"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False, index=True)
     earned_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("UserModel", back_populates="achievements")
@@ -96,8 +96,8 @@ class RecommendationModel(Base):
     __tablename__ = "ai_recommendations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    content_id = Column(Integer, ForeignKey("content.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey("content.id"), nullable=False, index=True)
     reason = Column(Text, nullable=False)
     confidence_score = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -108,7 +108,7 @@ class AccountabilityLockModel(Base):
     __tablename__ = "accountability_locks"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     pin_hash = Column(String(255), nullable=False)
     guardian_name = Column(String(255), nullable=True)
     lock_duration_days = Column(Integer, nullable=True)
@@ -136,7 +136,7 @@ class HabitModel(Base):
     __tablename__ = "habits"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     category = Column(String, default="general")
     icon = Column(String, default="check_circle")
@@ -153,8 +153,8 @@ class HabitCompletionModel(Base):
     __tablename__ = "habit_completions"
 
     id = Column(Integer, primary_key=True, index=True)
-    habit_id = Column(Integer, ForeignKey("habits.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    habit_id = Column(Integer, ForeignKey("habits.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     completed_at = Column(DateTime, default=datetime.utcnow)
     duration_minutes = Column(Integer, default=0)
     screen_time_earned = Column(Integer, default=0)

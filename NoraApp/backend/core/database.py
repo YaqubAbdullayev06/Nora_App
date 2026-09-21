@@ -11,7 +11,22 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./nora.db")
 # SQLite needs check_same_thread; PostgreSQL/MySQL do not
 _connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 
-engine = create_engine(DATABASE_URL, connect_args=_connect_args, pool_pre_ping=True)
+# Connection pool config — tuned for PostgreSQL on Render
+_pool_kwargs = {}
+if "sqlite" not in DATABASE_URL:
+    _pool_kwargs = {
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_timeout": 30,
+        "pool_recycle": 1800,
+    }
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args=_connect_args,
+    pool_pre_ping=True,
+    **_pool_kwargs,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

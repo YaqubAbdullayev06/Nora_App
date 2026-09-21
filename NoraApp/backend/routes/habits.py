@@ -50,13 +50,18 @@ def list_habits(
     ).all()
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    result = []
-    for habit in habits:
-        completions_today = db.query(HabitCompletionModel).filter(
-            HabitCompletionModel.habit_id == habit.id,
+    # Batch-load all today's completions in ONE query (fixes N+1)
+    today_counts = dict(
+        db.query(HabitCompletionModel.habit_id, func.count(HabitCompletionModel.id))
+        .filter(
             HabitCompletionModel.user_id == current_user.id,
             HabitCompletionModel.completed_at >= today_start,
-        ).count()
+        )
+        .group_by(HabitCompletionModel.habit_id)
+        .all()
+    )
+    result = []
+    for habit in habits:
         result.append({
             "id": habit.id,
             "name": habit.name,
@@ -66,7 +71,7 @@ def list_habits(
             "screen_time_minutes": habit.screen_time_minutes,
             "target_per_day": habit.target_per_day,
             "is_active": habit.is_active,
-            "completions_today": completions_today,
+            "completions_today": today_counts.get(habit.id, 0),
             "created_at": habit.created_at,
         })
     return {"success": True, "habits": result}

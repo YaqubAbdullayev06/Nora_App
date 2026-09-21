@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, Integer, cast
 from sqlalchemy.orm import Session
 
 from core.database import get_db
@@ -131,20 +132,31 @@ def get_focus_score(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    sessions = db.query(SessionModel).filter(
-        SessionModel.user_id == current_user.id
-    ).all()
+    """Get focus score using SQL aggregation (no full table load)."""
+    result = db.query(
+        func.coalesce(func.sum(SessionModel.points_earned), 0).label("total_points"),
+        func.coalesce(
+            func.sum(
+                cast(SessionModel.completed, Integer) * SessionModel.duration_minutes
+            ),
+            0,
+        ).label("total_minutes"),
+        func.count(SessionModel.id).label("total_sessions"),
+        func.coalesce(
+            func.sum(cast(SessionModel.completed, Integer)), 0
+        ).label("completed_count"),
+    ).filter(SessionModel.user_id == current_user.id).first()
 
-    total_points = sum(s.points_earned for s in sessions)
-    total_minutes = sum(s.duration_minutes for s in sessions if s.completed)
-    completed = [s for s in sessions if s.completed]
+    total_points = result.total_points
+    total_minutes = result.total_minutes
+    completed_count = result.completed_count
 
     return FocusScoreResponse(
         user_id=current_user.id,
         total_points=total_points,
         total_focus_minutes=total_minutes,
-        average_session_length=total_minutes / len(completed) if completed else 0,
-        sessions_completed=len(completed),
+        average_session_length=total_minutes / completed_count if completed_count > 0 else 0,
+        sessions_completed=completed_count,
     )
 
 

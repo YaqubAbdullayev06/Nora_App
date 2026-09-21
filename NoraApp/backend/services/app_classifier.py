@@ -10,9 +10,6 @@ from services.blocking_rules import AGE_BLOCKING_RULES, KNOWN_CATEGORIES
 class AppClassifier:
     """AI-powered app classifier and blocking recommender."""
 
-    def __init__(self):
-        self._classification_cache: dict[str, str] = {}
-
     def classify_apps(self, apps: list[dict[str, Any]], age_group: str = "adult") -> dict[str, Any]:
         """
         Classify apps and return blocking recommendations.
@@ -25,6 +22,12 @@ class AppClassifier:
 
         rules = AGE_BLOCKING_RULES.get(age_group, AGE_BLOCKING_RULES["adult"])
 
+        # Single-pass: classify + categorize + count
+        category_counts: dict[str, int] = {}
+        distraction_apps = []
+        productive_apps = []
+        user_apps = []
+
         for app in apps:
             package_name = app.get("packageName", "")
             app_name = app.get("appName", "")
@@ -33,6 +36,8 @@ class AppClassifier:
 
             if is_system:
                 classified.append({**app, "aiCategory": category, "shouldBlock": False})
+                cat = category
+                category_counts[cat] = category_counts.get(cat, 0) + 1
                 continue
 
             # Use known category or fall back to "other"
@@ -54,6 +59,13 @@ class AppClassifier:
                 "blockReason": reason,
             })
 
+            # Single-pass aggregation
+            category_counts[category] = category_counts.get(category, 0) + 1
+            user_apps.append(app)
+            if category in ("social_media", "entertainment", "games"):
+                distraction_apps.append(app)
+            if category in ("productivity", "education"):
+                productive_apps.append(app)
             if should_block:
                 ai_recommended_block.append({
                     "packageName": package_name,
@@ -62,20 +74,11 @@ class AppClassifier:
                     "reason": reason,
                 })
 
-        # Generate AI analysis summary
-        category_counts = {}
-        for item in classified:
-            cat = item.get("aiCategory", "other")
-            category_counts[cat] = category_counts.get(cat, 0) + 1
-
-        distraction_apps = [a for a in classified if a.get("aiCategory") in ("social_media", "entertainment", "games") and not a.get("isSystemApp")]
-        productive_apps = [a for a in classified if a.get("aiCategory") in ("productivity", "education") and not a.get("isSystemApp")]
-
         return {
             "success": True,
             "ageGroup": age_group,
             "totalApps": len(apps),
-            "userApps": len([a for a in classified if not a.get("isSystemApp")]),
+            "userApps": len(user_apps),
             "categoryBreakdown": category_counts,
             "distractionAppsCount": len(distraction_apps),
             "productiveAppsCount": len(productive_apps),
@@ -186,14 +189,29 @@ class AppClassifier:
     def _generate_summary(self, classified: list, rules: dict, age_group: str) -> str:
         """Generate a human-readable summary of the classification."""
         total = len(classified)
-        user_apps = [a for a in classified if not a.get("isSystemApp")]
-        blocking_count = len([a for a in classified if a.get("shouldBlock")])
-        social_count = len([a for a in user_apps if a.get("aiCategory") == "social_media"])
-        games_count = len([a for a in user_apps if a.get("aiCategory") == "games"])
-        productivity_count = len([a for a in user_apps if a.get("aiCategory") == "productivity"])
+        # Single-pass counts
+        user_apps = 0
+        blocking_count = 0
+        social_count = 0
+        games_count = 0
+        productivity_count = 0
+
+        for a in classified:
+            is_user = not a.get("isSystemApp")
+            cat = a.get("aiCategory", "other")
+            if is_user:
+                user_apps += 1
+                if cat == "social_media":
+                    social_count += 1
+                elif cat == "games":
+                    games_count += 1
+                elif cat == "productivity":
+                    productivity_count += 1
+            if a.get("shouldBlock"):
+                blocking_count += 1
 
         lines = [
-            f"Scanned {total} apps ({len(user_apps)} user-installed).",
+            f"Scanned {total} apps ({user_apps} user-installed).",
             f"Found {social_count} social media apps, {games_count} games, {productivity_count} productivity apps.",
         ]
 
