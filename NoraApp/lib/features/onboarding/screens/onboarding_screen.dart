@@ -7,12 +7,15 @@ import '../../../providers/persona_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/nora_components.dart';
 
-/// Onboarding Screen — two-step: name + account creation.
+/// Onboarding Screen — 4-step wizard for new users.
 ///
-/// Step 0: Enter name → personalizes greetings
-/// Step 1: Create account → email + password to save progress
+/// Step 0: Welcome — introduce Nora with mascot
+/// Step 1: Age Group — select persona (baby, child, kid, teen, adult)
+/// Step 2: Name — personalize greetings
+/// Step 3: Account — email + password to save progress
 ///
-/// Age group defaults to adult. Users can change persona later in Settings.
+/// Every step is skippable except account creation (step 3).
+/// Users can change persona later in Settings.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -22,16 +25,14 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen>
     with SingleTickerProviderStateMixin {
-  int _step = 0; // 0 = name, 1 = account
+  int _step = 0;
+  static const _totalSteps = 4;
 
-  // Default to adult persona
   AgeGroup _selectedGroup = AgeGroup.adult;
 
-  // Step 1: name
   final _nameController = TextEditingController();
   final _nameFocus = FocusNode();
 
-  // Step 2: account
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -64,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _nextStep() {
-    if (_step < 1) {
+    if (_step < _totalSteps - 1) {
       setState(() => _step++);
       _animController.reset();
       _animController.forward();
@@ -86,7 +87,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    // Validation
     if (name.isEmpty) {
       _showError('Please enter your name');
       return;
@@ -104,10 +104,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
 
-    // Set persona (default adult)
     personaProvider.setAgeGroup(_selectedGroup);
 
-    // Register
     final success = await authProvider.register(
       email,
       name,
@@ -138,7 +136,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Back button (on steps 1 and 2)
+            // Back button
             if (_step > 0)
               Align(
                 alignment: Alignment.topLeft,
@@ -174,7 +172,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               child: Column(
                 children: [
                   _buildBottomButton(),
-                  if (_step == 1) ...[
+                  if (_step == _totalSteps - 1) ...[
                     const SizedBox(height: DesignTokens.spacing16),
                     _buildSignInLink(),
                   ],
@@ -194,19 +192,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(2, (i) {
+      children: List.generate(_totalSteps, (i) {
         final isActive = i == _step;
         final isDone = i < _step;
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(horizontal: 3),
           width: isActive ? 32 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isDone
+            color: isDone || isActive
                 ? theme.primary
-                : isActive
-                    ? theme.primary
-                    : DesignTokens.textMuted.withValues(alpha: 0.3),
+                : DesignTokens.textMuted.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(4),
           ),
         );
@@ -219,15 +216,234 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget _buildCurrentStep() {
     switch (_step) {
       case 0:
-        return _buildNameStep();
+        return _buildWelcomeStep();
       case 1:
+        return _buildAgeGroupStep();
+      case 2:
+        return _buildNameStep();
+      case 3:
         return _buildAccountStep();
       default:
         return const SizedBox.shrink();
     }
   }
 
-  // ─── Step 0: Name Input ───
+  // ─── Step 0: Welcome ───
+
+  Widget _buildWelcomeStep() {
+    final theme = PersonaTheme.forAgeGroup(_selectedGroup);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spacing24, vertical: DesignTokens.spacing12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: DesignTokens.spacing40),
+          // Animated mascot with glow
+          NoraMascot(size: 120, showGlow: true, personaOverride: theme),
+          const SizedBox(height: DesignTokens.spacing32),
+          Text(
+            'Meet Nora',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: DesignTokens.textPrimary,
+              fontSize: DesignTokens.fontSizeH1,
+              fontWeight: DesignTokens.fontWeightBold,
+              fontFamily: DesignTokens.fontFamilyDisplay,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spacing12),
+          Text(
+            'Your AI-powered focus & productivity companion.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: DesignTokens.textMuted,
+              fontSize: DesignTokens.fontSizeBody,
+              fontFamily: DesignTokens.fontFamilyPrimary,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spacing40),
+          // Feature highlights
+          _buildFeatureRow(
+            icon: Icons.psychology_rounded,
+            title: 'AI-Powered',
+            subtitle: 'Personalized for your age group',
+            color: theme.primary,
+          ),
+          const SizedBox(height: DesignTokens.spacing16),
+          _buildFeatureRow(
+            icon: Icons.timer_rounded,
+            title: 'Focus Timer',
+            subtitle: 'Pomodoro with smart breaks',
+            color: theme.secondary,
+          ),
+          const SizedBox(height: DesignTokens.spacing16),
+          _buildFeatureRow(
+            icon: Icons.shield_rounded,
+            title: 'App Blocking',
+            subtitle: 'Block distractions during focus',
+            color: theme.accent,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(DesignTokens.radius12),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(width: DesignTokens.spacing16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: DesignTokens.textPrimary,
+                  fontSize: DesignTokens.fontSizeBody,
+                  fontWeight: DesignTokens.fontWeightSemiBold,
+                  fontFamily: DesignTokens.fontFamilyPrimary,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: DesignTokens.textMuted,
+                  fontSize: DesignTokens.fontSizeCaption,
+                  fontFamily: DesignTokens.fontFamilyPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Step 1: Age Group Selection ───
+
+  Widget _buildAgeGroupStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spacing24, vertical: DesignTokens.spacing12),
+      child: Column(
+        children: [
+          const SizedBox(height: DesignTokens.spacing16),
+          _buildStepHeader(
+            icon: Icons.cake_rounded,
+            title: 'Who will use Nora?',
+            subtitle: 'This personalizes the experience for you.',
+          ),
+          const SizedBox(height: DesignTokens.spacing32),
+          _buildAgeGroupSelector(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgeGroupSelector() {
+    return Column(
+      children: AgeGroup.values.map((group) {
+        final theme = PersonaTheme.forAgeGroup(group);
+        final isSelected = _selectedGroup == group;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: DesignTokens.spacing12),
+          child: GestureDetector(
+            onTap: () => setState(() => _selectedGroup = group),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(DesignTokens.spacing16),
+              decoration: BoxDecoration(
+                color: isSelected ? theme.primary.withValues(alpha: 0.1) : DesignTokens.surface,
+                borderRadius: BorderRadius.circular(DesignTokens.radius16),
+                border: Border.all(
+                  color: isSelected ? theme.primary : DesignTokens.border,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Mascot preview
+                  NoraMascot(
+                    size: 48,
+                    showGlow: isSelected,
+                    personaOverride: theme,
+                  ),
+                  const SizedBox(width: DesignTokens.spacing16),
+                  // Text
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          theme.mascotName,
+                          style: TextStyle(
+                            color: DesignTokens.textPrimary,
+                            fontSize: DesignTokens.fontSizeBody,
+                            fontWeight: DesignTokens.fontWeightSemiBold,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                        Text(
+                          _getAgeRange(group),
+                          style: TextStyle(
+                            color: DesignTokens.textMuted,
+                            fontSize: DesignTokens.fontSizeCaption,
+                            fontFamily: DesignTokens.fontFamilyPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Check
+                  if (isSelected)
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: theme.primary,
+                      size: 24,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _getAgeRange(AgeGroup group) {
+    switch (group) {
+      case AgeGroup.baby:
+        return 'Ages 0–2 · Parent-managed';
+      case AgeGroup.child:
+        return 'Ages 2–6 · Parent-managed';
+      case AgeGroup.kid:
+        return 'Ages 6–12 · Guided learning';
+      case AgeGroup.teen:
+        return 'Ages 12–18 · Coaching mode';
+      case AgeGroup.adult:
+        return 'Ages 18+ · Productivity focus';
+    }
+  }
+
+  // ─── Step 2: Name Input ───
 
   Widget _buildNameStep() {
     final theme = PersonaTheme.forAgeGroup(_selectedGroup);
@@ -269,7 +485,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  // ─── Step 2: Account Creation ───
+  // ─── Step 3: Account Creation ───
 
   Widget _buildAccountStep() {
     return SingleChildScrollView(
@@ -430,10 +646,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     switch (_step) {
       case 0:
-        label = 'Continue';
+        label = 'Get Started';
         onPressed = _nextStep;
         break;
       case 1:
+        label = 'Continue';
+        onPressed = _nextStep;
+        break;
+      case 2:
+        label = 'Continue';
+        onPressed = _nextStep;
+        break;
+      case 3:
         label = 'Create Account & Start';
         onPressed = _finish;
         break;
