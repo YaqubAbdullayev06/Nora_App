@@ -49,13 +49,23 @@ class _AppScanScreenState extends State<AppScanScreen>
     setState(() => _isScanning = true);
 
     try {
-      final apps = await _scannerService.scanAppsWithBlockStatus();
-      final todayUsage = await _usageService.getTodayUsage();
+      // Run scan, blocked apps, and usage queries IN PARALLEL (was sequential)
+      final results = await Future.wait([
+        _scannerService.scanAllApps(),
+        _scannerService.getBlockedApps(),
+        _usageService.getTodayUsage(),
+      ]);
+
+      final apps = results[0] as List<AppInfo>;
+      final blocked = results[1] as List<String>;
+      final todayUsage = results[2] as UsageStatsSummary?;
 
       if (!mounted) return;
 
-      // Merge usage data
+      // Merge blocked status + usage data in one pass
+      final blockedSet = blocked.toSet();
       final appsWithUsage = apps.map((app) {
+        final isBlocked = blockedSet.contains(app.packageName);
         final usageApp = todayUsage?.topApps.firstWhere(
           (u) => u.packageName == app.packageName,
           orElse: () => AppUsageEntry(
@@ -67,6 +77,7 @@ class _AppScanScreenState extends State<AppScanScreen>
           ),
         );
         return app.copyWith(
+          isBlocked: isBlocked,
           usageTodayMinutes: usageApp?.totalTimeMinutes ?? 0,
         );
       }).toList();
@@ -101,7 +112,7 @@ class _AppScanScreenState extends State<AppScanScreen>
         _isScanning = false;
       });
 
-      // Load app icons in background (non-blocking)
+      // Load app icons in background (non-blocking, batches of 20)
       _loadAppIcons(mergedApps);
     } catch (e) {
       setState(() => _isScanning = false);
@@ -117,9 +128,9 @@ class _AppScanScreenState extends State<AppScanScreen>
   }
 
   /// Load app icons in background after scan completes.
-  /// Loads in parallel batches of 10 for speed.
+  /// Uses larger batches (20) and only one setState at the end.
   Future<void> _loadAppIcons(List<AppInfo> apps) async {
-    const batchSize = 10;
+    const batchSize = 20;
     for (var i = 0; i < apps.length; i += batchSize) {
       if (!mounted) return;
       final batch = apps.skip(i).take(batchSize).toList();
@@ -131,13 +142,13 @@ class _AppScanScreenState extends State<AppScanScreen>
       );
       if (!mounted) return;
       for (final entry in results) {
-        if (entry.value != null) {
+        if (entry.value != null && entry.value!.isNotEmpty) {
           _appIcons[entry.key] = entry.value!;
         }
       }
-      // Single setState to rebuild all visible tiles at once
-      setState(() {});
     }
+    // Single setState after ALL icons loaded — prevents repeated rebuilds
+    if (mounted) setState(() {});
   }
 
   Future<void> _applyAIRecommendations() async {

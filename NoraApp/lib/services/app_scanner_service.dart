@@ -20,6 +20,9 @@ class AppScannerService {
 
   static const _channel = MethodChannel('com.nora.nora_app/app_scanner');
 
+  /// Static icon cache — persists across screen navigations.
+  static final Map<String, Uint8List> _iconCache = {};
+
   /// Check the current platform's scanning capabilities.
   Future<PlatformScanCapability> getPlatformCapability() async {
     if (kIsWeb) return PlatformScanCapability.web;
@@ -195,14 +198,21 @@ class AppScannerService {
     }).toList();
   }
 
-  /// Get app icon as raw PNG bytes.
+  /// Get app icon as raw PNG bytes (cached across sessions).
   Future<Uint8List?> getAppIcon(String packageName) async {
+    // Return cached icon if available
+    final cached = _iconCache[packageName];
+    if (cached != null) return cached;
+
     if (kIsWeb || Platform.isIOS) return null;
     try {
       final result = await _channel.invokeMethod<Uint8List>(
         'getAppIcon',
         packageName,
       );
+      if (result != null && result.isNotEmpty) {
+        _iconCache[packageName] = result;
+      }
       return result;
     } on PlatformException catch (e) {
       debugPrint('AppScanner getAppIcon failed: ${e.message}');
