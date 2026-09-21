@@ -41,29 +41,18 @@ OUTPUT FORMAT (JSON only, no markdown):
   "tip": "One practical tip for completing this task"
 }
 
-EXAMPLE:
-User input: "Write quarterly report"
-Output:
-{
-  "original_task": "Write quarterly report",
-  "subtasks": [
-    {"title": "Gather Q3 metrics and data", "priority": 1, "estimated_minutes": 25, "description": "Pull sales, growth, and KPI numbers"},
-    {"title": "Draft executive summary", "priority": 1, "estimated_minutes": 20, "description": "Write the high-level overview section"},
-    {"title": "Write revenue analysis section", "priority": 1, "estimated_minutes": 25, "description": "Detailed breakdown of revenue streams"},
-    {"title": "Create charts and visuals", "priority": 2, "estimated_minutes": 20, "description": "Build charts for key metrics"},
-    {"title": "Review and proofread", "priority": 2, "estimated_minutes": 15, "description": "Final review for errors and clarity"}
-  ],
-  "total_estimated_minutes": 105,
-  "tip": "Start with data gathering — everything else flows from having the numbers ready."
-}
-
 Respond with ONLY the JSON. No explanation, no markdown, no code fences."""
+
+AGE_STYLE_INSTRUCTIONS = {
+    "kid": "Use simple, fun language. Keep descriptions short and encouraging. Think like a helpful teacher.",
+    "teen": "Use casual, modern language. Sound like a supportive friend helping them plan.",
+    "adult": "Use clear, professional language. Be concise and actionable.",
+}
 
 
 async def decompose_task(
     task: str,
     age_group: str = "adult",
-    provider: str = "auto",
 ) -> dict:
     """
     Decompose a task into subtasks using the free LLM provider chain.
@@ -71,15 +60,15 @@ async def decompose_task(
     Args:
         task: The task to decompose
         age_group: User's age group (affects response style)
-        provider: "auto" or specific provider name
 
     Returns:
         dict with subtasks list, or error dict
     """
     from ai.llm_provider import llm
 
+    style = AGE_STYLE_INSTRUCTIONS.get(age_group, AGE_STYLE_INSTRUCTIONS["adult"])
     messages = [
-        {"role": "system", "content": DECOMPOSITION_PROMPT},
+        {"role": "system", "content": f"{DECOMPOSITION_PROMPT}\n\nSTYLE: {style}"},
         {"role": "user", "content": f"Break this task into subtasks: {task}"},
     ]
 

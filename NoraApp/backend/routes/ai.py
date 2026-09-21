@@ -18,10 +18,17 @@ from ai.prompts import (
 )
 from schemas import (
     AICommandRequest,
+    AnalyzeUsageRequest,
     ChatRequest,
     ChatResponse,
     ClassifyAppsRequest,
+    DailyPlanRequest,
+    DailyPlanResponse,
     NotificationTextRequest,
+    PredictiveBlockingRequest,
+    PredictiveBlockingResponse,
+    SentimentCheckinRequest,
+    SentimentCheckinResponse,
     TaskDecompositionRequest,
 )
 from services.app_classifier import app_classifier
@@ -255,7 +262,7 @@ def classify_apps(request: ClassifyAppsRequest):
 
 
 @router.post("/analyze-usage")
-def analyze_usage(request: ClassifyAppsRequest):
+def analyze_usage(request: AnalyzeUsageRequest):
     """AI-powered usage analysis with insights and recommendations."""
     return app_classifier.analyze_usage(request.usage_data, request.age_group)
 
@@ -371,6 +378,438 @@ async def decompose_task(request: TaskDecompositionRequest):
             status_code=500,
             detail=f"Task decomposition failed: {result.get('error', 'unknown')}",
         )
+
+
+# ─── Feature 1: Smart Daily Plans ───
+
+
+DAILY_PLAN_PROMPT = """You are a smart daily planner AI. Create an optimized schedule based on the user's goals, energy patterns, and available time.
+
+RULES:
+- Each block should be 15-60 minutes
+- Include focus blocks, breaks, and transition time
+- Match high-energy tasks to peak energy times
+- Include short breaks between focus blocks (5-10 min)
+- Add a longer break (15-30 min) every 2 hours
+- Order: deep work first, admin tasks later
+- Be realistic — don't over-schedule
+
+OUTPUT FORMAT (JSON only):
+{
+  "plan": [
+    {
+      "time": "09:00",
+      "end_time": "09:25",
+      "type": "focus",
+      "title": "Task name",
+      "description": "Brief description",
+      "energy_level": "high"
+    }
+  ],
+  "summary": "Brief overview of the day",
+  "total_focus_minutes": 180,
+  "total_break_minutes": 45,
+  "tip": "One practical tip for the day"
+}
+
+Respond with ONLY the JSON."""
+
+
+@router.post("/daily-plan")
+async def generate_daily_plan(request: DailyPlanRequest):
+    """AI-generated smart daily schedule based on goals and energy patterns."""
+
+    if request.age_group == "child":
+        return {
+            "success": True,
+            "plan": [
+                {"time": "09:00", "end_time": "09:20", "type": "focus", "title": "Learning Time", "description": "Fun educational activities", "energy_level": "high"},
+                {"time": "09:20", "end_time": "09:30", "type": "break", "title": "Snack Break", "description": "Healthy snack and stretch", "energy_level": "low"},
+                {"time": "09:30", "end_time": "09:50", "type": "focus", "title": "Creative Play", "description": "Drawing, building, or crafting", "energy_level": "medium"},
+                {"time": "09:50", "end_time": "10:00", "type": "break", "title": "Movement Break", "description": "Quick dance or stretch", "energy_level": "low"},
+            ],
+            "summary": "A fun learning day with creative activities!",
+            "total_focus_minutes": 40,
+            "total_break_minutes": 20,
+            "tip": "Take breaks to stay energized!",
+        }
+
+    commitments_text = ""
+    if request.existing_commitments:
+        commitments_text = "\nExisting commitments:\n" + "\n".join(
+            f"- {c.get('title', 'Event')} at {c.get('time', 'TBD')}"
+            for c in request.existing_commitments
+        )
+
+    goals_text = ", ".join(request.goals) if request.goals else "general productivity"
+
+    prompt = f"""{DAILY_PLAN_PROMPT}
+
+USER PROFILE:
+- Age group: {request.age_group}
+- Available hours: {request.available_hours}
+- Energy pattern: {request.energy_pattern}
+- Goals: {goals_text}
+{commitments_text}
+
+Create an optimized daily schedule."""
+
+    try:
+        response = await ollama.chat(
+            [{"role": "user", "content": prompt}],
+            temperature=0.4,
+        )
+
+        parsed = _parse_json_from_response(response)
+        if parsed and "plan" in parsed:
+            return {
+                "success": True,
+                "plan": parsed["plan"],
+                "summary": parsed.get("summary", ""),
+                "total_focus_minutes": parsed.get("total_focus_minutes", 0),
+                "total_break_minutes": parsed.get("total_break_minutes", 0),
+                "tip": parsed.get("tip", ""),
+            }
+    except Exception:
+        pass
+
+    # Fallback: generate a basic plan
+    return {
+        "success": True,
+        "plan": _generate_fallback_plan(request.available_hours, request.energy_pattern),
+        "summary": f"A productive {request.age_group}-focused day with balanced work and breaks.",
+        "total_focus_minutes": int(request.available_hours * 60 * 0.6),
+        "total_break_minutes": int(request.available_hours * 60 * 0.4),
+        "tip": "Start with your most important task when energy is highest.",
+    }
+
+
+def _parse_json_from_response(response: str) -> Optional[dict]:
+    """Extract JSON from LLM response."""
+    text = response.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines[-1].strip() == "```":
+            lines = lines[1:-1]
+        else:
+            lines = lines[1:]
+        text = "\n".join(lines).strip()
+    try:
+        return _json.loads(text)
+    except _json.JSONDecodeError:
+        pass
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    if start >= 0 and end > start:
+        try:
+            return _json.loads(text[start:end])
+        except _json.JSONDecodeError:
+            pass
+    return None
+
+
+def _generate_fallback_plan(available_hours: float, energy_pattern: str) -> list[dict]:
+    """Generate a basic fallback plan when LLM fails."""
+    blocks = []
+    start_hour = 9 if energy_pattern != "night_owl" else 11
+    total_minutes = int(available_hours * 60)
+    elapsed = 0
+
+    while elapsed < total_minutes - 25:
+        focus_duration = min(25, total_minutes - elapsed - 5)
+        break_duration = 5
+        hour = start_hour + (elapsed // 60)
+        minute = elapsed % 60
+
+        blocks.append({
+            "time": f"{hour:02d}:{minute:02d}",
+            "end_time": f"{hour:02d}:{(minute + focus_duration):02d}",
+            "type": "focus",
+            "title": "Focus Session",
+            "description": f"Pomodoro block — {focus_duration} minutes",
+            "energy_level": "high" if elapsed < total_minutes * 0.5 else "medium",
+        })
+        elapsed += focus_duration
+
+        if elapsed < total_minutes - 10:
+            blocks.append({
+                "time": f"{hour:02d}:{(minute + focus_duration):02d}",
+                "end_time": f"{hour:02d}:{(minute + focus_duration + break_duration):02d}",
+                "type": "break",
+                "title": "Short Break",
+                "description": "Stretch and recharge",
+                "energy_level": "low",
+            })
+            elapsed += break_duration
+
+    return blocks
+
+
+# ─── Feature 2: Sentiment-Aware Check-ins ───
+
+
+@router.post("/sentiment-check")
+async def sentiment_check(request: SentimentCheckinRequest):
+    """Analyze user sentiment and provide empathetic, age-appropriate response."""
+
+    if request.age_group == "child":
+        return {
+            "success": True,
+            "sentiment": "positive",
+            "confidence": 0.8,
+            "response": "Hey there! You're doing awesome! Keep smiling! 😊",
+            "suggestion": "Time for a fun activity!",
+            "mood_score": 7,
+        }
+
+    sentiment_prompt = f"""Analyze the sentiment of this message and respond empathetically.
+
+USER MESSAGE: "{request.message}"
+AGE GROUP: {request.age_group}
+
+Respond in JSON format:
+{{
+  "sentiment": "positive|negative|neutral|stressed|motivated",
+  "confidence": 0.0-1.0,
+  "response": "Empathetic, age-appropriate response (1-2 sentences)",
+  "suggestion": "One actionable suggestion based on their mood",
+  "mood_score": 1-10
+}}
+
+Rules:
+- Kid (6-12): Fun, encouraging, use simple words
+- Teen (12-18): Casual, supportive friend tone
+- Adult (18+): Professional, warm productivity partner
+- If stressed: acknowledge feelings, suggest a break
+- If motivated: channel energy into a task
+- If negative: offer support, don't dismiss feelings
+
+Respond with ONLY the JSON."""
+
+    try:
+        response = await ollama.chat(
+            [{"role": "user", "content": sentiment_prompt}],
+            temperature=0.6,
+        )
+
+        parsed = _parse_json_from_response(response)
+        if parsed and "sentiment" in parsed:
+            return {
+                "success": True,
+                "sentiment": parsed["sentiment"],
+                "confidence": min(1.0, max(0.0, parsed.get("confidence", 0.7))),
+                "response": parsed.get("response", "I hear you!"),
+                "suggestion": parsed.get("suggestion", ""),
+                "mood_score": max(1, min(10, parsed.get("mood_score", 5))),
+            }
+    except Exception:
+        pass
+
+    # Fallback sentiment analysis
+    msg_lower = request.message.lower()
+    positive_words = ["good", "great", "awesome", "happy", "excited", "productive", "amazing", "love", "fantastic"]
+    negative_words = ["tired", "stressed", "overwhelmed", "anxious", "frustrated", "sad", "exhausted", "hate", "terrible"]
+    motivated_words = ["motivated", "ready", "let's", "going to", "will do", "determined", "focus"]
+
+    pos_count = sum(1 for w in positive_words if w in msg_lower)
+    neg_count = sum(1 for w in negative_words if w in msg_lower)
+    mot_count = sum(1 for w in motivated_words if w in msg_lower)
+
+    if neg_count > pos_count:
+        sentiment = "stressed" if neg_count > 1 else "negative"
+        mood = max(2, 5 - neg_count)
+        response_text = "I hear you. It's okay to feel this way. Want to take a short break?"
+        suggestion = "Try a 5-minute breathing exercise or a quick walk."
+    elif mot_count > pos_count:
+        sentiment = "motivated"
+        mood = min(9, 6 + mot_count)
+        response_text = "Love the energy! Let's channel that into something productive."
+        suggestion = "Start with your most important task right now."
+    elif pos_count > 0:
+        sentiment = "positive"
+        mood = min(8, 6 + pos_count)
+        response_text = "That's great to hear! Keep up the momentum!"
+        suggestion = "Use this positive energy to tackle a challenging task."
+    else:
+        sentiment = "neutral"
+        mood = 5
+        response_text = "Thanks for sharing. How can I help you today?"
+        suggestion = "Check your daily plan for what's next."
+
+    return {
+        "success": True,
+        "sentiment": sentiment,
+        "confidence": 0.6,
+        "response": response_text,
+        "suggestion": suggestion,
+        "mood_score": mood,
+    }
+
+
+# ─── Feature 3: Predictive App Blocking ───
+
+
+PREDICTIVE_PROMPT = """You are a predictive digital wellness AI. Based on the user's patterns, predict when they might procrastinate and suggest proactive blocks.
+
+RULES:
+- Predict based on time of day and historical patterns
+- Suggest blocking BEFORE procrastination happens
+- Be specific about which apps and when
+- Consider the user's age group for appropriate limits
+
+OUTPUT FORMAT (JSON only):
+{
+  "predictions": [
+    {
+      "time": "14:00-15:00",
+      "risk_level": "high|medium|low",
+      "reason": "After lunch dip — historically high social media usage",
+      "apps_at_risk": ["instagram", "tiktok"],
+      "suggestion": "Start a focus session or take a walk"
+    }
+  ],
+  "proactive_nudges": [
+    {
+      "trigger_time": "13:45",
+      "message": "Heads up — your afternoon scroll window is coming up. Want to start a focus session?",
+      "action": "start_focus"
+    }
+  ],
+  "suggested_block": [
+    {
+      "packageName": "com.instagram.android",
+      "block_until": "15:00",
+      "reason": "High usage historically at this time"
+    }
+  ],
+  "summary": "Based on your patterns, 2-4 PM is your highest risk window. I suggest blocking social media during that time."
+}
+
+Respond with ONLY the JSON."""
+
+
+@router.post("/predictive-blocking")
+async def predictive_blocking(request: PredictiveBlockingRequest):
+    """Predict when user might procrastinate and suggest proactive blocks."""
+
+    if request.age_group == "child":
+        return {
+            "success": True,
+            "predictions": [],
+            "proactive_nudges": [],
+            "suggested_block": [],
+            "summary": "No predictive blocking needed for children. Parent controls are active.",
+        }
+
+    usage_summary = ""
+    if request.recent_usage:
+        usage_summary = f"\nRecent usage: {_json.dumps(request.recent_usage, indent=2)}"
+
+    prompt = f"""{PREDICTIVE_PROMPT}
+
+USER PROFILE:
+- Age group: {request.age_group}
+- Current time: {request.current_time or 'not specified'}
+- Day of week: {request.day_of_week or 'not specified'}
+- Installed apps: {len(request.installed_apps)} apps
+{usage_summary}
+
+Analyze patterns and predict procrastination windows."""
+
+    try:
+        response = await ollama.chat(
+            [{"role": "user", "content": prompt}],
+            temperature=0.5,
+        )
+
+        parsed = _parse_json_from_response(response)
+        if parsed and "predictions" in parsed:
+            return {
+                "success": True,
+                "predictions": parsed["predictions"],
+                "proactive_nudges": parsed.get("proactive_nudges", []),
+                "suggested_block": parsed.get("suggested_block", []),
+                "summary": parsed.get("summary", ""),
+            }
+    except Exception:
+        pass
+
+    # Fallback: rule-based predictions
+    return _generate_fallback_predictions(request.age_group, request.current_time, request.recent_usage)
+
+
+def _generate_fallback_predictions(age_group: str, current_time: str, recent_usage: dict) -> dict:
+    """Generate rule-based predictions when LLM fails."""
+    social_time = recent_usage.get("socialMediaMinutes", 0)
+    total_time = recent_usage.get("totalScreenTimeMinutes", 0)
+
+    predictions = []
+    nudges = []
+    blocks = []
+
+    # High social media usage prediction
+    if social_time > 60:
+        predictions.append({
+            "time": "next hour",
+            "risk_level": "high",
+            "reason": f"Already at {social_time}m social media today — trending toward excess",
+            "apps_at_risk": ["instagram", "tiktok", "twitter"],
+            "suggestion": "Consider switching to a focus session",
+        })
+        nudges.append({
+            "trigger_time": "now",
+            "message": f"You've spent {social_time}m on social media. Want to start a focus session?",
+            "action": "start_focus",
+        })
+
+    # Afternoon dip prediction
+    if current_time:
+        try:
+            hour = int(current_time.split(":")[0]) if ":" in current_time else -1
+            if 13 <= hour <= 15:
+                predictions.append({
+                    "time": f"{hour}:00-{hour+1}:00",
+                    "risk_level": "medium",
+                    "reason": "Afternoon energy dip — historically high distraction window",
+                    "apps_at_risk": ["youtube", "reddit", "news"],
+                    "suggestion": "Take a short walk or start a light task",
+                })
+        except (ValueError, IndexError):
+            pass
+
+    # Total screen time warning
+    if total_time > 180:
+        predictions.append({
+            "time": "now",
+            "risk_level": "high",
+            "reason": f"Total screen time at {total_time}m — approaching daily limit",
+            "apps_at_risk": [],
+            "suggestion": "Consider reducing screen time for the rest of the day",
+        })
+
+    if not predictions:
+        predictions.append({
+            "time": "today",
+            "risk_level": "low",
+            "reason": "Usage patterns look healthy",
+            "apps_at_risk": [],
+            "suggestion": "Keep up the good work!",
+        })
+
+    summary = f"Found {len(predictions)} prediction(s). "
+    high_risk = [p for p in predictions if p["risk_level"] == "high"]
+    if high_risk:
+        summary += f"{len(high_risk)} high-risk window(s) detected."
+    else:
+        summary += "No high-risk windows detected."
+
+    return {
+        "success": True,
+        "predictions": predictions,
+        "proactive_nudges": nudges,
+        "suggested_block": blocks,
+        "summary": summary,
+    }
 
 
 @router.get("/health")

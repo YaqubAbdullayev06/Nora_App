@@ -183,7 +183,7 @@ class UnifiedLLMProvider:
             elif provider in (Provider.OLLAMA, Provider.OLLAMA_COLAB):
                 return OLLAMA_MODELS.get(age_group, "llama3.1")
 
-        return "openai/gpt-oss-20b"
+        return "unknown"
 
     # ─── Cache Helpers ───
 
@@ -284,23 +284,31 @@ class UnifiedLLMProvider:
 
         # Convert OpenAI format → Gemini format
         contents = []
+        system_instruction = None
         for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
-            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+            if msg["role"] == "system":
+                system_instruction = msg["content"]
+            else:
+                role = "user" if msg["role"] == "user" else "model"
+                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent?key={self.gemini_api_key}"
+
+        payload = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": 1024,
+            },
+        }
+        if system_instruction:
+            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
 
         client = get_client()
         response = await client.post(
             url,
             headers={"Content-Type": "application/json"},
-            json={
-                "contents": contents,
-                "generationConfig": {
-                    "temperature": temperature,
-                    "maxOutputTokens": 1024,
-                },
-            },
+            json=payload,
         )
         response.raise_for_status()
         data = response.json()
@@ -344,7 +352,7 @@ class UnifiedLLMProvider:
                 "Content-Type": "application/json",
             },
             json={
-                "messages": messages,
+                "prompt": prompt,
                 "stream": False,
                 "max_tokens": 1024,
                 "temperature": temperature,
@@ -430,7 +438,6 @@ class UnifiedLLMProvider:
                     result = await self._cloudflare_chat(messages, temperature)
                 elif provider == Provider.OLLAMA:
                     # DISABLED: Local Ollama skipped for testing
-                    # result = await self._ollama_chat(messages, temperature, self.ollama_base_url)
                     raise Exception("Local Ollama disabled - using Colab")
                 elif provider == Provider.OLLAMA_COLAB:
                     result = await self._ollama_chat(messages, temperature, self.ollama_colab_url)
@@ -445,9 +452,9 @@ class UnifiedLLMProvider:
                 errors.append(f"{provider.value}: {str(e)[:80]}")
                 continue
 
-        return self._validate_response(
-            f"All {len(errors)} LLM providers failed. Last error: {errors[-1] if errors else 'none'}",
-            "none"
+        # All providers failed — raise so callers can handle explicitly
+        raise Exception(
+            f"All {len(errors)} LLM providers failed. Last error: {errors[-1] if errors else 'none'}"
         )
 
     async def chat_stream(self, messages: list[dict], temperature: float = 0.7) -> AsyncGenerator[str, None]:

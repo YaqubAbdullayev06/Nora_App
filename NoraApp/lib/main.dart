@@ -45,6 +45,9 @@ import 'features/hardcap/widgets/hard_cap_overlay.dart';
 import 'features/pomodoro/screens/pomodoro_setup_screen.dart';
 import 'features/habits/screens/habits_screen.dart';
 import 'features/onboarding/screens/setup_wizard_screen.dart';
+import 'features/ai_features/screens/smart_daily_plan_screen.dart';
+import 'features/ai_features/screens/sentiment_checkin_screen.dart';
+import 'features/ai_features/screens/predictive_blocking_screen.dart';
 import 'services/api_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
@@ -239,6 +242,15 @@ class NoraApp extends StatelessWidget {
                   break;
                 case '/setup-wizard':
                   page = const SetupWizardScreen();
+                  break;
+                case '/daily-plan':
+                  page = const SmartDailyPlanScreen();
+                  break;
+                case '/sentiment-check':
+                  page = const SentimentCheckinScreen();
+                  break;
+                case '/predictive-blocking':
+                  page = const PredictiveBlockingScreen();
                   break;
                 default:
                   return null;

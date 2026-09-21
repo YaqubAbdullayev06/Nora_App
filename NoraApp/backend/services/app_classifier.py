@@ -2,8 +2,7 @@
 AI App Classifier — Uses LLM to analyze installed apps and usage data.
 Recommends which apps to block for better focus and productivity.
 """
-import json
-from typing import Any, Optional
+from typing import Any
 
 from services.blocking_rules import AGE_BLOCKING_RULES, KNOWN_CATEGORIES
 

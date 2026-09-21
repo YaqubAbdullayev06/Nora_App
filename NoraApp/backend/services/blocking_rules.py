@@ -1,4 +1,4 @@
-﻿"""
+"""
 Age-specific app blocking rules and known app category mappings.
 
 Extracted from app_classifier.py for clarity and reusability.
@@ -47,7 +47,7 @@ KNOWN_CATEGORIES = {
 
 # Age-appropriate blocking rules
 AGE_BLOCKING_RULES = {
-    "baby": {
+    "child": {
         "always_block": ["social_media", "games", "news"],
         "max_social_media_minutes": 0,
         "max_entertainment_minutes": 15,

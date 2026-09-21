@@ -277,3 +277,61 @@ class HabitStatsResponse(BaseModel):
 class TaskDecompositionRequest(BaseModel):
     task: str
     age_group: str = "adult"
+
+
+# ─── AI Daily Plan ───
+
+
+class DailyPlanRequest(BaseModel):
+    age_group: str = "adult"
+    goals: list[str] = []
+    available_hours: float = 8.0
+    energy_pattern: str = "normal"  # "morning_person", "night_owl", "normal"
+    existing_commitments: list[dict] = []
+    preferences: dict = {}
+
+
+class DailyPlanResponse(BaseModel):
+    success: bool
+    plan: list[dict] = []
+    summary: str = ""
+    total_focus_minutes: int = 0
+    total_break_minutes: int = 0
+    tip: str = ""
+
+
+# ─── AI Sentiment Check-in ───
+
+
+class SentimentCheckinRequest(BaseModel):
+    message: str
+    age_group: str = "adult"
+    context: dict = {}
+
+
+class SentimentCheckinResponse(BaseModel):
+    success: bool
+    sentiment: str  # "positive", "negative", "neutral", "stressed", "motivated"
+    confidence: float  # 0.0 - 1.0
+    response: str
+    suggestion: str = ""
+    mood_score: int = 5  # 1-10 scale
+
+
+# ─── AI Predictive Blocking ───
+
+
+class PredictiveBlockingRequest(BaseModel):
+    age_group: str = "adult"
+    current_time: str = ""  # ISO format or "HH:MM"
+    day_of_week: str = ""  # "monday", "tuesday", etc.
+    recent_usage: dict = {}
+    installed_apps: list[dict] = []
+
+
+class PredictiveBlockingResponse(BaseModel):
+    success: bool
+    predictions: list[dict] = []
+    proactive_nudges: list[dict] = []
+    suggested_block: list[dict] = []
+    summary: str = ""
