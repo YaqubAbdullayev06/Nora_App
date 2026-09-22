@@ -559,6 +559,7 @@ class AppProvider extends ChangeNotifier {
         email: email,
         name: name,
         password: password,
+        ageGroup: ageGroup.name,
       );
       _currentUser = User.fromJson(data['user']);
       setAgeGroup(ageGroup);

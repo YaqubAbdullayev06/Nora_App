@@ -74,6 +74,7 @@ class Provider(str, Enum):
 
 GROQ_MODELS = {
     "child": None,
+    "baby": None,
     "kid": "openai/gpt-oss-20b",
     "teen": "openai/gpt-oss-20b",
     "adult": "openai/gpt-oss-20b",
@@ -81,6 +82,7 @@ GROQ_MODELS = {
 
 GEMINI_MODELS = {
     "child": None,
+    "baby": None,
     "kid": "gemini-3.6-flash",
     "teen": "gemini-3.6-flash",
     "adult": "gemini-3.6-flash",
@@ -88,6 +90,7 @@ GEMINI_MODELS = {
 
 CLOUDFLARE_MODELS = {
     "child": None,
+    "baby": None,
     "kid": "@cf/meta/llama-3.1-8b-instruct",
     "teen": "@cf/meta/llama-3.1-8b-instruct",
     "adult": "@cf/meta/llama-3.1-8b-instruct",
@@ -95,6 +98,7 @@ CLOUDFLARE_MODELS = {
 
 OLLAMA_MODELS = {
     "child": None,
+    "baby": None,
     "kid": "qwen3.5:4b",
     "teen": "llama3.1",
     "adult": "llama3.1",
@@ -174,7 +178,7 @@ class UnifiedLLMProvider:
 
     def get_model_for_age_group(self, age_group: str) -> str:
         """Pick the best model based on provider and age group."""
-        if age_group == "child":
+        if age_group in ("child", "baby"):
             return None
 
         provider_priority = self._get_provider_priority()

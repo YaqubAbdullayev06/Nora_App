@@ -91,10 +91,12 @@ class AccountabilityProvider extends ChangeNotifier {
   }
 
   /// Setup a new accountability lock.
+  /// [currentPin] is required when replacing an active (non-expired) lock.
   Future<bool> setupLock({
     required String pin,
     required String guardianName,
     int? lockDurationDays,
+    String? currentPin,
   }) async {
     _setupInProgress = true;
     _error = null;
@@ -105,6 +107,7 @@ class AccountabilityProvider extends ChangeNotifier {
         pin: pin,
         guardianName: guardianName,
         lockDurationDays: lockDurationDays,
+        currentPin: currentPin,
       );
 
       if (response['success'] == true) {

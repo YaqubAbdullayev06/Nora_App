@@ -344,7 +344,7 @@ def check_crisis(text: str) -> bool:
 
 def get_system_prompt(age_group: str) -> str:
     """Get the system prompt for a given age group."""
-    if age_group == "child":
+    if age_group in ("child", "baby"):
         # Children do NOT chat with the LLM. Return a safe fallback.
         return "You are a reading assistant for young children. Only suggest stories and colors."
     return PERSONALITIES.get(age_group, PERSONALITIES["default"])
@@ -352,7 +352,7 @@ def get_system_prompt(age_group: str) -> str:
 
 def get_assistant_system_prompt(age_group: str, context: dict = None) -> str:
     """Get the digital assistant system prompt with device context."""
-    if age_group == "child":
+    if age_group in ("child", "baby"):
         # Children do NOT use the digital assistant.
         return ASSISTANT_PERSONALITIES.get("kid", ASSISTANT_PERSONALITIES["default"])
 

@@ -44,6 +44,8 @@ OUTPUT FORMAT (JSON only, no markdown):
 Respond with ONLY the JSON. No explanation, no markdown, no code fences."""
 
 AGE_STYLE_INSTRUCTIONS = {
+    "baby": "Use very simple, playful words. Keep it short and encouraging, like talking to a toddler.",
+    "child": "Use very simple, playful words. Keep it short and encouraging, like talking to a young child.",
     "kid": "Use simple, fun language. Keep descriptions short and encouraging. Think like a helpful teacher.",
     "teen": "Use casual, modern language. Sound like a supportive friend helping them plan.",
     "adult": "Use clear, professional language. Be concise and actionable.",

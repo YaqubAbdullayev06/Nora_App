@@ -152,6 +152,11 @@ def startup():
         db.commit()
     except Exception:
         pass  # Constraint doesn't exist or dialect doesn't support DROP CONSTRAINT IF EXISTS
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN age_group VARCHAR(20)"))
+        db.commit()
+    except Exception:
+        pass  # Column already exists
     seed_content(db)
     db.close()
 

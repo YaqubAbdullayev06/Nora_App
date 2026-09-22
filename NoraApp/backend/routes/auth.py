@@ -32,6 +32,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         name=user.name,
         password_hash=hash_password(user.password),
         refresh_token_family=str(uuid.uuid4()),
+        age_group=user.age_group,
     )
     db.add(new_user)
     db.commit()

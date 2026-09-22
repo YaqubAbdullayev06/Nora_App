@@ -32,6 +32,16 @@ def setup_accountability_lock(
     ).first()
 
     if existing:
+        # Only an expired lock can be replaced without the current PIN.
+        is_expired = existing.expires_at is not None and datetime.utcnow() > existing.expires_at
+        if not is_expired:
+            if not request.current_pin:
+                raise HTTPException(
+                    status_code=400,
+                    detail="current_pin required to replace an active lock",
+                )
+            if not verify_password(request.current_pin, existing.pin_hash):
+                raise HTTPException(status_code=401, detail="Incorrect current PIN")
         # Deactivate the old lock so a new one can be created
         existing.is_active = False
         db.commit()

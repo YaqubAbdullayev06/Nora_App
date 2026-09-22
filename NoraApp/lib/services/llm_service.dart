@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/config/env_config.dart';
+import 'api_service.dart';
 
 /// LLM Service — connects Nora Flutter app to cloud LLM via backend.
 ///
@@ -26,7 +27,7 @@ class LlmService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/ai/chat'),
-        headers: {'Content-Type': 'application/json'},
+        headers: ApiService().authHeaders,
         body: jsonEncode({
           'message': message,
           'age_group': ageGroup,
@@ -71,7 +72,7 @@ class LlmService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/ai/command'),
-        headers: {'Content-Type': 'application/json'},
+        headers: ApiService().authHeaders,
         body: jsonEncode({
           'command': command,
           'age_group': ageGroup,

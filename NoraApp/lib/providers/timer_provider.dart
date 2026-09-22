@@ -142,6 +142,10 @@ class TimerProvider extends ChangeNotifier {
       context: {'duration': minutes, 'points': points},
     );
 
+    // Count this session BEFORE reading breakDurationSeconds so the
+    // long-break threshold (every N sessions) triggers correctly.
+    _completedSessionsInCycle++;
+
     // Transition to break phase
     _isBreakPhase = true;
     _timerSeconds = breakDurationSeconds;

@@ -62,11 +62,14 @@ class AIRecommendation {
 
   factory AIRecommendation.fromJson(Map<String, dynamic> json) {
     return AIRecommendation(
-      id: json['id'] ?? '',
+      // Backend returns content_id (int); local/homegrown data uses id
+      id: (json['id'] ?? json['content_id'] ?? '').toString(),
       title: json['title'] ?? '',
-      description: json['description'] ?? '',
+      // Backend returns reason (not description)
+      description: json['description'] ?? json['reason'] ?? '',
       type: json['type'] ?? '',
-      confidence: (json['confidence'] ?? 0).toDouble(),
+      confidence: (json['confidence'] ?? json['confidence_score'] ?? 0)
+          .toDouble(),
     );
   }
 }
@@ -85,9 +88,11 @@ class FocusScore {
 
   factory FocusScore.fromJson(Map<String, dynamic> json) {
     return FocusScore(
-      score: json['score'] ?? 0,
-      totalMinutes: json['totalMinutes'] ?? 0,
-      sessions: json['sessions'] ?? 0,
+      // Backend returns total_points; legacy/local data uses score
+      score: json['score'] ?? json['total_points'] ?? 0,
+      totalMinutes:
+          json['totalMinutes'] ?? json['total_focus_minutes'] ?? 0,
+      sessions: json['sessions'] ?? json['sessions_completed'] ?? 0,
     );
   }
 }

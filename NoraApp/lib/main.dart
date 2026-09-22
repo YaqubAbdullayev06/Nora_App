@@ -91,17 +91,18 @@ class NoraApp extends StatelessWidget {
             personaProvider: ctx.read<PersonaProvider>(),
           ),
         ),
-        // Timer depends on Persona
-        ChangeNotifierProvider(
-          create: (ctx) => TimerProvider(
-            personaProvider: ctx.read<PersonaProvider>(),
-          ),
-        ),
-        // Focus depends on Persona
+        // Focus first — TimerProvider wires onSessionCompleted to it
         ChangeNotifierProvider(
           create: (ctx) => FocusProvider(
             personaProvider: ctx.read<PersonaProvider>(),
           ),
+        ),
+        // Timer depends on Persona; records completed sessions into Focus
+        ChangeNotifierProvider(
+          create: (ctx) => TimerProvider(
+            personaProvider: ctx.read<PersonaProvider>(),
+          )..onSessionCompleted =
+              ctx.read<FocusProvider>().recordSession,
         ),
         // Plan depends on Persona
         ChangeNotifierProvider(

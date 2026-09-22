@@ -43,6 +43,10 @@ class _TimerScreenState extends State<TimerScreen>
   // Tab selector: 0 = Focus, 1 = Breathe
   int _selectedTab = 0;
 
+  /// Guards against pushing BreakScreen + recording session multiple times
+  /// while the timer stays in break phase (build runs every tick).
+  bool _breakHandled = false;
+
   @override
   void initState() {
     super.initState();
@@ -90,11 +94,14 @@ class _TimerScreenState extends State<TimerScreen>
         final persona = personaProvider.persona;
         final progress = timerProvider.timerProgress;
 
-        // Auto-navigate to break screen when break phase starts
-        if (timerProvider.isBreakPhase) {
-          // Record session in PomodoroProvider
+        // Auto-navigate to break screen when break phase starts (once)
+        if (!timerProvider.isBreakPhase) {
+          _breakHandled = false;
+        } else if (!_breakHandled) {
+          _breakHandled = true;
+          // Record session + navigate exactly once per break phase
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
+            if (mounted && timerProvider.isBreakPhase) {
               final pomodoro = context.read<PomodoroProvider>();
               pomodoro.recordSession(timerProvider.lastFocusDurationSeconds ~/ 60);
 

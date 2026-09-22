@@ -4,9 +4,11 @@ AI routes — chat, command, classify-apps, analyze-usage, notification-text, de
 
 import json as _json
 import os
+import time
+from collections import defaultdict, deque
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from ai.llm_provider import llm
 from ai.ollama_client import ollama
@@ -16,6 +18,8 @@ from ai.prompts import (
     get_assistant_system_prompt,
     get_system_prompt,
 )
+from core.security import get_current_user
+from models.orm import UserModel
 from schemas import (
     AICommandRequest,
     AnalyzeUsageRequest,
@@ -34,6 +38,30 @@ from schemas import (
 from services.app_classifier import app_classifier
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+# ─── Auth + Rate Limiting ───
+# In-memory sliding-window rate limit per user (60 req/min).
+# Ephemeral per process — fine for a single-instance deployment.
+
+_RATE_LIMIT_WINDOW_SECONDS = 60.0
+_RATE_LIMIT_MAX_REQUESTS = 60
+_rate_limit_buckets: dict[int, deque] = defaultdict(deque)
+
+
+def require_ai_user(
+    current_user: UserModel = Depends(get_current_user),
+) -> UserModel:
+    """Authenticated AI access + per-user sliding-window rate limit."""
+    now = time.monotonic()
+    bucket = _rate_limit_buckets[current_user.id]
+    cutoff = now - _RATE_LIMIT_WINDOW_SECONDS
+    while bucket and bucket[0] <= cutoff:
+        bucket.popleft()
+    if len(bucket) >= _RATE_LIMIT_MAX_REQUESTS:
+        raise HTTPException(status_code=429, detail="AI rate limit exceeded. Try again in a minute.")
+    bucket.append(now)
+    return current_user
+
 
 # ─── Action Validation ───
 
@@ -143,11 +171,14 @@ def _parse_actions_from_response(response: str) -> list[dict]:
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def ai_chat(request: ChatRequest):
+async def ai_chat(
+    request: ChatRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """Chat with Nora AI — powered by multi-provider LLM fallback."""
 
     # SAFETY: Children (1-6) do NOT chat with the LLM
-    if request.age_group == "child":
+    if request.age_group in ("child", "baby"):
         return ChatResponse(
             response="Nora Little is a learning companion for young children. "
             "Let's read a story or learn colors together!",
@@ -189,14 +220,17 @@ async def ai_chat(request: ChatRequest):
 
 
 @router.post("/command")
-async def ai_command(request: AICommandRequest):
+async def ai_command(
+    request: AICommandRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """
     AI Digital Assistant — processes commands and executes actions.
     The AI can: scan apps, block apps, analyze usage, start focus, etc.
     """
 
     # SAFETY: Children (1-6) do NOT use the digital assistant
-    if request.age_group == "child":
+    if request.age_group in ("child", "baby"):
         return {
             "response": "Nora Little is a learning companion for young children. "
             "For device management, please use the parent's account.",
@@ -256,19 +290,28 @@ async def ai_command(request: AICommandRequest):
 
 
 @router.post("/classify-apps")
-def classify_apps(request: ClassifyAppsRequest):
+def classify_apps(
+    request: ClassifyAppsRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """AI-powered app classification and blocking recommendations."""
     return app_classifier.classify_apps(request.apps, request.age_group)
 
 
 @router.post("/analyze-usage")
-def analyze_usage(request: AnalyzeUsageRequest):
+def analyze_usage(
+    request: AnalyzeUsageRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """AI-powered usage analysis with insights and recommendations."""
     return app_classifier.analyze_usage(request.usage_data, request.age_group)
 
 
 @router.post("/notification-text")
-async def generate_notification_text(request: NotificationTextRequest):
+async def generate_notification_text(
+    request: NotificationTextRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """
     Generate AI-powered notification text for different app events.
     Falls back to default texts if LLM is unavailable.
@@ -353,10 +396,24 @@ Generate ONLY the notification text. No quotes, no explanation. Just the message
 
 
 @router.post("/decompose-task")
-async def decompose_task(request: TaskDecompositionRequest):
+async def decompose_task(
+    request: TaskDecompositionRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """
     Decompose a broad task into Pomodoro-sized subtasks (15-25 min each).
     """
+    # SAFETY: Young children do NOT use task decomposition
+    if request.age_group in ("child", "baby"):
+        return {
+            "success": True,
+            "subtasks": [],
+            "original_task": request.task,
+            "total_estimated_minutes": 0,
+            "tip": "Ask a grown-up to help break big jobs into little ones!",
+            "provider": "none",
+        }
+
     from ai.task_decomposer import decompose_task as _decompose
 
     result = await _decompose(
@@ -416,10 +473,13 @@ Respond with ONLY the JSON."""
 
 
 @router.post("/daily-plan")
-async def generate_daily_plan(request: DailyPlanRequest):
+async def generate_daily_plan(
+    request: DailyPlanRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """AI-generated smart daily schedule based on goals and energy patterns."""
 
-    if request.age_group == "child":
+    if request.age_group in ("child", "baby"):
         return {
             "success": True,
             "plan": [
@@ -561,10 +621,13 @@ def _generate_fallback_plan(available_hours: float, energy_pattern: str) -> list
 
 
 @router.post("/sentiment-check")
-async def sentiment_check(request: SentimentCheckinRequest):
+async def sentiment_check(
+    request: SentimentCheckinRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """Analyze user sentiment and provide empathetic, age-appropriate response."""
 
-    if request.age_group == "child":
+    if request.age_group in ("child", "baby"):
         return {
             "success": True,
             "sentiment": "positive",
@@ -701,10 +764,13 @@ Respond with ONLY the JSON."""
 
 
 @router.post("/predictive-blocking")
-async def predictive_blocking(request: PredictiveBlockingRequest):
+async def predictive_blocking(
+    request: PredictiveBlockingRequest,
+    current_user: UserModel = Depends(require_ai_user),
+):
     """Predict when user might procrastinate and suggest proactive blocks."""
 
-    if request.age_group == "child":
+    if request.age_group in ("child", "baby"):
         return {
             "success": True,
             "predictions": [],

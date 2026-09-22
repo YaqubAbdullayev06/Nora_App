@@ -91,8 +91,15 @@ class AuthStorage {
     }
   }
 
-  /// Clear everything on logout.
+  /// Clear auth state on logout — only deletes auth keys, NOT all app data.
+  /// Never call `_storage.deleteAll()` here — that would wipe habits,
+  /// sessions, hard cap, setup wizard, accountability lock, etc.
   Future<void> clearAll() async {
-    await _storage.deleteAll();
+    await _storage.delete(key: _accessTokenKey);
+    await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _userIdKey);
+    await _storage.delete(key: _userEmailKey);
+    await _storage.delete(key: _userNameKey);
+    await _storage.delete(key: _personaKey);
   }
 }

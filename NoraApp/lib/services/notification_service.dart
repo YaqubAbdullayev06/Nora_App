@@ -6,6 +6,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:rxdart/rxdart.dart';
 import 'package:http/http.dart' as http;
 import '../core/config/env_config.dart';
+import 'api_service.dart';
 
 /// Notification types for different app events.
 enum NotificationType {
@@ -126,7 +127,7 @@ class NotificationService {
       final response = await http
           .post(
             Uri.parse('$baseUrl/ai/notification-text'),
-            headers: {'Content-Type': 'application/json'},
+            headers: ApiService().authHeaders,
             body: jsonEncode({
               'event_type': eventType,
               'age_group': ageGroup,

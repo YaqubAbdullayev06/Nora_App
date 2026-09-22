@@ -30,6 +30,7 @@ class UserModel(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True)
     refresh_token_family = Column(String(36), nullable=True, index=True)
+    age_group = Column(String(20), nullable=True)
 
     sessions = relationship("SessionModel", back_populates="user")
     achievements = relationship("UserAchievementModel", back_populates="user")

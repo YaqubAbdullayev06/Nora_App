@@ -47,8 +47,8 @@ KNOWN_CATEGORIES = {
 
 # Age-appropriate blocking rules
 AGE_BLOCKING_RULES = {
-    "child": {
-        "always_block": ["social_media", "games", "news"],
+    "baby": {
+        "always_block": ["social_media", "games"],
         "max_social_media_minutes": 0,
         "max_entertainment_minutes": 15,
         "strict_mode": True,
@@ -75,3 +75,14 @@ AGE_BLOCKING_RULES = {
         "strict_mode": False,
     },
 }
+
+
+def get_blocking_rules(age_group: str) -> dict:
+    """Look up blocking rules for an age group.
+
+    "child" is an alias for "baby" (ages 1-6) so both get strict rules
+    instead of falling through to the adult defaults.
+    """
+    if age_group in ("child", "baby"):
+        return AGE_BLOCKING_RULES["baby"]
+    return AGE_BLOCKING_RULES.get(age_group, AGE_BLOCKING_RULES["adult"])

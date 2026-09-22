@@ -4,7 +4,7 @@ Recommends which apps to block for better focus and productivity.
 """
 from typing import Any
 
-from services.blocking_rules import AGE_BLOCKING_RULES, KNOWN_CATEGORIES
+from services.blocking_rules import AGE_BLOCKING_RULES, KNOWN_CATEGORIES, get_blocking_rules
 
 
 class AppClassifier:
@@ -20,7 +20,7 @@ class AppClassifier:
         ai_recommended_block = []
         ai_recommended_keep = []
 
-        rules = AGE_BLOCKING_RULES.get(age_group, AGE_BLOCKING_RULES["adult"])
+        rules = get_blocking_rules(age_group)
 
         # Single-pass: classify + categorize + count
         category_counts: dict[str, int] = {}
@@ -93,7 +93,7 @@ class AppClassifier:
         """
         Analyze usage data and provide AI-powered insights.
         """
-        rules = AGE_BLOCKING_RULES.get(age_group, AGE_BLOCKING_RULES["adult"])
+        rules = get_blocking_rules(age_group)
         apps = usage_data.get("apps", [])
         total_time = usage_data.get("totalScreenTimeMinutes", 0)
         social_time = usage_data.get("socialMediaMinutes", 0)

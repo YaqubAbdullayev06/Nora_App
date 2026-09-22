@@ -43,6 +43,10 @@ class ApiService {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
+  /// Public auth headers for services that call the backend with raw http
+  /// (e.g. LlmService, NotificationService) — includes Bearer token if present.
+  Map<String, String> get authHeaders => Map.unmodifiable(_headers);
+
   // ─── Auto-Refresh on 401 ───
 
   /// Make an authenticated request. On 401, tries refresh token before failing.
@@ -155,6 +159,7 @@ class ApiService {
     required String email,
     required String name,
     required String password,
+    String? ageGroup,
   }) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/auth/register'),
@@ -163,6 +168,7 @@ class ApiService {
         'email': email,
         'name': name,
         'password': password,
+        if (ageGroup != null) 'age_group': ageGroup,
       }),
     );
     if (response.statusCode == 201 || response.statusCode == 200) {
@@ -255,7 +261,12 @@ class ApiService {
     final response = await _client.post(
       Uri.parse('$baseUrl/sessions/'),
       headers: _headers,
-      body: jsonEncode(session.toJson()),
+      // SessionCreate expects snake_case fields (duration_minutes etc.)
+      body: jsonEncode({
+        'duration_minutes': session.durationMinutes,
+        'session_type': 'pomodoro',
+        'notes': null,
+      }),
     );
     if (response.statusCode == 201) {
       return FocusSession.fromJson(jsonDecode(response.body));
@@ -437,11 +448,13 @@ class ApiService {
     required String pin,
     required String guardianName,
     int? lockDurationDays,
+    String? currentPin,
   }) async {
     return postJson('/accountability/setup', {
       'pin': pin,
       'guardian_name': guardianName,
       'lock_duration_days': lockDurationDays,
+      if (currentPin != null) 'current_pin': currentPin,
     });
   }
 

@@ -24,10 +24,18 @@ class _AccountabilitySetupScreenState extends State<AccountabilitySetupScreen> {
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
   final _durationController = TextEditingController();
+  final _currentPinController = TextEditingController();
 
   bool _isLoading = false;
   bool _showPin = false;
   int _currentStep = 0; // 0: guardian name, 1: PIN, 2: duration
+
+  @override
+  void initState() {
+    super.initState();
+    // Ensure lock status is loaded so we know if a current PIN is required
+    context.read<AccountabilityProvider>().initialize();
+  }
 
   @override
   void dispose() {
@@ -35,6 +43,7 @@ class _AccountabilitySetupScreenState extends State<AccountabilitySetupScreen> {
     _pinController.dispose();
     _confirmPinController.dispose();
     _durationController.dispose();
+    _currentPinController.dispose();
     super.dispose();
   }
 
@@ -43,15 +52,16 @@ class _AccountabilitySetupScreenState extends State<AccountabilitySetupScreen> {
 
     setState(() => _isLoading = true);
 
-    setState(() => _isLoading = true);
-
     final provider = context.read<AccountabilityProvider>();
     final durationDays = int.tryParse(_durationController.text);
+    // Replacing an active lock requires the current PIN
+    final needsCurrentPin = provider.isLockActive && !provider.isExpired;
 
     final success = await provider.setupLock(
       pin: _pinController.text,
       guardianName: _guardianNameController.text.trim(),
       lockDurationDays: durationDays,
+      currentPin: needsCurrentPin ? _currentPinController.text : null,
     );
 
     setState(() => _isLoading = false);
@@ -400,6 +410,9 @@ class _AccountabilitySetupScreenState extends State<AccountabilitySetupScreen> {
   }
 
   Widget _buildDurationStep() {
+    final provider = context.watch<AccountabilityProvider>();
+    final needsCurrentPin = provider.isLockActive && !provider.isExpired;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -473,6 +486,55 @@ class _AccountabilitySetupScreenState extends State<AccountabilitySetupScreen> {
               _durationChip('90 days', 90),
             ],
           ),
+          // When replacing an active lock, verify the current PIN first
+          if (needsCurrentPin) ...[
+            const SizedBox(height: 32),
+            const Text(
+              'Enter current PIN to authorize replacement',
+              style: TextStyle(
+                fontSize: DesignTokens.fontSizeBodySmall,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _currentPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              style: const TextStyle(
+                fontSize: DesignTokens.fontSizeH2,
+                letterSpacing: 8,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+              maxLength: 6,
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: '• • • •',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  letterSpacing: 8,
+                ),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.06),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Colors.amber, width: 2),
+                ),
+              ),
+              validator: (v) {
+                if (!needsCurrentPin) return null;
+                if (v == null || v.length < 4) return 'Enter the current PIN';
+                if (!RegExp(r'^\d+$').hasMatch(v)) return 'Numbers only';
+                return null;
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -498,6 +560,17 @@ class _AccountabilitySetupScreenState extends State<AccountabilitySetupScreen> {
         return _pinController.text.length >= 4 &&
             _pinController.text == _confirmPinController.text;
       default:
+        final provider = context.read<AccountabilityProvider>();
+        final needsCurrentPin = provider.isLockActive && !provider.isExpired;
+        if (needsCurrentPin && _currentPinController.text.length < 4) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Enter the current PIN to authorize replacement'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return false;
+        }
         return true;
     }
   }

@@ -14,6 +14,7 @@ class UserCreate(BaseModel):
     email: str
     name: str
     password: str
+    age_group: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -27,6 +28,7 @@ class UserResponse(BaseModel):
     name: str
     created_at: datetime
     is_active: bool
+    age_group: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -178,6 +180,7 @@ class AccountabilitySetupRequest(BaseModel):
     pin: str
     guardian_name: str
     lock_duration_days: Optional[int] = None
+    current_pin: Optional[str] = None
 
     @validator("pin")
     def pin_must_be_4_to_6_digits(cls, v):

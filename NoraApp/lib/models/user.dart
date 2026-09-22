@@ -31,7 +31,8 @@ class User {
       email: json['email'] ?? '',
       name: json['name'] ?? '',
       ageGroup: AgeGroup.values.firstWhere(
-        (g) => g.name == json['ageGroup'],
+        (g) =>
+            g.name == (json['ageGroup'] ?? json['age_group']),
         orElse: () => AgeGroup.adult,
       ),
       birthDate: json['birthDate'] != null
