@@ -27,7 +27,6 @@ class _SentimentCheckinScreenState extends State<SentimentCheckinScreen>
   bool _isAnalyzing = false;
   SentimentResult? _lastResult;
   late AnimationController _animController;
-  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -36,10 +35,6 @@ class _SentimentCheckinScreenState extends State<SentimentCheckinScreen>
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeInOut,
     );
 
     // Add welcome message

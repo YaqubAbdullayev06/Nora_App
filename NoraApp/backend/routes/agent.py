@@ -20,7 +20,8 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 
 @router.get("/capabilities")
-def get_agent_capabilities():
+def get_agent_capabilities(current_user: UserModel = Depends(get_current_user)):
+    # H13: capabilities probe previously required no auth
     return agent_capabilities.capabilities()
 
 

@@ -109,7 +109,7 @@ class _PredictiveBlockingScreenState extends State<PredictiveBlockingScreen> {
 
   Widget _buildSummaryCard(PersonaTheme? persona) {
     return Card(
-      color: persona?.primary?.withOpacity(0.1),
+      color: persona?.primary.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(DesignTokens.spacing16),
         child: Column(

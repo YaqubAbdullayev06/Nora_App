@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -31,6 +32,9 @@ class UserModel(Base):
     is_active = Column(Boolean, default=True)
     refresh_token_family = Column(String(36), nullable=True, index=True)
     age_group = Column(String(20), nullable=True)
+
+    # H1: admin role — only admins may create shared content
+    is_admin = Column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     sessions = relationship("SessionModel", back_populates="user")
     achievements = relationship("UserAchievementModel", back_populates="user")

@@ -5,14 +5,32 @@ Daily Hard Cap routes — set / query / deactivate screen time limits.
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.security import get_current_user
-from models.orm import DailyHardCapModel, UserModel
+from models.orm import DailyHardCapModel, SessionModel, UserModel
 from schemas import HardCapSetupRequest, HardCapStatusResponse
 
 router = APIRouter(prefix="/hardcap", tags=["hardcap"])
+
+
+def _today_usage_minutes(db: Session, user_id: int) -> int:
+    """H9: sum of focus-session minutes started today (UTC day).
+
+    Previously always returned None so progress/warnings never worked.
+    """
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    total = (
+        db.query(func.coalesce(func.sum(SessionModel.duration_minutes), 0))
+        .filter(
+            SessionModel.user_id == user_id,
+            SessionModel.started_at >= today_start,
+        )
+        .scalar()
+    )
+    return int(total or 0)
 
 
 @router.post("/setup")
@@ -56,7 +74,7 @@ def setup_hard_cap(
             soft_warning_percent=cap.soft_warning_percent,
             hard_warning_percent=cap.hard_warning_percent,
             require_pin_to_override=cap.require_pin_to_override,
-            today_usage_minutes=None,
+            today_usage_minutes=_today_usage_minutes(db, current_user.id),
             created_at=cap.created_at,
         ).model_dump(),
     }
@@ -80,7 +98,7 @@ def get_hard_cap_status(
             soft_warning_percent=80,
             hard_warning_percent=90,
             require_pin_to_override=False,
-            today_usage_minutes=None,
+            today_usage_minutes=_today_usage_minutes(db, current_user.id),
             created_at=None,
         ).model_dump()
 
@@ -90,7 +108,7 @@ def get_hard_cap_status(
         soft_warning_percent=cap.soft_warning_percent,
         hard_warning_percent=cap.hard_warning_percent,
         require_pin_to_override=cap.require_pin_to_override,
-        today_usage_minutes=None,
+        today_usage_minutes=_today_usage_minutes(db, current_user.id),
         created_at=cap.created_at,
     ).model_dump()
 

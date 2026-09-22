@@ -301,7 +301,7 @@ class UnifiedLLMProvider:
                 role = "user" if msg["role"] == "user" else "model"
                 contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent?key={self.gemini_api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent"
 
         payload = {
             "contents": contents,
@@ -316,7 +316,7 @@ class UnifiedLLMProvider:
         client = get_client()
         response = await client.post(
             url,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "x-goog-api-key": self.gemini_api_key},
             json=payload,
         )
         response.raise_for_status()
@@ -453,11 +453,8 @@ class UnifiedLLMProvider:
                 else:
                     continue
 
-                # Check if this was served from cache (provider methods return
-                # a dict when cached, a string when fresh — avoid re-reading disk)
-                if isinstance(result, dict):
-                    # Already a validated dict from cache — return directly
-                    return result
+                # Provider methods always return a plain string (cache is
+                # consulted internally before any HTTP call). Validate & wrap.
                 return self._validate_response(result, provider.value, False)
 
             except Exception as e:
@@ -526,7 +523,8 @@ class UnifiedLLMProvider:
             if self.gemini_api_key:
                 client = get_client()
                 resp = await client.get(
-                    f"https://generativelanguage.googleapis.com/v1beta/models?key={self.gemini_api_key}",
+                    "https://generativelanguage.googleapis.com/v1beta/models",
+                    headers={"x-goog-api-key": self.gemini_api_key},
                     timeout=5.0,
                 )
                 status["gemini"] = resp.status_code == 200

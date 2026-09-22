@@ -13,6 +13,7 @@ from core.security import (
     create_refresh_token,
     get_current_user,
     hash_password,
+    parse_subject,
     verify_password,
 )
 from models.orm import UserModel
@@ -77,9 +78,7 @@ def refresh_token(refresh_req: dict, db: Session = Depends(get_db)):
         payload = _jwt.decode(token_str, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        user_id = int(payload.get("sub"))
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
+        user_id = parse_subject(payload)
         token_family = payload.get("family")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")

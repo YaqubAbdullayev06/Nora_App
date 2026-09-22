@@ -14,7 +14,7 @@ class ConnectivityService extends ChangeNotifier {
   bool _isInitialized = false;
 
   bool get isConnected {
-    if (!_isInitialized) initialize(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
     return _isConnected;
   }
   bool get isChecking => _isChecking;

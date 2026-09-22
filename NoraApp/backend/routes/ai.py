@@ -3,6 +3,7 @@ AI routes — chat, command, classify-apps, analyze-usage, notification-text, de
 """
 
 import json as _json
+import logging
 import os
 import time
 from collections import defaultdict, deque
@@ -38,6 +39,8 @@ from schemas import (
 from services.app_classifier import app_classifier
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+logger = logging.getLogger("nora.ai")
 
 # ─── Auth + Rate Limiting ───
 # In-memory sliding-window rate limit per user (60 req/min).
@@ -88,19 +91,19 @@ def _validate_actions(raw_actions: list[dict]) -> list[dict]:
     for raw in raw_actions:
         action_name = raw.get("action")
         if action_name not in VALID_ACTION_TYPES:
-            print(f"[ACTION VALIDATION FAILED] Unknown action: {action_name}")
+            logger.warning("Action validation failed: unknown action %s", action_name)
             continue
         packages = raw.get("packages", [])
         for pkg in packages:
             if pkg in BLOCKED_EMERGENCY_PACKAGES:
-                print(f"[ACTION VALIDATION FAILED] Cannot block emergency app: {pkg}")
+                logger.warning("Action validation failed: cannot block emergency app %s", pkg)
                 break
         else:
             minutes = raw.get("minutes", 25)
             if isinstance(minutes, int) and 1 <= minutes <= 120:
                 validated.append(raw)
             else:
-                print(f"[ACTION VALIDATION FAILED] Invalid minutes: {minutes}")
+                logger.warning("Action validation failed: invalid minutes %r", minutes)
     return validated
 
 
@@ -213,6 +216,7 @@ async def ai_chat(
 
         return ChatResponse(response=response, model=model)
     except Exception as e:
+        logger.error("AI chat failed: %s", e, exc_info=True)
         return ChatResponse(
             response=f"I'm having trouble connecting to my brain right now. All LLM providers failed. Error: {str(e)}",
             model=model,
@@ -282,6 +286,7 @@ async def ai_command(
             "actions": validated_actions,
         }
     except Exception as e:
+        logger.error("AI command failed: %s", e, exc_info=True)
         return {
             "response": f"I had trouble processing that. Error: {str(e)}",
             "model": model,
@@ -377,6 +382,7 @@ Generate ONLY the notification text. No quotes, no explanation. Just the message
         return {"text": clean_text, "event_type": request.event_type}
     except Exception as e:
         # LLM failed — return a sensible default
+        logger.warning("Notification text generation failed: %s", e)
         defaults = {
             "focus_start": "Time to focus! Your session starts now.",
             "focus_end": "Great work! Your focus session is complete.",
@@ -530,8 +536,8 @@ Create an optimized daily schedule."""
                 "total_break_minutes": parsed.get("total_break_minutes", 0),
                 "tip": parsed.get("tip", ""),
             }
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Daily plan LLM path failed, using fallback: %s", e)
 
     # Fallback: generate a basic plan
     return {
@@ -677,8 +683,8 @@ Respond with ONLY the JSON."""
                 "suggestion": parsed.get("suggestion", ""),
                 "mood_score": max(1, min(10, parsed.get("mood_score", 5))),
             }
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Sentiment LLM path failed, using fallback: %s", e)
 
     # Fallback sentiment analysis
     msg_lower = request.message.lower()
@@ -809,8 +815,8 @@ Analyze patterns and predict procrastination windows."""
                 "suggested_block": parsed.get("suggested_block", []),
                 "summary": parsed.get("summary", ""),
             }
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Predictive blocking LLM path failed, using fallback: %s", e)
 
     # Fallback: rule-based predictions
     return _generate_fallback_predictions(request.age_group, request.current_time, request.recent_usage)

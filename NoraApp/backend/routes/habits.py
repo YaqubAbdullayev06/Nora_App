@@ -16,6 +16,19 @@ from schemas import HabitCompleteRequest, HabitCreateRequest
 router = APIRouter(prefix="/habits", tags=["habits"])
 
 
+def _local_today_start(tz_offset_minutes: int = 0) -> datetime:
+    """UTC instant of the user's local midnight for "today".
+
+    H2: previously used UTC midnight, which resets habit counters at the wrong
+    local time (e.g. 05:00 for UTC+5). tz_offset_minutes is minutes east of UTC
+    (DateTime.now().timeZoneOffset.inMinutes from Flutter). Default 0 = UTC.
+    """
+    offset = timedelta(minutes=max(-840, min(840, int(tz_offset_minutes or 0))))
+    local_now = datetime.utcnow() + offset
+    local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return local_midnight - offset
+
+
 @router.post("")
 def create_habit(
     request: HabitCreateRequest,
@@ -40,6 +53,7 @@ def create_habit(
 
 @router.get("")
 def list_habits(
+    tz_offset_minutes: int = 0,
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -49,7 +63,7 @@ def list_habits(
         HabitModel.is_active == True,
     ).all()
 
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _local_today_start(tz_offset_minutes)
     # Batch-load all today's completions in ONE query (fixes N+1)
     today_counts = dict(
         db.query(HabitCompletionModel.habit_id, func.count(HabitCompletionModel.id))
@@ -94,7 +108,7 @@ def complete_habit(
         raise HTTPException(status_code=404, detail="Habit not found")
 
     # Check daily limit
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _local_today_start(getattr(request, "tz_offset_minutes", 0))
     today_completions = db.query(HabitCompletionModel).filter(
         HabitCompletionModel.habit_id == habit.id,
         HabitCompletionModel.user_id == current_user.id,
@@ -145,11 +159,12 @@ def delete_habit(
 
 @router.get("/stats")
 def get_habit_stats(
+    tz_offset_minutes: int = 0,
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get habit completion statistics."""
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _local_today_start(tz_offset_minutes)
     week_start = today_start - timedelta(days=7)
 
     total_habits = db.query(HabitModel).filter(

@@ -49,7 +49,7 @@ class AccountabilityProvider extends ChangeNotifier {
 
   // ─── Getters ───
   bool get isLockActive {
-    if (!_isInitialized) initialize(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
     return _isLockActive;
   }
   String? get guardianName => _guardianName;

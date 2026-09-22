@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/enums/age_group.dart';
 import '../models/models.dart';
 import 'persona_provider.dart';
@@ -6,6 +8,10 @@ import 'persona_provider.dart';
 /// Manages daily planning state and task completion.
 class PlanProvider extends ChangeNotifier {
   final PersonaProvider _personaProvider;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  static const _todayKey = 'plan_today';
+  static const _historyKey = 'plan_history';
 
   DailyPlan? _todayPlan;
   List<DailyPlan> _planHistory = [];
@@ -45,9 +51,30 @@ class PlanProvider extends ChangeNotifier {
       return;
     }
 
+    _restoreTodayFromStorage(today);
+  }
+
+  /// Restore today's plan from secure storage if it matches [today],
+  /// otherwise create an empty placeholder plan for the new day.
+  Future<void> _restoreTodayFromStorage(DateTime today) async {
+    try {
+      final raw = await _storage.read(key: _todayKey);
+      if (raw != null && raw.isNotEmpty) {
+        final stored = DailyPlan.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final storedDay = DateTime(stored.date.year, stored.date.month, stored.date.day);
+        if (storedDay.isAtSameMomentAs(today)) {
+          _todayPlan = stored;
+          notifyListeners();
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('PlanProvider: failed to restore today plan: $e');
+    }
+
     _todayPlan = DailyPlan(
       id: 'plan_${today.millisecondsSinceEpoch}',
-      userId: _userId ?? '1',
+      userId: _userId ?? 'local',
       date: today,
       tasks: [],
       morningPlanned: false,
@@ -75,13 +102,14 @@ class PlanProvider extends ChangeNotifier {
 
     _todayPlan = DailyPlan(
       id: 'plan_${today.millisecondsSinceEpoch}',
-      userId: _userId ?? '1',
+      userId: _userId ?? 'local',
       date: today,
       tasks: tasks,
       morningPlanned: true,
       eveningReflected: false,
       pointsEarned: 0,
     );
+    _persistToday();
     notifyListeners();
   }
 
@@ -107,6 +135,7 @@ class PlanProvider extends ChangeNotifier {
       tasks: updatedTasks,
       pointsEarned: newPointsEarned,
     );
+    _persistToday();
     notifyListeners();
   }
 
@@ -119,19 +148,56 @@ class PlanProvider extends ChangeNotifier {
     );
 
     _planHistory = [_todayPlan!, ..._planHistory];
+    _persistToday();
+    _persistHistory();
     notifyListeners();
   }
 
   void loadPlanHistory() {
-    // TODO: Fetch real plan history from backend when endpoint is available.
-    // Previously returned fabricated fake history — now returns empty.
-    _planHistory = [];
-    notifyListeners();
+    Future.microtask(_restoreHistory);
+  }
+
+  Future<void> _restoreHistory() async {
+    try {
+      final raw = await _storage.read(key: _historyKey);
+      if (raw != null && raw.isNotEmpty) {
+        final list = jsonDecode(raw) as List<dynamic>;
+        _planHistory = list
+            .map((e) => DailyPlan.fromJson(e as Map<String, dynamic>))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('PlanProvider: failed to restore history: $e');
+    }
+  }
+
+  Future<void> _persistToday() async {
+    try {
+      if (_todayPlan != null) {
+        await _storage.write(key: _todayKey, value: jsonEncode(_todayPlan!.toJson()));
+      }
+    } catch (e) {
+      debugPrint('PlanProvider: failed to persist today plan: $e');
+    }
+  }
+
+  Future<void> _persistHistory() async {
+    try {
+      await _storage.write(
+        key: _historyKey,
+        value: jsonEncode(_planHistory.map((p) => p.toJson()).toList()),
+      );
+    } catch (e) {
+      debugPrint('PlanProvider: failed to persist history: $e');
+    }
   }
 
   void clearAll() {
     _todayPlan = null;
     _planHistory = [];
+    _storage.delete(key: _todayKey);
+    _storage.delete(key: _historyKey);
     notifyListeners();
   }
 }

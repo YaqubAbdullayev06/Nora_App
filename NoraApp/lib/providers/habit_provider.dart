@@ -30,7 +30,7 @@ class HabitProvider extends ChangeNotifier {
 
   // ─── Getters ───
   List<Habit> get habits {
-    if (!_isInitialized) initialize(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
     return _habits;
   }
 

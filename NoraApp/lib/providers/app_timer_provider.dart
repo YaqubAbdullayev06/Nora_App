@@ -29,7 +29,7 @@ class AppTimerProvider extends ChangeNotifier {
 
   /// Get all configured limits.
   Map<String, int> get limits {
-    if (!_isInitialized) initialize(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
     return Map.unmodifiable(_limits);
   }
 

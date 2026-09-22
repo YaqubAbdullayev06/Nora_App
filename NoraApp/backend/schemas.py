@@ -264,6 +264,8 @@ class HabitResponse(BaseModel):
 class HabitCompleteRequest(BaseModel):
     habit_id: int
     duration_minutes: int = 0
+    # H2: client's UTC offset in minutes (east positive) for local-day boundaries
+    tz_offset_minutes: int = 0
 
 
 class HabitStatsResponse(BaseModel):

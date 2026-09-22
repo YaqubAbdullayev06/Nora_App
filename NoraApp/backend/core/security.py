@@ -48,10 +48,30 @@ def verify_password(password: str, hashed: str) -> bool:
 # ─── Token Creation ───
 
 
+def _utcnow() -> datetime:
+    """Naive UTC now — compatible with DateTime columns stored as naive UTC."""
+    from datetime import timezone
+
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def parse_subject(payload: dict) -> int:
+    """Safely parse the `sub` claim into a user id.
+
+    Raises HTTPException(401) instead of leaking a 500 on missing/non-int subs.
+    """
+    sub = payload.get("sub")
+    try:
+        user_id = int(sub)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return user_id
+
+
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     to_encode["sub"] = str(to_encode["sub"])
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = _utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -59,7 +79,7 @@ def create_access_token(data: dict) -> str:
 def create_refresh_token(data: dict, family: Optional[str] = None) -> str:
     to_encode = data.copy()
     to_encode["sub"] = str(to_encode["sub"])
-    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = _utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
     if family:
         to_encode["family"] = family
@@ -81,9 +101,7 @@ def get_current_user(
         # Enforce token type — refresh tokens must NOT be used as access tokens
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        user_id = int(payload.get("sub"))
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
+        user_id = parse_subject(payload)
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 

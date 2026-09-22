@@ -53,7 +53,7 @@ class HardCapProvider extends ChangeNotifier {
 
   // ─── Getters ───
   bool get isActive {
-    if (!_isInitialized) initialize(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
     return _isActive;
   }
   int get capMinutes => _capMinutes;

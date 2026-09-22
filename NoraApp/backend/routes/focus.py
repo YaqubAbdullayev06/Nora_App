@@ -118,6 +118,9 @@ def create_content(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    # H1: shared content is admin-only (content is seeded; regular users cannot inject)
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Only admins can create content")
     new_content = ContentModel(
         title=content.title,
         description=content.description,

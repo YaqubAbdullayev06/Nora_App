@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/enums/age_group.dart';
 import '../core/constants/design_tokens.dart';
 import '../core/theme/persona_theme.dart';
@@ -26,6 +28,7 @@ class AppProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
   final FocusProtectionService _focusProtection = FocusProtectionService();
   final ScreenTimeService _screenTimeService = ScreenTimeService();
+  final FlutterSecureStorage _planStorage = const FlutterSecureStorage();
   Timer? _screenTimeRefreshTimer;
   bool _isInitialized = false;
 
@@ -191,7 +194,7 @@ class AppProvider extends ChangeNotifier {
   // ─── Screen Time Tracking ───
   int _screenTimeTodayMinutes = 0;
   int get screenTimeTodayMinutes {
-    if (!_isInitialized) init(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(init); // defer side effects out of build
     return _screenTimeTodayMinutes;
   }
   bool get isScreenTimeExceeded {
@@ -207,6 +210,8 @@ class AppProvider extends ChangeNotifier {
   // ─── Daily Planning State ───
   DailyPlan? _todayPlan;
   List<DailyPlan> _planHistory = [];
+  static const _planTodayKey = 'app_plan_today';
+  static const _planHistoryKey = 'app_plan_history';
 
   DailyPlan? get todayPlan => _todayPlan;
   List<DailyPlan> get planHistory => _planHistory;
@@ -687,9 +692,29 @@ class AppProvider extends ChangeNotifier {
       return;
     }
 
+    _restoreTodayPlan(today);
+  }
+
+  Future<void> _restoreTodayPlan(DateTime today) async {
+    try {
+      final raw = await _planStorage.read(key: _planTodayKey);
+      if (raw != null && raw.isNotEmpty) {
+        final stored = DailyPlan.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final storedDay =
+            DateTime(stored.date.year, stored.date.month, stored.date.day);
+        if (storedDay.isAtSameMomentAs(today)) {
+          _todayPlan = stored;
+          notifyListeners();
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('AppProvider: failed to restore plan: $e');
+    }
+
     _todayPlan = DailyPlan(
       id: 'plan_${today.millisecondsSinceEpoch}',
-      userId: _currentUser?.id ?? '1',
+      userId: _currentUser?.id ?? 'local',
       date: today,
       tasks: [],
       morningPlanned: false,
@@ -697,6 +722,28 @@ class AppProvider extends ChangeNotifier {
       pointsEarned: 0,
     );
     notifyListeners();
+  }
+
+  Future<void> _persistPlanToday() async {
+    try {
+      if (_todayPlan != null) {
+        await _planStorage.write(
+            key: _planTodayKey, value: jsonEncode(_todayPlan!.toJson()));
+      }
+    } catch (e) {
+      debugPrint('AppProvider: failed to persist plan: $e');
+    }
+  }
+
+  Future<void> _persistPlanHistory() async {
+    try {
+      await _planStorage.write(
+        key: _planHistoryKey,
+        value: jsonEncode(_planHistory.map((p) => p.toJson()).toList()),
+      );
+    } catch (e) {
+      debugPrint('AppProvider: failed to persist plan history: $e');
+    }
   }
 
   void createDailyPlan(List<String> taskTitles) {
@@ -717,13 +764,14 @@ class AppProvider extends ChangeNotifier {
 
     _todayPlan = DailyPlan(
       id: 'plan_${today.millisecondsSinceEpoch}',
-      userId: _currentUser?.id ?? '1',
+      userId: _currentUser?.id ?? 'local',
       date: today,
       tasks: tasks,
       morningPlanned: true,
       eveningReflected: false,
       pointsEarned: 0,
     );
+    _persistPlanToday();
     notifyListeners();
   }
 
@@ -749,6 +797,7 @@ class AppProvider extends ChangeNotifier {
       tasks: updatedTasks,
       pointsEarned: newPointsEarned,
     );
+    _persistPlanToday();
     notifyListeners();
   }
 
@@ -761,14 +810,28 @@ class AppProvider extends ChangeNotifier {
     );
 
     _planHistory = [_todayPlan!, ..._planHistory];
+    _persistPlanToday();
+    _persistPlanHistory();
     notifyListeners();
   }
 
   void loadPlanHistory() {
-    // TODO: Fetch real plan history from backend when endpoint is available.
-    // Previously returned fabricated fake history — now returns empty.
-    _planHistory = [];
-    notifyListeners();
+    Future.microtask(_restorePlanHistory);
+  }
+
+  Future<void> _restorePlanHistory() async {
+    try {
+      final raw = await _planStorage.read(key: _planHistoryKey);
+      if (raw != null && raw.isNotEmpty) {
+        final list = jsonDecode(raw) as List<dynamic>;
+        _planHistory = list
+            .map((e) => DailyPlan.fromJson(e as Map<String, dynamic>))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('AppProvider: failed to restore plan history: $e');
+    }
   }
 
   // ─── Cleanup ───

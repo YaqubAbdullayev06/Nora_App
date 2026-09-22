@@ -25,7 +25,7 @@ class SetupProvider extends ChangeNotifier {
   bool _isInitialized = false;
 
   bool get isCompleted {
-    if (!_isInitialized) initialize(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
     return _isCompleted;
   }
   bool get accountabilityEnabled => _accountabilityEnabled;

@@ -103,12 +103,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS: allow your Flutter app domains + localhost for dev
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+# CORS: allow your Flutter app domains + localhost for dev.
+# SECURITY: browsers reject `Access-Control-Allow-Origin: *` combined with
+# credentials, and a wildcard + credentials would let any site make credentialed
+# requests. Only enable credentials when explicit origins are configured.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+_allow_credentials = bool(CORS_ORIGINS) and CORS_ORIGINS != ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS or ["*"],
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -127,7 +131,10 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    from datetime import timezone
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return {"status": "healthy", "timestamp": now.isoformat()}
 
 
 # ─── Startup ───
@@ -154,6 +161,12 @@ def startup():
         pass  # Constraint doesn't exist or dialect doesn't support DROP CONSTRAINT IF EXISTS
     try:
         db.execute(text("ALTER TABLE users ADD COLUMN age_group VARCHAR(20)"))
+        db.commit()
+    except Exception:
+        pass  # Column already exists
+    try:
+        # H1: admin role for privileged writes (content creation)
+        db.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
         db.commit()
     except Exception:
         pass  # Column already exists

@@ -30,7 +30,7 @@ class PomodoroProvider extends ChangeNotifier {
 
   // ─── Getters ───
   bool get autoCycleEnabled {
-    if (!_isInitialized) initialize(); // fire-and-forget
+    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
     return _autoCycleEnabled;
   }
 

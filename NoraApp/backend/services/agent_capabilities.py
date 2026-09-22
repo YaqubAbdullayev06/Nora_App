@@ -1,6 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from urllib.parse import urlencode
+import secrets
+
+
+def _utcnow() -> datetime:
+    """Naive UTC now — matches naive DateTime columns and focus windows."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class AgentCapabilities:
@@ -103,7 +109,7 @@ class AgentCapabilities:
         return {"success": True, "setting": normalized, "value": converted}
 
     def focus_status(self, user_id: int, now: Optional[datetime] = None) -> dict[str, Any]:
-        current = now or datetime.utcnow()
+        current = now or _utcnow()
         focus = self._focus.get(user_id)
         active = bool(focus and focus["start_at"] <= current < focus["end_at"])
         return {
@@ -124,7 +130,7 @@ class AgentCapabilities:
         if duration <= 0 or duration > 1440:
             return {"success": False, "error": "Focus duration must be between 1 and 1440 minutes."}
 
-        now = datetime.utcnow()
+        now = _utcnow()
         start = datetime.combine(now.date(), parsed)
         if start < now:
             start += timedelta(days=1)
@@ -132,7 +138,7 @@ class AgentCapabilities:
         return self.focus_status(user_id, now)
 
     def start_focus(self, user_id: int, duration_minutes: int, label: str) -> dict[str, Any]:
-        now = datetime.utcnow()
+        now = _utcnow()
         start = (now - timedelta(seconds=1)).strftime("%H:%M")
         return self.schedule_focus(user_id, start, duration_minutes, label)
 
@@ -152,7 +158,8 @@ class AgentCapabilities:
         config = self.social_platforms.get((platform or "").strip().lower())
         if not config:
             return {"success": False, "error": "Platform is not in the approved social-media allowlist."}
-        state = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+        # H12: unpredictable CSRF state (timestamp was guessable)
+        state = secrets.token_urlsafe(32)
         normalized = platform.strip().lower()
         self._oauth_states.setdefault(user_id, {})[normalized] = state
         query = urlencode({

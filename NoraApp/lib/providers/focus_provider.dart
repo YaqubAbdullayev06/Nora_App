@@ -28,7 +28,7 @@ class FocusProvider extends ChangeNotifier {
   int get focusScore {
     if (!_isInitialized) {
       _isInitialized = true;
-      load(); // fire-and-forget
+      Future.microtask(load); // defer side effects out of build
     }
     return _focusScore;
   }
