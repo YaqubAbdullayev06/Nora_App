@@ -146,7 +146,32 @@ async def health_check():
     from datetime import timezone
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    return {"status": "healthy", "timestamp": now.isoformat()}
+    # RENDER_GIT_COMMIT is set by Render for every deploy: knowing which
+    # commit is actually live ends the "is prod running my fix?" guessing.
+    # `db` is a real SELECT so a broken database shows up here instead of as
+    # an opaque deploy failure. Always HTTP 200: a non-2xx would itself fail
+    # Render's health check and hide the reason.
+    return {
+        "status": "healthy",
+        "timestamp": now.isoformat(),
+        "commit": os.environ.get("RENDER_GIT_COMMIT") or "unknown",
+        "db": _probe_db(),
+    }
+
+
+def _first_line(exc: Exception, limit: int = 300) -> str:
+    """One usable line from an exception (SQLAlchemy messages are multiline)."""
+    return ((str(exc).splitlines() or [""])[0])[:limit]
+
+
+def _probe_db() -> str:
+    """Live connectivity check: 'ok' or '<ExceptionType>: <message>'."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return "ok"
+    except Exception as exc:
+        return f"{exc.__class__.__name__}: {_first_line(exc)}"
 
 
 # ─── Startup ───
@@ -187,7 +212,16 @@ def _add_column_if_missing(db, table: str, column: str, ddl: str) -> None:
 def startup():
     # create_all creates missing tables (incl. agent_state); it does NOT
     # alter existing tables, so existing-database columns are added below.
-    Base.metadata.create_all(bind=engine)
+    #
+    # Schema work must never kill the boot: when startup raises, Render marks
+    # the deploy Failed and keeps serving the PREVIOUS build — so the real
+    # error is only visible inside the failed deploy's own logs, while the
+    # Logs tab keeps streaming the old build's output. Log it, keep going,
+    # and let /health's `db` field report the state.
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        print(f"[startup] create_all failed ({exc.__class__.__name__}): {_first_line(exc)}")
     db = SessionLocal()
     try:
         _add_column_if_missing(db, "users", "refresh_token_family", "VARCHAR(36)")
@@ -205,6 +239,7 @@ def startup():
         seed_content(db)
     finally:
         db.close()
+    print(f"[startup] ready commit={os.environ.get('RENDER_GIT_COMMIT') or 'unknown'}")
 
 
 if __name__ == "__main__":
