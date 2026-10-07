@@ -91,12 +91,18 @@ class UsageTrackerService(private val context: Context) {
         val calendar = Calendar.getInstance()
         // End of today
         val endTime = calendar.timeInMillis
-        // Start of Monday this week
-        calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+        // Start of Monday this week (zero out time first)
         calendar.set(Calendar.HOUR_OF_DAY, 0)
         calendar.set(Calendar.MINUTE, 0)
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
+        // M26: `set(DAY_OF_WEEK, MONDAY)` depends on the locale's first day of
+        // week — with Sunday-first locales and today=Sunday it lands on a
+        // FUTURE Monday, making startTime > endTime and yielding no data.
+        // Walk backwards to the most recent Monday (today itself if Monday).
+        while (calendar.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+            calendar.add(Calendar.DAY_OF_YEAR, -1)
+        }
         val startTime = calendar.timeInMillis
 
         val stats = usageStatsManager.queryUsageStats(

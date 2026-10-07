@@ -374,12 +374,15 @@ extension AgeGroupExtension on AgeGroup {
 
 /// Determines AgeGroup from a birth date.
 AgeGroup ageGroupFromBirthDate(DateTime birthDate) {
-  final age = DateTime.now().difference(birthDate).inDays ~/ 365;
-  if (age < 2) return AgeGroup.baby;
-  if (age < 6) return AgeGroup.child;
-  if (age < 12) return AgeGroup.kid;
-  if (age < 18) return AgeGroup.teen;
-  return AgeGroup.adult;
+  // M37: calendar age — `inDays ~/ 365` drifts on leap years and ignores
+  // whether the birthday has occurred yet this year.
+  final now = DateTime.now();
+  int age = now.year - birthDate.year;
+  final birthdayPassed = now.month > birthDate.month ||
+      (now.month == birthDate.month && now.day >= birthDate.day);
+  if (!birthdayPassed) age--;
+  if (age < 0) age = 0;
+  return ageGroupFromAge(age);
 }
 
 /// Determines AgeGroup from a raw age number.

@@ -46,19 +46,22 @@ class ContentItem {
   }
 
   Map<String, dynamic> toJson() {
+    // M28: emit the snake_case keys the backend ContentCreate schema
+    // expects (image_url, content_type, duration_minutes, key_points) —
+    // the old camelCase payload silently dropped every optional field.
     return {
       'id': id,
       'title': title,
       'description': description,
       'category': category,
-      'contentType': contentType,
-      'durationMinutes': durationMinutes,
+      'content_type': contentType,
+      'duration_minutes': durationMinutes,
       'points': points,
       'tags': tags,
-      'imageUrl': imageUrl,
+      'image_url': imageUrl,
       'author': author,
       'takeaway': takeaway,
-      'keyPoints': keyPoints,
+      'key_points': keyPoints,
     };
   }
 }

@@ -25,6 +25,12 @@ class _BreakScreenState extends State<BreakScreen>
   late Animation<double> _breatheTextOpacity;
   bool _showBreatheIn = true;
   bool _breakCompleted = false;
+  /// M20: separate "handled" flag — the timer path sets [_breakCompleted]
+  /// when it *schedules* the handler, but the skip path calls the handler
+  /// directly. Without this, skipBreak() → notifyListeners → build sees
+  /// !isBreakPhase && !_breakCompleted and schedules a SECOND completion
+  /// (double recordCycleCompleted + double Navigator.pop).
+  bool _breakHandled = false;
 
   @override
   void initState() {
@@ -376,6 +382,11 @@ class _BreakScreenState extends State<BreakScreen>
   }
 
   void _handleBreakComplete(TimerProvider provider) {
+    // M20: single-fire — timer-zero path and skip path may both land here
+    if (_breakHandled) return;
+    _breakHandled = true;
+    _breakCompleted = true;
+
     final pomodoro = context.read<PomodoroProvider>();
     final isLongBreak = provider.isLongBreak;
 

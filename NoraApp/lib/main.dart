@@ -141,10 +141,23 @@ class NoraApp extends StatelessWidget {
       ],
       child: Consumer<PersonaProvider>(
         builder: (context, personaProvider, _) {
-          // Sync DesignTokensProvider with persona changes
-          context.read<DesignTokensProvider>().setPersona(personaProvider.persona);
-          // Legacy static accessor for non-widget code
-          DesignTokens.init(personaProvider.persona);
+          // M24: side effects were run synchronously inside build() —
+          // defer to after the frame so builds stay pure/idempotent.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            context
+                .read<DesignTokensProvider>()
+                .setPersona(personaProvider.persona);
+            // Legacy static accessor for non-widget code
+            DesignTokens.init(personaProvider.persona);
+            // H2: AppProvider.init() had no callers anywhere, so
+            // _weeklyAppUsage was never filled and the Stats weekly
+            // app-usage chart always rendered its placeholder week. Kick it
+            // off after the first frame; init() guards on _isInitialized, so
+            // re-running this on every persona rebuild is a no-op, and it
+            // starts the 5-minute screen-time refresh.
+            context.read<AppProvider>().init();
+          });
 
           return MaterialApp(
             title: 'Nora',
@@ -237,6 +250,12 @@ class NoraApp extends StatelessWidget {
                 case '/timer':
                   page = const TimerScreen();
                   break;
+                case '/focus':
+                  // C3: this name was pushed by predictive_blocking_screen but
+                  // never registered, so onGenerateRoute returned null and the
+                  // app crashed (release: null-check on onUnknownRoute).
+                  page = const TimerScreen();
+                  break;
                 case '/screen-time':
                   page = const ScreenTimeScreen();
                   break;
@@ -262,6 +281,17 @@ class NoraApp extends StatelessWidget {
               return FadePageRoute(
                 settings: settings,
                 pageBuilder: (_, __, ___) => page,
+              );
+            },
+            onUnknownRoute: (settings) {
+              // C3 safety net: an unregistered route name must not hard-crash
+              // the app — with no onUnknownRoute, returning null from
+              // onGenerateRoute throws in release ("null check operator used
+              // on a null value"). Send the user home and log it.
+              debugPrint('[Router] Unknown route "${settings.name}" → /main');
+              return FadePageRoute(
+                settings: settings,
+                pageBuilder: (_, __, ___) => const MainScreen(),
               );
             },
           );
@@ -306,20 +336,19 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeIn,
-        switchOutCurve: Curves.easeOut,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        },
-          child: KeyedSubtree(
-            key: ValueKey(_currentIndex),
-            child: _buildScreen(_currentIndex),
-          ),
+      // M23: IndexedStack instead of AnimatedSwitcher — switching tabs
+      // used to unmount the old screen, losing timer/plan/scroll state.
+      // IndexedStack keeps every visited tab alive (state preserved) while
+      // showing only the selected one.
+      body: IndexedStack(
+        index: _currentIndex.clamp(0, 4),
+        children: [
+          _buildScreen(0),
+          _buildScreen(1),
+          _buildScreen(2),
+          _buildScreen(3),
+          _buildScreen(4),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

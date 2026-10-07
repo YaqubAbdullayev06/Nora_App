@@ -323,7 +323,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   // ── STEP 1: Accountability Lock ──
 
   Widget _buildAccountabilityStep() {
-    final setup = context.watch<SetupProvider>();
     return _FeatureStep(
       icon: Icons.lock_outline,
       iconColor: DesignTokens.primary,
@@ -336,11 +335,14 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
         'Choose a guardian you trust',
         'Set lock duration (7–90 days)',
       ],
-      child: _buildAccountabilityPreview(setup),
+      child: Selector<SetupProvider, bool>(
+        selector: (_, p) => p.accountabilityEnabled,
+        builder: (context, enabled, _) => _buildAccountabilityPreview(enabled),
+      ),
     );
   }
 
-  Widget _buildAccountabilityPreview(SetupProvider setup) {
+  Widget _buildAccountabilityPreview(bool enabled) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -372,8 +374,8 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                 ),
               ),
               Switch(
-                value: setup.accountabilityEnabled,
-                onChanged: setup.setAccountability,
+                value: enabled,
+                onChanged: (v) => context.read<SetupProvider>().setAccountability(v),
                 activeThumbColor: DesignTokens.primary,
               ),
             ],
@@ -386,7 +388,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   // ── STEP 2: Daily Hard Cap ──
 
   Widget _buildHardCapStep() {
-    final setup = context.watch<SetupProvider>();
     return _FeatureStep(
       icon: Icons.timer_outlined,
       iconColor: DesignTokens.warning,
@@ -400,13 +401,16 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
         'Hard warning at 90% usage',
         'Full block at 100% (optional PIN)',
       ],
-      child: _buildHardCapPreview(setup),
+      child: Selector<SetupProvider, (bool, int)>(
+        selector: (_, p) => (p.hardCapEnabled, p.hardCapMinutes),
+        builder: (context, data, _) => _buildHardCapPreview(data.$1, data.$2),
+      ),
     );
   }
 
-  Widget _buildHardCapPreview(SetupProvider setup) {
-    final hours = setup.hardCapMinutes ~/ 60;
-    final minutes = setup.hardCapMinutes % 60;
+  Widget _buildHardCapPreview(bool enabled, int minutes) {
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -430,7 +434,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         )),
-                    Text('Currently: ${hours}h ${minutes}m per day',
+                    Text('Currently: ${hours}h ${remainingMinutes}m per day',
                         style: TextStyle(
                           color: DesignTokens.textMuted,
                           fontSize: 12,
@@ -439,24 +443,24 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                 ),
               ),
               Switch(
-                value: setup.hardCapEnabled,
-                onChanged: (v) => setup.setHardCap(v),
+                value: enabled,
+                onChanged: (v) => context.read<SetupProvider>().setHardCap(v),
                 activeThumbColor: DesignTokens.warning,
               ),
             ],
           ),
-          if (setup.hardCapEnabled) ...[
+          if (enabled) ...[
             const SizedBox(height: 12),
             // Quick select chips
             Row(
               children: [
-                _buildCapChip(setup, 60, '1h'),
+                _buildCapChip(60, '1h'),
                 const SizedBox(width: 8),
-                _buildCapChip(setup, 90, '1h 30m'),
+                _buildCapChip(90, '1h 30m'),
                 const SizedBox(width: 8),
-                _buildCapChip(setup, 120, '2h'),
+                _buildCapChip(120, '2h'),
                 const SizedBox(width: 8),
-                _buildCapChip(setup, 180, '3h'),
+                _buildCapChip(180, '3h'),
               ],
             ),
           ],
@@ -465,11 +469,11 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
     );
   }
 
-  Widget _buildCapChip(SetupProvider setup, int minutes, String label) {
-    final isSelected = setup.hardCapMinutes == minutes;
+  Widget _buildCapChip(int minutes, String label) {
+    final isSelected = context.select<SetupProvider, int>((p) => p.hardCapMinutes) == minutes;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setup.setHardCapMinutes(minutes),
+        onTap: () => context.read<SetupProvider>().setHardCapMinutes(minutes),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
@@ -500,7 +504,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   // ── STEP 3: Pomodoro Cycles ──
 
   Widget _buildPomodoroStep() {
-    final setup = context.watch<SetupProvider>();
     return _FeatureStep(
       icon: Icons.local_fire_department_outlined,
       iconColor: DesignTokens.accentSecondary,
@@ -514,11 +517,14 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
         'Auto-chain multiple cycles',
         'Track sessions & focus time',
       ],
-      child: _buildPomodoroPreview(setup),
+      child: Selector<SetupProvider, (bool, int)>(
+        selector: (_, p) => (p.pomodoroEnabled, p.pomodoroCycles),
+        builder: (context, data, _) => _buildPomodoroPreview(data.$1, data.$2),
+      ),
     );
   }
 
-  Widget _buildPomodoroPreview(SetupProvider setup) {
+  Widget _buildPomodoroPreview(bool enabled, int cycles) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -551,13 +557,13 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                 ),
               ),
               Switch(
-                value: setup.pomodoroEnabled,
-                onChanged: (v) => setup.setPomodoro(v),
+                value: enabled,
+                onChanged: (v) => context.read<SetupProvider>().setPomodoro(v),
                 activeThumbColor: DesignTokens.accentSecondary,
               ),
             ],
           ),
-          if (setup.pomodoroEnabled) ...[
+          if (enabled) ...[
             const SizedBox(height: 12),
             Row(
               children: [
@@ -567,11 +573,11 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                       fontSize: 13,
                     )),
                 const Spacer(),
-                _buildCycleButton(setup, -1),
+                _buildCycleButton(-1),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    '${setup.pomodoroCycles}',
+                    '$cycles',
                     style: TextStyle(
                       color: DesignTokens.textPrimary,
                       fontSize: 18,
@@ -579,17 +585,17 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                     ),
                   ),
                 ),
-                _buildCycleButton(setup, 1),
+                _buildCycleButton(1),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [2, 3, 4, 6].map((c) {
-                final isSelected = setup.pomodoroCycles == c;
+                final isSelected = cycles == c;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: GestureDetector(
-                    onTap: () => setup.setPomodoroCycles(c),
+                    onTap: () => context.read<SetupProvider>().setPomodoroCycles(c),
                     child: Container(
                       width: 40,
                       height: 32,
@@ -627,9 +633,10 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
     );
   }
 
-  Widget _buildCycleButton(SetupProvider setup, int delta) {
+  Widget _buildCycleButton(int delta) {
     return GestureDetector(
       onTap: () {
+        final setup = context.read<SetupProvider>();
         final newCycles = setup.pomodoroCycles + delta;
         if (newCycles >= 1 && newCycles <= 10) {
           setup.setPomodoroCycles(newCycles);
@@ -656,7 +663,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   // ── STEP 4: Earn Screen Time ──
 
   Widget _buildEarnScreenTimeStep() {
-    final setup = context.watch<SetupProvider>();
     return _FeatureStep(
       icon: Icons.emoji_events_outlined,
       iconColor: DesignTokens.success,
@@ -670,11 +676,14 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
         'Earn bonus minutes per completion',
         'Build positive routines',
       ],
-      child: _buildEarnPreview(setup),
+      child: Selector<SetupProvider, bool>(
+        selector: (_, p) => p.earnScreenTimeEnabled,
+        builder: (context, enabled, _) => _buildEarnPreview(enabled),
+      ),
     );
   }
 
-  Widget _buildEarnPreview(SetupProvider setup) {
+  Widget _buildEarnPreview(bool enabled) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -705,8 +714,8 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
             ),
           ),
           Switch(
-            value: setup.earnScreenTimeEnabled,
-            onChanged: setup.setEarnScreenTime,
+            value: enabled,
+            onChanged: (v) => context.read<SetupProvider>().setEarnScreenTime(v),
             activeThumbColor: DesignTokens.success,
           ),
         ],
@@ -717,80 +726,86 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   // ── STEP 5: Permissions ──
 
   Widget _buildPermissionsStep() {
-    final setup = context.watch<SetupProvider>();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: DesignTokens.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.security_rounded,
-              color: DesignTokens.primary,
-              size: 40,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Permissions',
-            style: TextStyle(
-              fontFamily: DesignTokens.fontFamilyDisplay,
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: DesignTokens.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Nora needs a few permissions to\nprotect your focus time.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              color: DesignTokens.textSecondary,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 28),
+    return Selector<SetupProvider, (bool, bool)>(
+      selector: (_, p) => (p.hardCapEnabled, p.accountabilityEnabled),
+      builder: (context, data, _) {
+        final hardCapEnabled = data.$1;
+        final accountabilityEnabled = data.$2;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: DesignTokens.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.security_rounded,
+                  color: DesignTokens.primary,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Permissions',
+                style: TextStyle(
+                  fontFamily: DesignTokens.fontFamilyDisplay,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: DesignTokens.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Nora needs a few permissions to\nprotect your focus time.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: DesignTokens.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 28),
 
-          // Permission cards
-          _buildPermissionCard(
-            icon: Icons.notifications_outlined,
-            title: 'Notifications',
-            description: 'Focus reminders & daily digest',
-            required: true,
-          ),
-          const SizedBox(height: 10),
-          _buildPermissionCard(
-            icon: Icons.phonelink_lock,
-            title: 'Usage Access',
-            description: 'Track screen time & block apps',
-            required: setup.hardCapEnabled || setup.accountabilityEnabled,
-          ),
-          const SizedBox(height: 10),
-          _buildPermissionCard(
-            icon: Icons.accessibility_new_rounded,
-            title: 'Accessibility',
-            description: 'Enable focus mode overlay',
-            required: setup.accountabilityEnabled,
-          ),
+              // Permission cards
+              _buildPermissionCard(
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                description: 'Focus reminders & daily digest',
+                required: true,
+              ),
+              const SizedBox(height: 10),
+              _buildPermissionCard(
+                icon: Icons.phonelink_lock,
+                title: 'Usage Access',
+                description: 'Track screen time & block apps',
+                required: hardCapEnabled || accountabilityEnabled,
+              ),
+              const SizedBox(height: 10),
+              _buildPermissionCard(
+                icon: Icons.accessibility_new_rounded,
+                title: 'Accessibility',
+                description: 'Enable focus mode overlay',
+                required: accountabilityEnabled,
+              ),
 
-          const SizedBox(height: 24),
-          Text(
-            'You can grant or revoke these anytime in Settings.',
-            style: TextStyle(
-              fontSize: 12,
-              color: DesignTokens.textMuted,
-              fontStyle: FontStyle.italic,
-            ),
+              const SizedBox(height: 24),
+              Text(
+                'You can grant or revoke these anytime in Settings.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: DesignTokens.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

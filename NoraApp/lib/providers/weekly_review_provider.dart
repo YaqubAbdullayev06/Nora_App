@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/utils/week_utils.dart';
 import '../models/models.dart';
 import 'focus_provider.dart';
 import 'persona_provider.dart';
@@ -21,8 +22,10 @@ class WeeklyReviewProvider extends ChangeNotifier {
   List<WeeklyReview> get weeklyReviewHistory => _weeklyReviewHistory;
 
   DateTime get _currentWeekStart {
-    final now = DateTime.now();
-    return now.subtract(Duration(days: now.weekday - 1));
+    // C2/M1: local midnight of this week's Monday (see core/utils/week_utils)
+    // — stable across calls so the equality memo below works. A time-of-day
+    // component made every call look like a new week and wiped the review.
+    return startOfWeek(DateTime.now());
   }
 
   DateTime get _currentWeekEnd {
@@ -31,23 +34,24 @@ class WeeklyReviewProvider extends ChangeNotifier {
   }
 
   WeeklyReview getOrCreateCurrentWeeklyReview() {
-    if (_currentWeeklyReview != null &&
-        _currentWeeklyReview!.weekStart == _currentWeekStart) {
-      return _currentWeeklyReview!;
+    final weekStart = _currentWeekStart;
+    final existing = _currentWeeklyReview;
+    if (existing != null && existing.weekStart == weekStart) {
+      return existing;
     }
 
     // Filter sessions once for both totalSessions and totalPointsEarned
     final weekEnd = _currentWeekEnd.add(const Duration(days: 1));
     final weekSessions = _focusProvider.sessions
         .where((s) =>
-            s.startTime.isAfter(_currentWeekStart) &&
+            !s.startTime.isBefore(weekStart) &&
             s.startTime.isBefore(weekEnd) &&
             s.completed)
         .toList();
 
     _currentWeeklyReview = WeeklyReview(
-      id: 'review_${_currentWeekStart.millisecondsSinceEpoch}',
-      weekStart: _currentWeekStart,
+      id: 'review_${weekStart.millisecondsSinceEpoch}',
+      weekStart: weekStart,
       weekEnd: _currentWeekEnd,
       reflections: [],
       goals: WeeklyReview.getDefaultGoals(_personaProvider.ageGroup),
@@ -59,7 +63,7 @@ class WeeklyReviewProvider extends ChangeNotifier {
       streakDays: _focusProvider.computedStreakDays,
       createdAt: DateTime.now(),
     );
-    notifyListeners();
+    // C2: no notifyListeners() — this runs inside build(). Mutators notify.
     return _currentWeeklyReview!;
   }
 

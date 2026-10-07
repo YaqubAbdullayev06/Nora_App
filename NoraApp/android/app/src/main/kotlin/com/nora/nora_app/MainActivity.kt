@@ -46,10 +46,15 @@ class MainActivity : FlutterActivity() {
 						result.success(null)
 					}
 					"selectApps" -> {
-						getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
-							.edit()
-							.putStringSet(BLOCKED_PACKAGES_KEY, DEFAULT_BLOCKED_PACKAGES)
-							.apply()
+						// M31: only seed the default blocklist the FIRST time —
+						// the old code overwrote the user's custom selection with
+						// DEFAULT_BLOCKED_PACKAGES on every call.
+						val prefs = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+						if (!prefs.contains(BLOCKED_PACKAGES_KEY)) {
+							prefs.edit()
+								.putStringSet(BLOCKED_PACKAGES_KEY, DEFAULT_BLOCKED_PACKAGES)
+								.apply()
+						}
 						startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
 						result.success(focusProtectionStatus())
 					}

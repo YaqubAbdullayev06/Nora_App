@@ -5,8 +5,8 @@ Focus session & content routes — CRUD for focus sessions, content, focus score
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, Integer, cast
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from core.database import get_db
@@ -64,8 +64,9 @@ def create_session(
 
 @router.get("/sessions/", response_model=List[SessionResponse])
 def get_user_sessions(
-    limit: int = 50,
-    offset: int = 0,
+    # M3: bound pagination — unbounded limit/offset allowed huge scans / negative values
+    limit: int = Query(50, ge=1, le=200, description="Max sessions to return"),
+    offset: int = Query(0, ge=0, description="Sessions to skip"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -129,6 +130,7 @@ def create_content(
         duration_minutes=content.duration_minutes,
         points=content.points,
         url=content.url,
+        image_url=content.image_url,
         tags=",".join(content.tags) if content.tags else None,
     )
     db.add(new_content)
@@ -140,25 +142,40 @@ def create_content(
 # ─── Focus Score ───
 
 
+def focus_score_aggregates():
+    """The four aggregate columns behind GET /focus-score/.
+
+    Kept at module level so tests can compile the statement against the
+    PostgreSQL dialect — C1: `CAST(boolean AS INTEGER)` is invalid on
+    PostgreSQL (it is silently accepted by SQLite/MySQL, which is why the
+    test suite never caught the 500 we saw in production). A portable
+    CASE expression behaves the same on every dialect.
+    """
+    completed_minutes = case(
+        (SessionModel.completed == True, SessionModel.duration_minutes),
+        else_=0,
+    )
+    completed_flag = case((SessionModel.completed == True, 1), else_=0)
+
+    return (
+        func.coalesce(func.sum(SessionModel.points_earned), 0).label("total_points"),
+        func.coalesce(func.sum(completed_minutes), 0).label("total_minutes"),
+        func.count(SessionModel.id).label("total_sessions"),
+        func.coalesce(func.sum(completed_flag), 0).label("completed_count"),
+    )
+
+
 @router.get("/focus-score/", response_model=FocusScoreResponse)
 def get_focus_score(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     """Get focus score using SQL aggregation (no full table load)."""
-    result = db.query(
-        func.coalesce(func.sum(SessionModel.points_earned), 0).label("total_points"),
-        func.coalesce(
-            func.sum(
-                cast(SessionModel.completed, Integer) * SessionModel.duration_minutes
-            ),
-            0,
-        ).label("total_minutes"),
-        func.count(SessionModel.id).label("total_sessions"),
-        func.coalesce(
-            func.sum(cast(SessionModel.completed, Integer)), 0
-        ).label("completed_count"),
-    ).filter(SessionModel.user_id == current_user.id).first()
+    result = (
+        db.query(*focus_score_aggregates())
+        .filter(SessionModel.user_id == current_user.id)
+        .first()
+    )
 
     total_points = result.total_points
     total_minutes = result.total_minutes

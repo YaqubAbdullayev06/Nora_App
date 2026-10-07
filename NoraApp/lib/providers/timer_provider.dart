@@ -22,6 +22,10 @@ class TimerProvider extends ChangeNotifier {
   /// Duration of the last completed focus session (in seconds).
   /// Saved before _totalTimerSeconds is overwritten by break duration.
   int _lastFocusDurationSeconds = 0;
+  /// M21: last focus duration chosen via [setTimerDuration] (in seconds).
+  /// Without this, completeBreak() resets to the age-group default and
+  /// silently discards the user's custom session length every cycle.
+  int? _customFocusDurationSeconds;
 
   TimerProvider({required PersonaProvider personaProvider})
       : _personaProvider = personaProvider {
@@ -62,6 +66,7 @@ class TimerProvider extends ChangeNotifier {
   void Function(FocusSession session)? onSessionCompleted;
 
   void setTimerDuration(int minutes) {
+    _customFocusDurationSeconds = minutes * 60; // M21: remember custom length
     _totalTimerSeconds = minutes * 60;
     _timerSeconds = _totalTimerSeconds;
     if (_isBreakPhase) {
@@ -104,7 +109,12 @@ class TimerProvider extends ChangeNotifier {
   void resetTimer() {
     _isTimerRunning = false;
     _timer?.cancel();
+
+    // Restore to the intended focus duration, not the current phase duration (e.g. break)
+    _totalTimerSeconds = _customFocusDurationSeconds ??
+        _personaProvider.ageGroup.defaultFocusMinutes * 60;
     _timerSeconds = _totalTimerSeconds;
+
     unawaited(_focusProtection.disableBlocking());
     notifyListeners();
   }
@@ -170,7 +180,9 @@ class TimerProvider extends ChangeNotifier {
       _completedSessionsInCycle = 0;
     }
 
-    _timerSeconds = _personaProvider.ageGroup.defaultFocusMinutes * 60;
+    // M21: restore the user's custom duration (if any), not just the default
+    _timerSeconds = _customFocusDurationSeconds ??
+        _personaProvider.ageGroup.defaultFocusMinutes * 60;
     _totalTimerSeconds = _timerSeconds;
 
     _vibrate();

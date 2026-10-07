@@ -25,18 +25,23 @@ class Habit {
   });
 
   factory Habit.fromJson(Map<String, dynamic> json) {
+    // M38: defensive casts — server fields may arrive as String/double/null
+    // and a malformed created_at must not crash the whole habit list.
+    final target = (json['target_per_day'] as num?)?.toInt() ?? 1;
+    final active = json['is_active'];
     return Habit(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? '',
-      category: json['category'] ?? 'general',
-      icon: json['icon'] ?? 'check_circle',
-      color: json['color'] ?? '#4CAF50',
-      screenTimeMinutes: json['screen_time_minutes'] ?? 15,
-      targetPerDay: json['target_per_day'] ?? 1,
-      isActive: json['is_active'] ?? true,
-      completionsToday: json['completions_today'] ?? 0,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
+      id: (json['id'] as num?)?.toInt() ?? int.tryParse('${json['id']}') ?? 0,
+      name: json['name'] is String ? json['name'] as String : '',
+      category: json['category'] is String ? json['category'] as String : 'general',
+      icon: json['icon'] is String ? json['icon'] as String : 'check_circle',
+      color: json['color'] is String ? json['color'] as String : '#4CAF50',
+      screenTimeMinutes: (json['screen_time_minutes'] as num?)?.toInt() ?? 15,
+      // Guard: target < 1 would make isCompletedToday always true
+      targetPerDay: target > 0 ? target : 1,
+      isActive: active is bool ? active : true,
+      completionsToday: (json['completions_today'] as num?)?.toInt() ?? 0,
+      createdAt: json['created_at'] is String
+          ? DateTime.tryParse(json['created_at'] as String)
           : null,
     );
   }

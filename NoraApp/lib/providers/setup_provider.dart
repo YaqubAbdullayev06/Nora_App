@@ -14,6 +14,7 @@ class SetupProvider extends ChangeNotifier {
 
   final _storage = const FlutterSecureStorage();
 
+  bool _disposed = false;
   bool _isCompleted = false;
   bool _accountabilityEnabled = false;
   bool _hardCapEnabled = false;
@@ -24,17 +25,52 @@ class SetupProvider extends ChangeNotifier {
   bool _permissionsGranted = false;
   bool _isInitialized = false;
 
+  /// M33: every getter lazily kicks off load() — previously only
+  /// [isCompleted] did, so other getters returned defaults until (or
+  /// unless) something else happened to call initialize().
+  void _ensureInitialized() {
+    if (!_isInitialized) Future.microtask(initialize);
+  }
+
   bool get isCompleted {
-    if (!_isInitialized) Future.microtask(initialize); // defer side effects out of build
+    _ensureInitialized();
     return _isCompleted;
   }
-  bool get accountabilityEnabled => _accountabilityEnabled;
-  bool get hardCapEnabled => _hardCapEnabled;
-  int get hardCapMinutes => _hardCapMinutes;
-  bool get pomodoroEnabled => _pomodoroEnabled;
-  int get pomodoroCycles => _pomodoroCycles;
-  bool get earnScreenTimeEnabled => _earnScreenTimeEnabled;
-  bool get permissionsGranted => _permissionsGranted;
+
+  bool get accountabilityEnabled {
+    _ensureInitialized();
+    return _accountabilityEnabled;
+  }
+
+  bool get hardCapEnabled {
+    _ensureInitialized();
+    return _hardCapEnabled;
+  }
+
+  int get hardCapMinutes {
+    _ensureInitialized();
+    return _hardCapMinutes;
+  }
+
+  bool get pomodoroEnabled {
+    _ensureInitialized();
+    return _pomodoroEnabled;
+  }
+
+  int get pomodoroCycles {
+    _ensureInitialized();
+    return _pomodoroCycles;
+  }
+
+  bool get earnScreenTimeEnabled {
+    _ensureInitialized();
+    return _earnScreenTimeEnabled;
+  }
+
+  bool get permissionsGranted {
+    _ensureInitialized();
+    return _permissionsGranted;
+  }
 
   /// Load saved state from secure storage.
   Future<void> initialize() async {
@@ -52,7 +88,7 @@ class SetupProvider extends ChangeNotifier {
     _pomodoroCycles = int.tryParse(await _storage.read(key: _keyPomodoroCycles) ?? '') ?? 3;
     _earnScreenTimeEnabled = (await _storage.read(key: _keyEarnScreenTime)) == 'true';
     _permissionsGranted = (await _storage.read(key: _keyPermissions)) == 'true';
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   void setAccountability(bool value) {
@@ -105,13 +141,19 @@ class SetupProvider extends ChangeNotifier {
       _storage.write(key: _keyPermissions, value: _permissionsGranted.toString()),
     ]);
     _isCompleted = true;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   /// Reset wizard (for re-entry from settings).
   Future<void> reset() async {
     await _storage.write(key: _keyCompleted, value: 'false');
     _isCompleted = false;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

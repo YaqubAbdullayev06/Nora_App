@@ -60,6 +60,7 @@ class BreathingProvider extends ChangeNotifier {
 
   /// Start a breathing session with the given pattern and duration.
   void startSession(BreathingPattern pattern, int durationMinutes) {
+    _phaseTimer?.cancel(); // Ensure any existing timer is killed before starting a new one
     _selectedPattern = pattern;
     _sessionDurationMinutes = durationMinutes;
     _currentPhaseIndex = 0;

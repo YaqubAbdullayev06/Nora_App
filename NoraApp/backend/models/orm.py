@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import relationship
@@ -67,6 +68,8 @@ class ContentModel(Base):
     duration_minutes = Column(Integer, nullable=False)
     points = Column(Integer, default=0)
     url = Column(String(500), nullable=True)
+    # M28: cover image for content cards
+    image_url = Column(String(500), nullable=True)
     tags = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
@@ -165,4 +168,19 @@ class HabitCompletionModel(Base):
     screen_time_earned = Column(Integer, default=0)
 
     habit = relationship("HabitModel")
+    user = relationship("UserModel")
+
+
+class AgentStateModel(Base):
+    """M13: persisted per-user agent state (key-value), replaces in-memory-only state."""
+
+    __tablename__ = "agent_state"
+    __table_args__ = (UniqueConstraint("user_id", "state_key", name="uq_agent_state_user_key"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    state_key = Column(String(100), nullable=False)
+    state_value = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     user = relationship("UserModel")

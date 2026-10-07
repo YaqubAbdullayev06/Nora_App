@@ -8,6 +8,7 @@ import 'api_service.dart';
 class ConnectivityService extends ChangeNotifier {
   final ApiService _api = ApiService();
 
+  bool _disposed = false;
   bool _isConnected = true;
   bool _isChecking = false;
   Timer? _checkTimer;
@@ -53,11 +54,11 @@ class ConnectivityService extends ChangeNotifier {
 
       // Notify listeners only if status changed
       if (wasConnected != _isConnected) {
-        notifyListeners();
+        if (!_disposed) notifyListeners();
       }
     } catch (e) {
       _isConnected = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     } finally {
       _isChecking = false;
     }
@@ -66,6 +67,7 @@ class ConnectivityService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _checkTimer?.cancel();
     super.dispose();
   }

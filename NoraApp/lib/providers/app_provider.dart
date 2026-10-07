@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/enums/age_group.dart';
 import '../core/constants/design_tokens.dart';
 import '../core/theme/persona_theme.dart';
+import '../core/utils/week_utils.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/agent_api.dart';
@@ -29,6 +30,8 @@ class AppProvider extends ChangeNotifier {
   final FocusProtectionService _focusProtection = FocusProtectionService();
   final ScreenTimeService _screenTimeService = ScreenTimeService();
   final FlutterSecureStorage _planStorage = const FlutterSecureStorage();
+
+  bool _disposed = false;
   Timer? _screenTimeRefreshTimer;
   bool _isInitialized = false;
 
@@ -99,11 +102,13 @@ class AppProvider extends ChangeNotifier {
     required String startTime,
     required int durationMinutes,
     String label = 'Focus session',
+    int? tzOffsetMinutes,
   }) {
     return _api.scheduleAgentFocus(
       startTime: startTime,
       durationMinutes: durationMinutes,
       label: label,
+      tzOffsetMinutes: tzOffsetMinutes,
     );
   }
 
@@ -122,15 +127,24 @@ class AppProvider extends ChangeNotifier {
     return _api.readAgentDeviceSetting(setting);
   }
 
+  /// M11 step 1: propose a setting change, get a short-lived approval token.
+  Future<Map<String, dynamic>> proposeAgentDeviceSetting({
+    required String setting,
+    required dynamic value,
+  }) {
+    return _api.proposeAgentDeviceSetting(setting: setting, value: value);
+  }
+
+  /// M11 step 2: apply the change with the server-issued approval token.
   Future<Map<String, dynamic>> updateAgentDeviceSetting({
     required String setting,
     required dynamic value,
-    required bool userApproved,
+    required String approvalToken,
   }) {
     return _api.updateAgentDeviceSetting(
       setting: setting,
       value: value,
-      userApproved: userApproved,
+      approvalToken: approvalToken,
     );
   }
 
@@ -148,13 +162,16 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
+  /// M14: [state] comes from [startAgentSocialOAuth] (single-use CSRF token).
   Future<Map<String, dynamic>> connectAgentSocialAccount({
     required String platform,
     required String accountId,
+    required String state,
   }) {
     return _api.connectAgentSocialAccount(
       platform: platform,
       accountId: accountId,
+      state: state,
     );
   }
 
@@ -235,8 +252,11 @@ class AppProvider extends ChangeNotifier {
   List<WeeklyReview> get weeklyReviewHistory => _weeklyReviewHistory;
 
   DateTime get _currentWeekStart {
-    final now = DateTime.now();
-    return now.subtract(Duration(days: now.weekday - 1));
+    // C2/M1: local midnight of this week's Monday (see core/utils/week_utils).
+    // Truncating the time-of-day keeps the value stable across calls — the memo
+    // key below is compared for equality, so a time-of-day component made every
+    // call look like a new week and wiped the review.
+    return startOfWeek(DateTime.now());
   }
 
   DateTime get _currentWeekEnd {
@@ -245,28 +265,29 @@ class AppProvider extends ChangeNotifier {
   }
 
   WeeklyReview getOrCreateCurrentWeeklyReview() {
-    if (_currentWeeklyReview != null &&
-        _currentWeeklyReview!.weekStart == _currentWeekStart) {
-      return _currentWeeklyReview!;
+    final weekStart = _currentWeekStart;
+    final existing = _currentWeeklyReview;
+    if (existing != null && existing.weekStart == weekStart) {
+      return existing;
     }
 
     _currentWeeklyReview = WeeklyReview(
-      id: 'review_${_currentWeekStart.millisecondsSinceEpoch}',
-      weekStart: _currentWeekStart,
+      id: 'review_${weekStart.millisecondsSinceEpoch}',
+      weekStart: weekStart,
       weekEnd: _currentWeekEnd,
       reflections: [],
       goals: WeeklyReview.getDefaultGoals(_ageGroup),
       totalFocusMinutes: weeklyFocusMinutes.fold(0, (a, b) => a + b),
       totalSessions: _sessions
           .where((s) =>
-              s.startTime.isAfter(_currentWeekStart) &&
+              !s.startTime.isBefore(weekStart) &&
               s.startTime
                   .isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
               s.completed)
           .length,
       totalPointsEarned: _sessions
           .where((s) =>
-              s.startTime.isAfter(_currentWeekStart) &&
+              !s.startTime.isBefore(weekStart) &&
               s.startTime
                   .isBefore(_currentWeekEnd.add(const Duration(days: 1))) &&
               s.completed)
@@ -274,7 +295,10 @@ class AppProvider extends ChangeNotifier {
       streakDays: computedStreakDays,
       createdAt: DateTime.now(),
     );
-    notifyListeners();
+    // C2: deliberately NO notifyListeners() here — this is called from
+    // build(). Notifying there throws "setState() called during build" in
+    // debug and re-dirties the root scope (rebuild loop) in release. Every
+    // mutator below assigns a new review and notifies on its own.
     return _currentWeeklyReview!;
   }
 
@@ -434,25 +458,8 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Weekly Data ───
 
-  List<int> get weeklyFocusMinutes {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-
-    final List<int> minutes = List.filled(7, 0);
-    for (final session in _sessions) {
-      if (!session.completed) continue;
-      final sessionDate = DateTime(
-        session.startTime.year,
-        session.startTime.month,
-        session.startTime.day,
-      );
-      final dayIndex = sessionDate.difference(startOfWeek).inDays;
-      if (dayIndex >= 0 && dayIndex < 7) {
-        minutes[dayIndex] += session.durationMinutes;
-      }
-    }
-    return minutes;
-  }
+  List<int> get weeklyFocusMinutes =>
+      weeklyMinutesByDay(_sessions, DateTime.now());
 
   /// Returns the most used app for each day of the current week.
   /// Each entry contains [appName], [minutes], and [category].
@@ -497,8 +504,11 @@ class AppProvider extends ChangeNotifier {
     await refreshScreenTime();
     _startScreenTimeRefresh();
 
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
+
+  /// Whether [init] has run (screen-time data loaded, refresh timer running).
+  bool get isInitialized => _isInitialized;
 
   Future<void> refreshScreenTime() async {
     try {
@@ -510,7 +520,7 @@ class AppProvider extends ChangeNotifier {
       // Refresh weekly app usage data
       _weeklyAppUsage = await _screenTimeService.getWeeklyAppUsage();
 
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     } catch (e) {
       debugPrint('Failed to refresh screen time: $e');
     }
@@ -543,12 +553,12 @@ class AppProvider extends ChangeNotifier {
       _currentUser = User.fromJson(data['user']);
       setAgeGroup(_currentUser!.ageGroup);
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     }
   }
@@ -570,12 +580,12 @@ class AppProvider extends ChangeNotifier {
       setAgeGroup(ageGroup);
       _currentUser = _currentUser!.copyWith(ageGroup: ageGroup);
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     }
   }
@@ -591,8 +601,11 @@ class AppProvider extends ChangeNotifier {
     _sessions = [];
     _screenTimeRefreshTimer?.cancel();
     _screenTimeTodayMinutes = 0;
+    // M34: allow re-init after logout — otherwise the screen-time refresh
+    // timer and init() never run again for the next account
+    _isInitialized = false;
     await _api.clearAuth();
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   void lockApp() {
@@ -704,7 +717,7 @@ class AppProvider extends ChangeNotifier {
             DateTime(stored.date.year, stored.date.month, stored.date.day);
         if (storedDay.isAtSameMomentAs(today)) {
           _todayPlan = stored;
-          notifyListeners();
+          if (!_disposed) notifyListeners();
           return;
         }
       }
@@ -721,7 +734,7 @@ class AppProvider extends ChangeNotifier {
       eveningReflected: false,
       pointsEarned: 0,
     );
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   Future<void> _persistPlanToday() async {
@@ -827,7 +840,7 @@ class AppProvider extends ChangeNotifier {
         _planHistory = list
             .map((e) => DailyPlan.fromJson(e as Map<String, dynamic>))
             .toList();
-        notifyListeners();
+        if (!_disposed) notifyListeners();
       }
     } catch (e) {
       debugPrint('AppProvider: failed to restore plan history: $e');
@@ -838,6 +851,7 @@ class AppProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _screenTimeRefreshTimer?.cancel();
     super.dispose();
   }

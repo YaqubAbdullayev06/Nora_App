@@ -28,6 +28,8 @@ class UsageTrackerService {
       if (!success) return null;
 
       return UsageStatsSummary.fromMap(Map<String, dynamic>.from(result));
+    } on MissingPluginException {
+      return null; // M30: channel not registered
     } on PlatformException catch (e) {
       debugPrint('UsageTracker getUsageStats failed: ${e.message}');
       return null;
@@ -45,6 +47,8 @@ class UsageTrackerService {
       if (!success) return null;
 
       return UsageStatsSummary.fromMap(Map<String, dynamic>.from(result));
+    } on MissingPluginException {
+      return null; // M30
     } on PlatformException catch (e) {
       debugPrint('UsageTracker getTodayUsage failed: ${e.message}');
       return null;
@@ -62,6 +66,8 @@ class UsageTrackerService {
       if (result == null) return {'success': false};
 
       return Map<String, dynamic>.from(result as Map);
+    } on MissingPluginException {
+      return {'success': false}; // M30
     } on PlatformException catch (e) {
       debugPrint('UsageTracker getAppUsage failed: ${e.message}');
       return {'success': false, 'error': e.message};

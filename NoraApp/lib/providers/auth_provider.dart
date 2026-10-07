@@ -9,6 +9,7 @@ class AuthProvider extends ChangeNotifier {
   final ApiService _api;
   final PersonaProvider _personaProvider;
 
+  bool _disposed = false;
   User? _currentUser;
   bool _isLoading = false;
   String? _error;
@@ -32,11 +33,11 @@ class AuthProvider extends ChangeNotifier {
       final data = await _api.getMe();
       _currentUser = User.fromJson(data);
       _personaProvider.setAgeGroup(_currentUser!.ageGroup);
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     } catch (e) {
       // Token invalid or expired — user must log in
       _currentUser = null;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -50,12 +51,12 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = User.fromJson(data['user']);
       _personaProvider.setAgeGroup(_currentUser!.ageGroup);
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     }
   }
@@ -81,12 +82,12 @@ class AuthProvider extends ChangeNotifier {
       _personaProvider.setAgeGroup(ageGroup);
       _currentUser = _currentUser!.copyWith(ageGroup: ageGroup);
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     }
   }
@@ -97,7 +98,7 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = false;
     _error = null;
     await _api.clearAuth();
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   void lockApp() {
@@ -113,17 +114,18 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void updateProfile({required String name}) {
-    if (_currentUser != null) {
-      _currentUser = _currentUser!.copyWith(name: name);
-    } else {
-      _currentUser = User(
-        id: '1',
-        email: 'explorer@nora.app',
-        name: name,
-        ageGroup: _personaProvider.ageGroup,
-        createdAt: DateTime.now(),
-      );
+    if (_currentUser == null) {
+      _error = "You must be logged in to update your profile.";
+      if (!_disposed) notifyListeners();
+      return;
     }
-    notifyListeners();
+    _currentUser = _currentUser!.copyWith(name: name);
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

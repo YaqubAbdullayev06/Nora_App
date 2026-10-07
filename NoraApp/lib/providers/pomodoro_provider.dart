@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -12,6 +13,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class PomodoroProvider extends ChangeNotifier {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   bool _isInitialized = false;
+  Timer? _dayCheckTimer;
+  /// M35: mutation epoch so a stale async `_loadLocal` can't clobber
+  /// toggles the user made while the load was in flight.
+  int _mutationEpoch = 0;
 
   // ─── State ───
   bool _autoCycleEnabled = false;
@@ -54,13 +59,25 @@ class PomodoroProvider extends ChangeNotifier {
     _isInitialized = true;
     await _loadLocal();
     await _checkDailyReset();
+    _startDayWatch();
     notifyListeners();
+  }
+
+  /// M15: rollover check while the app stays open past midnight —
+  /// `_checkDailyReset` previously ran only once, during initialize().
+  void _startDayWatch() {
+    _dayCheckTimer?.cancel();
+    _dayCheckTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkDailyReset(),
+    );
   }
 
   // ─── Configuration ───
 
   /// Toggle auto-cycle on/off.
   Future<void> toggleAutoCycle() async {
+    _mutationEpoch++; // M35
     _autoCycleEnabled = !_autoCycleEnabled;
     await _saveLocal();
     notifyListeners();
@@ -68,6 +85,7 @@ class PomodoroProvider extends ChangeNotifier {
 
   /// Set the target number of cycles.
   Future<void> setTargetCycles(int cycles) async {
+    _mutationEpoch++; // M35
     _targetCycles = cycles.clamp(1, 10);
     await _saveLocal();
     notifyListeners();
@@ -77,6 +95,7 @@ class PomodoroProvider extends ChangeNotifier {
 
   /// Record a completed focus session.
   void recordSession(int minutes) {
+    _mutationEpoch++; // M35
     _totalSessionsToday++;
     _totalFocusMinutesToday += minutes;
     _saveLocal();
@@ -85,6 +104,7 @@ class PomodoroProvider extends ChangeNotifier {
 
   /// Record a completed cycle (after long break).
   void recordCycleCompleted() {
+    _mutationEpoch++; // M35
     _completedCycles++;
     _saveLocal();
     notifyListeners();
@@ -92,6 +112,7 @@ class PomodoroProvider extends ChangeNotifier {
 
   /// Reset all daily stats (new day or manual reset).
   void resetDailyStats() {
+    _mutationEpoch++; // M35
     _completedCycles = 0;
     _totalSessionsToday = 0;
     _totalFocusMinutesToday = 0;
@@ -102,6 +123,7 @@ class PomodoroProvider extends ChangeNotifier {
   // ─── Private Methods ───
 
   Future<void> _checkDailyReset() async {
+    _mutationEpoch++; // M35
     final savedDate = await _storage.read(key: _lastDateKey);
     final today = DateTime.now().toIso8601String().substring(0, 10);
 
@@ -119,24 +141,25 @@ class PomodoroProvider extends ChangeNotifier {
   // ─── Local Storage ───
 
   Future<void> _loadLocal() async {
+    // M35: collect reads first; assign only if no mutation happened meanwhile
+    final epoch = _mutationEpoch;
     try {
       final autoCycle = await _storage.read(key: _autoCycleKey);
-      _autoCycleEnabled = autoCycle == 'true';
-
       final targetStr = await _storage.read(key: _targetCyclesKey);
-      if (targetStr != null) _targetCycles = int.tryParse(targetStr) ?? 1;
-
       final completedStr = await _storage.read(key: _completedCyclesKey);
+      final sessionsStr = await _storage.read(key: _totalSessionsKey);
+      final focusStr = await _storage.read(key: _totalFocusKey);
+
+      if (epoch != _mutationEpoch) return; // stale — discard
+
+      _autoCycleEnabled = autoCycle == 'true';
+      if (targetStr != null) _targetCycles = int.tryParse(targetStr) ?? 1;
       if (completedStr != null) {
         _completedCycles = int.tryParse(completedStr) ?? 0;
       }
-
-      final sessionsStr = await _storage.read(key: _totalSessionsKey);
       if (sessionsStr != null) {
         _totalSessionsToday = int.tryParse(sessionsStr) ?? 0;
       }
-
-      final focusStr = await _storage.read(key: _totalFocusKey);
       if (focusStr != null) {
         _totalFocusMinutesToday = int.tryParse(focusStr) ?? 0;
       }
@@ -160,5 +183,11 @@ class PomodoroProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('PomodoroProvider: failed to save: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _dayCheckTimer?.cancel();
+    super.dispose();
   }
 }

@@ -41,41 +41,54 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<PersonaProvider, AuthProvider>(
-      builder: (context, personaProvider, authProvider, _) {
-        final focusProvider = context.watch<FocusProvider>();
-        return Scaffold(
-          backgroundColor: DesignTokens.background,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(DesignTokens.spacing20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  HomeHeader(personaProvider: personaProvider, authProvider: authProvider),
-                  const SizedBox(height: DesignTokens.spacing24),
+    return Scaffold(
+      backgroundColor: DesignTokens.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(DesignTokens.spacing20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              HomeHeader(personaProvider: context.read<PersonaProvider>(), authProvider: context.read<AuthProvider>()),
+              const SizedBox(height: DesignTokens.spacing24),
 
-                  // Smart Insight (if available)
-                  if (_smartSummary != null) ...[
-                    HomeInsight(summary: _smartSummary!),
-                    const SizedBox(height: DesignTokens.spacing24),
-                  ],
+              // Smart Insight (if available)
+              _buildSmartInsight(context),
+              const SizedBox(height: DesignTokens.spacing24),
 
-                  // Stats
-                  HomeStats(personaProvider: personaProvider, focusProvider: focusProvider),
-                  const SizedBox(height: DesignTokens.spacing24),
-
-                  // Quick Actions
-                  HomeActions(personaProvider: personaProvider, onPlanTap: widget.onPlanTap),
-                  const SizedBox(height: DesignTokens.spacing24),
-
-                  // Motivation
-                  HomeMotivation(personaProvider: personaProvider),
-                ],
+              // Stats - Wrapped in Selector to prevent entire screen rebuilds on FocusProvider updates
+              Selector<FocusProvider, FocusProvider>(
+                selector: (_, provider) => provider,
+                builder: (context, focusProvider, _) {
+                  return HomeStats(personaProvider: context.read<PersonaProvider>(), focusProvider: focusProvider);
+                },
               ),
-            ),
+              const SizedBox(height: DesignTokens.spacing24),
+
+              // Quick Actions
+              HomeActions(personaProvider: context.read<PersonaProvider>(), onPlanTap: widget.onPlanTap),
+              const SizedBox(height: DesignTokens.spacing24),
+
+              // Motivation
+              HomeMotivation(personaProvider: context.read<PersonaProvider>()),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmartInsight(BuildContext context) {
+    return Selector<FocusProvider, SmartSummary?>(
+      selector: (_, provider) => provider.todaySummary,
+      builder: (context, summary, _) {
+        if (summary == null) return const SizedBox.shrink();
+        return Column(
+          children: [
+            HomeInsight(summary: summary),
+            const SizedBox(height: DesignTokens.spacing24),
+          ],
         );
       },
     );

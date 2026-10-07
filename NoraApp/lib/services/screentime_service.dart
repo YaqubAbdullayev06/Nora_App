@@ -70,6 +70,9 @@ class ScreenTimeService {
       } else if (_platform == ScreenTimePlatform.ios) {
         return await _checkIOSPermission();
       }
+    } on MissingPluginException {
+      // M30: channel not registered (e.g. tests / unsupported platform)
+      return ScreenTimePermission.unavailable;
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] Permission check failed: ${e.message}');
     }
@@ -87,6 +90,8 @@ class ScreenTimeService {
       } else if (_platform == ScreenTimePlatform.ios) {
         return await _requestIOSPermission();
       }
+    } on MissingPluginException {
+      return ScreenTimePermission.unavailable; // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] Permission request failed: ${e.message}');
     }
@@ -147,6 +152,8 @@ class ScreenTimeService {
       if (result['success'] != true) return null;
 
       return UsageStatsSummary.fromMap(Map<String, dynamic>.from(result));
+    } on MissingPluginException {
+      return null; // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] getUsageStats failed: ${e.message}');
       return null;
@@ -165,6 +172,8 @@ class ScreenTimeService {
       if (result['success'] != true) return null;
 
       return UsageStatsSummary.fromMap(Map<String, dynamic>.from(result));
+    } on MissingPluginException {
+      return null; // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] getTodayUsage failed: ${e.message}');
       return null;
@@ -201,13 +210,21 @@ class ScreenTimeService {
           iconPath: iconPath,
         );
       }).toList();
+    } on MissingPluginException {
+      return _emptyWeek(); // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] getWeeklyAppUsage failed: ${e.message}');
-      return List.generate(7, (i) => WeeklyAppUsage(
-        dayIndex: i, appName: '', minutes: 0, category: '', iconPath: '',
-      ));
+      return _emptyWeek();
     }
   }
+
+  List<WeeklyAppUsage> _emptyWeek() => List.generate(7, (i) => WeeklyAppUsage(
+        dayIndex: i,
+        appName: '',
+        minutes: 0,
+        category: '',
+        iconPath: '',
+      ));
 
   /// Maps app name / category to a local SVG icon path.
   String _iconPathForApp(String appName, String category) {
@@ -239,6 +256,8 @@ class ScreenTimeService {
       );
       if (result == null) return null;
       return Map<String, dynamic>.from(result);
+    } on MissingPluginException {
+      return null; // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] getAppUsage failed: ${e.message}');
       return null;
@@ -256,6 +275,8 @@ class ScreenTimeService {
         'startMonitoring',
       );
       return result?['success'] == true;
+    } on MissingPluginException {
+      return false; // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] startMonitoring failed: ${e.message}');
       return false;
@@ -271,6 +292,8 @@ class ScreenTimeService {
         'stopMonitoring',
       );
       return result?['success'] == true;
+    } on MissingPluginException {
+      return false; // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] stopMonitoring failed: ${e.message}');
       return false;
@@ -286,6 +309,8 @@ class ScreenTimeService {
         'isMonitoring',
       );
       return result?['isMonitoring'] == true;
+    } on MissingPluginException {
+      return false; // M30
     } on PlatformException catch (e) {
       debugPrint('[ScreenTimeService] isMonitoring failed: ${e.message}');
       return false;

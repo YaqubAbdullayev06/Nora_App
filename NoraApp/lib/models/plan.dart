@@ -1,3 +1,6 @@
+/// Sentinel for copyWith "leave unchanged" vs "set to null".
+const Object _unset = Object();
+
 /// A single task within a daily plan.
 class PlanTask {
   final String id;
@@ -45,16 +48,22 @@ class PlanTask {
     String? title,
     int? priority,
     bool? completed,
-    String? iconAsset,
-    DateTime? completedAt,
+    Object? iconAsset = _unset,
+    Object? completedAt = _unset,
   }) {
     return PlanTask(
       id: id ?? this.id,
       title: title ?? this.title,
       priority: priority ?? this.priority,
       completed: completed ?? this.completed,
-      iconAsset: iconAsset ?? this.iconAsset,
-      completedAt: completedAt ?? this.completedAt,
+      // M22: sentinel — plain `?? this.x` made it impossible to CLEAR these
+      // fields (e.g. un-completing a task kept its completedAt timestamp)
+      iconAsset: identical(iconAsset, _unset)
+          ? this.iconAsset
+          : iconAsset as String?,
+      completedAt: identical(completedAt, _unset)
+          ? this.completedAt
+          : completedAt as DateTime?,
     );
   }
 
@@ -131,7 +140,7 @@ class DailyPlan {
     List<PlanTask>? tasks,
     bool? morningPlanned,
     bool? eveningReflected,
-    String? reflectionNote,
+    Object? reflectionNote = _unset,
     int? pointsEarned,
   }) {
     return DailyPlan(
@@ -141,7 +150,10 @@ class DailyPlan {
       tasks: tasks ?? this.tasks,
       morningPlanned: morningPlanned ?? this.morningPlanned,
       eveningReflected: eveningReflected ?? this.eveningReflected,
-      reflectionNote: reflectionNote ?? this.reflectionNote,
+      // M22: sentinel — allows clearing the note (pass null explicitly)
+      reflectionNote: identical(reflectionNote, _unset)
+          ? this.reflectionNote
+          : reflectionNote as String?,
       pointsEarned: pointsEarned ?? this.pointsEarned,
     );
   }

@@ -25,8 +25,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # C5: `--no-fatal-infos` does not exist (--fatal-infos is non-negatable),
+      # so this step exited 64 with "Cannot negate option" on every run and
+      # `flutter test` below never executed. Infos are non-fatal by default.
+      # Scope to lib/test: `dart analyze` with no path would also walk the
+      # vendored SDK in NoraApp/flutter/.
       - name: Analyze
-        run: dart analyze --no-fatal-infos
+        run: dart analyze lib test
 
       - name: Run tests
         run: flutter test
@@ -54,4 +59,7 @@ jobs:
         env:
           SECRET_KEY: ci-test-secret-key-do-not-use-in-production
           DATABASE_URL: "sqlite:///./test_nora.db"
-        run: pytest tests/ -v
+        # Run the whole backend suite: `pytest tests/` silently skipped the
+        # 25 tests living at backend/ root (test_app_classifier.py,
+        # test_blocking_rules.py) — they passed locally but never in CI.
+        run: pytest -v

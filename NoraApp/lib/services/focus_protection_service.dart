@@ -115,6 +115,9 @@ class FocusProtectionService {
       return result == null
           ? FocusProtectionStatus.unsupported
           : FocusProtectionStatus.fromMap(result);
+    } on MissingPluginException {
+      // M30: channel not registered on this platform — not a PlatformException
+      return FocusProtectionStatus.unsupported;
     } on PlatformException catch (error) {
       return FocusProtectionStatus(
         supported: false,
@@ -141,6 +144,9 @@ class FocusProtectionService {
       return result == null
           ? FocusProtectionStatus.unsupported
           : FocusProtectionStatus.fromMap(result);
+    } on MissingPluginException {
+      // M30
+      return FocusProtectionStatus.unsupported;
     } on PlatformException catch (error) {
       return FocusProtectionStatus(
         supported: false,
@@ -158,7 +164,13 @@ class FocusProtectionService {
   /// Open platform-specific settings page.
   Future<void> openSettings() async {
     if (kIsWeb) return;
-    await _channel.invokeMethod<void>('openSettings');
+    try {
+      await _channel.invokeMethod<void>('openSettings');
+    } on MissingPluginException {
+      // M30: silently ignore — no native handler on this platform
+    } on PlatformException {
+      // ignore — settings screen unavailable
+    }
   }
 
   /// iOS-only: Select app categories via FamilyActivityPicker.
@@ -170,11 +182,17 @@ class FocusProtectionService {
       // Android uses package names, not categories.
       return getStatus();
     }
-    final result =
-        await _channel.invokeMethod<Map<dynamic, dynamic>>('selectApps');
-    return result == null
-        ? FocusProtectionStatus.unsupported
-        : FocusProtectionStatus.fromMap(result);
+    try {
+      final result =
+          await _channel.invokeMethod<Map<dynamic, dynamic>>('selectApps');
+      return result == null
+          ? FocusProtectionStatus.unsupported
+          : FocusProtectionStatus.fromMap(result);
+    } on MissingPluginException {
+      return FocusProtectionStatus.unsupported; // M30
+    } on PlatformException {
+      return FocusProtectionStatus.unsupported;
+    }
   }
 
   /// Set the complete list of blocked apps.
@@ -187,33 +205,51 @@ class FocusProtectionService {
       // iOS blocking goes through Screen Time categories, not package names.
       return getStatus();
     }
-    final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'setBlockedPackages',
-      packageIds,
-    );
-    return result == null
-        ? FocusProtectionStatus.unsupported
-        : FocusProtectionStatus.fromMap(result);
+    try {
+      final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'setBlockedPackages',
+        packageIds,
+      );
+      return result == null
+          ? FocusProtectionStatus.unsupported
+          : FocusProtectionStatus.fromMap(result);
+    } on MissingPluginException {
+      return FocusProtectionStatus.unsupported; // M30
+    } on PlatformException {
+      return FocusProtectionStatus.unsupported;
+    }
   }
 
   /// Enable blocking overlay.
   Future<FocusProtectionStatus> enableBlocking() async {
     if (kIsWeb) return FocusProtectionStatus.unsupported;
-    final result =
-        await _channel.invokeMethod<Map<dynamic, dynamic>>('enableBlocking');
-    return result == null
-        ? FocusProtectionStatus.unsupported
-        : FocusProtectionStatus.fromMap(result);
+    try {
+      final result =
+          await _channel.invokeMethod<Map<dynamic, dynamic>>('enableBlocking');
+      return result == null
+          ? FocusProtectionStatus.unsupported
+          : FocusProtectionStatus.fromMap(result);
+    } on MissingPluginException {
+      return FocusProtectionStatus.unsupported; // M30
+    } on PlatformException {
+      return FocusProtectionStatus.unsupported;
+    }
   }
 
   /// Disable blocking overlay.
   Future<FocusProtectionStatus> disableBlocking() async {
     if (kIsWeb) return FocusProtectionStatus.unsupported;
-    final result =
-        await _channel.invokeMethod<Map<dynamic, dynamic>>('disableBlocking');
-    return result == null
-        ? FocusProtectionStatus.unsupported
-        : FocusProtectionStatus.fromMap(result);
+    try {
+      final result =
+          await _channel.invokeMethod<Map<dynamic, dynamic>>('disableBlocking');
+      return result == null
+          ? FocusProtectionStatus.unsupported
+          : FocusProtectionStatus.fromMap(result);
+    } on MissingPluginException {
+      return FocusProtectionStatus.unsupported; // M30
+    } on PlatformException {
+      return FocusProtectionStatus.unsupported;
+    }
   }
 
   /// Check if Android "restricted settings" apply (sideloaded app).
@@ -224,6 +260,8 @@ class FocusProtectionService {
     try {
       final result = await _channel.invokeMethod<bool>('isRestrictedSettings');
       return result ?? false;
+    } on MissingPluginException {
+      return false; // M30
     } on PlatformException {
       return false;
     }
@@ -233,6 +271,12 @@ class FocusProtectionService {
   /// This is required for Google Play Store submission.
   Future<void> showDisclosureDialog() async {
     if (kIsWeb || Platform.isIOS) return;
-    await _channel.invokeMethod<void>('showDisclosureDialog');
+    try {
+      await _channel.invokeMethod<void>('showDisclosureDialog');
+    } on MissingPluginException {
+      // M30: silently ignore
+    } on PlatformException {
+      // ignore
+    }
   }
 }

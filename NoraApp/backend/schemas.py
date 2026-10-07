@@ -68,6 +68,8 @@ class ContentCreate(BaseModel):
     duration_minutes: int
     points: int = 0
     url: Optional[str] = None
+    # M28: cover image for content cards
+    image_url: Optional[str] = None
     tags: List[str] = []
 
 
@@ -80,6 +82,7 @@ class ContentResponse(BaseModel):
     duration_minutes: int
     points: int
     url: Optional[str]
+    image_url: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -115,6 +118,9 @@ class FocusScheduleRequest(BaseModel):
     start_time: str
     duration_minutes: int
     label: str = "Focus session"
+    # M9: client UTC offset in minutes (east positive) — start_time is the
+    # user's local wall-clock time, not the server's UTC time
+    tz_offset_minutes: int = 0
 
 
 class FocusStartRequest(BaseModel):
@@ -122,10 +128,18 @@ class FocusStartRequest(BaseModel):
     label: str = "Focus session"
 
 
+class DeviceSettingProposeRequest(BaseModel):
+    """M11 step 1: propose a change; server returns a short-lived approval token."""
+    setting: str
+    value: Any
+
+
 class DeviceSettingUpdateRequest(BaseModel):
     setting: str
     value: Any
-    user_approved: bool = False
+    # M11: server-issued, single-use token from /agent/device/settings/propose —
+    # replaces the client-asserted `user_approved` boolean
+    approval_token: str
 
 
 class SocialOAuthRequest(BaseModel):
@@ -136,6 +150,8 @@ class SocialOAuthRequest(BaseModel):
 class SocialConnectRequest(BaseModel):
     platform: str
     account_id: str
+    # M14: CSRF state from /agent/social/oauth/start (verified + consumed server-side)
+    state: str
 
 
 class SocialPostRequest(BaseModel):
@@ -227,6 +243,11 @@ class HardCapStatusResponse(BaseModel):
     created_at: Optional[datetime]
 
 
+class HardCapDeactivateRequest(BaseModel):
+    """M32: PIN required to deactivate when require_pin_to_override is set."""
+    pin: Optional[str] = None
+
+
 # ─── Habits ───
 
 
@@ -242,6 +263,14 @@ class HabitCreateRequest(BaseModel):
     def screen_time_must_be_reasonable(cls, v):
         if v < 5 or v > 120:  # 5 min to 2 hours
             raise ValueError("Screen time earned must be between 5 and 120 minutes")
+        return v
+
+    @validator("target_per_day")
+    def target_must_be_at_least_one(cls, v):
+        # M10: target 0/negative made `completions >= target` always true →
+        # habit could never be completed (400 on every attempt)
+        if v < 1:
+            raise ValueError("target_per_day must be at least 1")
         return v
 
 
@@ -294,6 +323,13 @@ class DailyPlanRequest(BaseModel):
     energy_pattern: str = "normal"  # "morning_person", "night_owl", "normal"
     existing_commitments: list[dict] = []
     preferences: dict = {}
+
+    @validator("available_hours")
+    def hours_must_be_sane(cls, v):
+        # M4: 0/negative/NaN produced empty plans; >24h is not a day
+        if v is None or v != v or v <= 0:
+            raise ValueError("available_hours must be a positive number")
+        return min(v, 24.0)
 
 
 class DailyPlanResponse(BaseModel):

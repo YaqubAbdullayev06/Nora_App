@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/design_tokens.dart';
 import '../../../core/enums/age_group.dart';
+import '../../../core/utils/week_utils.dart';
 import '../../../providers/app_provider.dart';
 import '../../../models/models.dart';
 import '../../../widgets/nora_components.dart';
@@ -130,8 +131,9 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
 
   Widget _buildAppBar(BuildContext context, AppProvider provider) {
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+    // M1: midnight-truncated boundaries, matching what the weekly chart plots.
+    final weekStart = startOfWeek(now);
+    final weekEnd = endOfWeek(now);
 
     return SliverToBoxAdapter(
       child: Container(
@@ -186,7 +188,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${_formatDate(startOfWeek)} - ${_formatDate(endOfWeek)}',
+                        '${_formatDate(weekStart)} - ${_formatDate(weekEnd)}',
                         style: TextStyle(
                           color: DesignTokens.textMuted,
                           fontSize: DesignTokens.fontSizeCaption,
@@ -577,7 +579,11 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen>
           ),
         ],
       ),
-    );
+    ).then((_) {
+      // M39: dialog-local controllers were never disposed (leaked on every open)
+      titleController.dispose();
+      minutesController.dispose();
+    });
   }
 
   void _saveWeeklyReview(BuildContext context, AppProvider provider) {

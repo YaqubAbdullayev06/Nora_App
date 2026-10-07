@@ -66,6 +66,7 @@ class Provider(str, Enum):
     GROQ = "groq"
     GEMINI = "gemini"
     CLOUDFLARE = "cloudflare"
+    DEEPINFRA = "deepinfra"
     OLLAMA = "ollama"
     OLLAMA_COLAB = "ollama_colab"
 
@@ -104,15 +105,22 @@ OLLAMA_MODELS = {
     "adult": "llama3.1",
 }
 
+DEEPINFRA_MODELS = {
+    "child": None,
+    "baby": None,
+    "kid": "tencent/Hy3",
+    "teen": "tencent/Hy3",
+    "adult": "tencent/Hy4-preview",
+}
+
 
 def _cache_key(messages: list[dict], provider: str) -> str:
     """Generate a deterministic cache key from messages + provider.
 
-    Uses str() instead of json.dumps(sort_keys=True) — faster for simple message
-    dicts and avoids the overhead of full JSON serialization on every cache lookup.
-    Messages are typically plain dicts with 'role' and 'content' keys.
+    Uses json.dumps(sort_keys=True) to ensure a robust, deterministic key
+    regardless of dictionary key order.
     """
-    raw = f"{provider}:{str(messages)}"
+    raw = f"{provider}:{json.dumps(messages, sort_keys=True)}"
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
@@ -129,6 +137,7 @@ class UnifiedLLMProvider:
         gemini_api_key: str = None,
         cloudflare_account_id: str = None,
         cloudflare_api_token: str = None,
+        deepinfra_api_key: str = None,
         ollama_base_url: str = None,
         ollama_colab_url: str = None,
         preferred_provider: str = None,
@@ -142,6 +151,9 @@ class UnifiedLLMProvider:
         self.cloudflare_account_id = cloudflare_account_id or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
         self.cloudflare_api_token = cloudflare_api_token or os.getenv("CLOUDFLARE_API_TOKEN", "")
         self.cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/meta/llama-3.1-8b-instruct")
+
+        self.deepinfra_api_key = deepinfra_api_key or os.getenv("DEEPINFRA_API_KEY", "")
+        self.deepinfra_model = os.getenv("DEEPINFRA_MODEL", "tencent/Hy3")
 
         self.ollama_base_url = (ollama_base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
         self.ollama_colab_url = (ollama_colab_url or os.getenv("OLLAMA_COLAB_URL", "")).rstrip("/")
@@ -164,6 +176,8 @@ class UnifiedLLMProvider:
             priority.append(Provider.GEMINI)
         if self.cloudflare_account_id and self.cloudflare_api_token:
             priority.append(Provider.CLOUDFLARE)
+        if self.deepinfra_api_key:
+            priority.append(Provider.DEEPINFRA)
         # DISABLED FOR TESTING: Local Ollama skipped, using Colab GPU only
         # if self.ollama_base_url:
         #     try:
@@ -189,6 +203,8 @@ class UnifiedLLMProvider:
                 return GEMINI_MODELS.get(age_group, self.gemini_model)
             elif provider == Provider.CLOUDFLARE:
                 return CLOUDFLARE_MODELS.get(age_group, self.cloudflare_model)
+            elif provider == Provider.DEEPINFRA:
+                return DEEPINFRA_MODELS.get(age_group, self.deepinfra_model)
             elif provider in (Provider.OLLAMA, Provider.OLLAMA_COLAB):
                 return OLLAMA_MODELS.get(age_group, "llama3.1")
 
@@ -445,6 +461,8 @@ class UnifiedLLMProvider:
                     result = await self._gemini_chat(messages, temperature)
                 elif provider == Provider.CLOUDFLARE:
                     result = await self._cloudflare_chat(messages, temperature)
+                elif provider == Provider.DEEPINFRA:
+                    result = await self._deepinfra_chat(messages, temperature)
                 elif provider == Provider.OLLAMA:
                     # DISABLED: Local Ollama skipped for testing
                     raise Exception("Local Ollama disabled - using Colab")
@@ -467,20 +485,34 @@ class UnifiedLLMProvider:
         )
 
     async def chat_stream(self, messages: list[dict], temperature: float = 0.7) -> AsyncGenerator[str, None]:
-        """Stream chat with automatic provider fallback."""
+        """Stream chat with automatic provider fallback.
+
+        M12: once a provider has emitted tokens, a mid-stream failure must NOT
+        fall through to the next provider — that re-generated the whole reply
+        and the user saw the answer twice (or answer + error banner).
+        """
         errors = []
         for provider in self._get_provider_priority():
+            yielded_any = False
             try:
                 if provider == Provider.GROQ:
                     async for token in self._groq_chat_stream(messages, temperature):
+                        yielded_any = True
                         yield token
                     return
                 elif provider == Provider.GEMINI:
                     async for token in self._gemini_chat_stream(messages, temperature):
+                        yielded_any = True
                         yield token
                     return
                 elif provider == Provider.CLOUDFLARE:
                     async for token in self._cloudflare_chat_stream(messages, temperature):
+                        yielded_any = True
+                        yield token
+                    return
+                elif provider == Provider.DEEPINFRA:
+                    async for token in self._deepinfra_chat_stream(messages, temperature):
+                        yielded_any = True
                         yield token
                     return
                 elif provider == Provider.OLLAMA:
@@ -491,9 +523,14 @@ class UnifiedLLMProvider:
                     return
                 elif provider == Provider.OLLAMA_COLAB:
                     async for token in self._ollama_chat_stream(messages, temperature, self.ollama_colab_url):
+                        yielded_any = True
                         yield token
                     return
             except Exception as e:
+                if yielded_any:
+                    # Partial output already delivered — stop instead of
+                    # duplicating the response with another provider.
+                    return
                 errors.append(f"{provider.value}: {str(e)[:80]}")
                 continue
 
@@ -547,6 +584,21 @@ class UnifiedLLMProvider:
                 status["cloudflare"] = False
         except Exception:
             status["cloudflare"] = False
+
+        # DeepInfra
+        try:
+            if self.deepinfra_api_key:
+                client = get_client()
+                resp = await client.get(
+                    "https://api.deepinfra.com/v1/openai/models",
+                    headers={"Authorization": f"Bearer {self.deepinfra_api_key}"},
+                    timeout=5.0,
+                )
+                status["deepinfra"] = resp.status_code == 200
+            else:
+                status["deepinfra"] = False
+        except Exception:
+            status["deepinfra"] = False
 
         # Ollama local
         try:

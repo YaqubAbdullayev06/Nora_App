@@ -26,26 +26,28 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // M38: defensive — malformed dates / non-string urls / num ages must
+    // not throw inside login or profile refresh.
+    DateTime? tryParse(dynamic v) => v is String ? DateTime.tryParse(v) : null;
+    final settings = json['settings'];
+    final avatar = json['avatarUrl'] ?? json['avatar_url'];
     return User(
       id: json['id']?.toString() ?? '',
-      email: json['email'] ?? '',
-      name: json['name'] ?? '',
+      email: json['email'] is String ? json['email'] as String : '',
+      name: json['name'] is String ? json['name'] as String : '',
       ageGroup: AgeGroup.values.firstWhere(
-        (g) =>
-            g.name == (json['ageGroup'] ?? json['age_group']),
+        (g) => g.name == (json['ageGroup'] ?? json['age_group']),
         orElse: () => AgeGroup.adult,
       ),
-      birthDate: json['birthDate'] != null
-          ? DateTime.parse(json['birthDate'])
+      birthDate: tryParse(json['birthDate'] ?? json['birth_date']),
+      age: (json['age'] as num?)?.toInt(),
+      avatarUrl: avatar is String ? avatar : null,
+      createdAt: tryParse(json['created_at']) ??
+          tryParse(json['createdAt']) ??
+          DateTime.now(),
+      settings: settings is Map
+          ? Map<String, dynamic>.from(settings)
           : null,
-      age: json['age'],
-      avatarUrl: json['avatarUrl'],
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : json['createdAt'] != null
-              ? DateTime.parse(json['createdAt'])
-              : DateTime.now(),
-      settings: json['settings'],
     );
   }
 

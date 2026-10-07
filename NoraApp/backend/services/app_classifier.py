@@ -7,6 +7,24 @@ from typing import Any
 from services.blocking_rules import AGE_BLOCKING_RULES, KNOWN_CATEGORIES, get_blocking_rules
 
 
+def _as_number(value: Any, default: float = 0) -> float:
+    """M1: coerce JSON numbers that arrive as strings ("120") to int/float.
+
+    Usage payloads built on the client can serialize minutes as strings;
+    comparing str > int raises TypeError and crashed analyze_usage.
+    """
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
+
+
 class AppClassifier:
     """AI-powered app classifier and blocking recommender."""
 
@@ -95,39 +113,41 @@ class AppClassifier:
         """
         rules = get_blocking_rules(age_group)
         apps = usage_data.get("apps", [])
-        total_time = usage_data.get("totalScreenTimeMinutes", 0)
-        social_time = usage_data.get("socialMediaMinutes", 0)
-        entertainment_time = usage_data.get("entertainmentMinutes", 0)
+        # M1: coerce — client JSON may send minute counts as strings
+        total_time = _as_number(usage_data.get("totalScreenTimeMinutes", 0))
+        social_time = _as_number(usage_data.get("socialMediaMinutes", 0))
+        entertainment_time = _as_number(usage_data.get("entertainmentMinutes", 0))
 
         # Check against limits
         alerts = []
         recommendations = []
-        social_limit = rules.get("max_social_media_minutes", 999)
-        entertainment_limit = rules.get("max_entertainment_minutes", 999)
-        game_limit = rules.get("max_game_minutes", 999)
+        social_limit = _as_number(rules.get("max_social_media_minutes", 999))
+        entertainment_limit = _as_number(rules.get("max_entertainment_minutes", 999))
+        game_limit = _as_number(rules.get("max_game_minutes", 999))
 
         if social_time > social_limit:
             alerts.append({
                 "type": "limit_exceeded",
                 "category": "social_media",
-                "message": f"Social media usage ({social_time}m) exceeds recommended limit ({social_limit}m)",
+                "message": f"Social media usage ({social_time:g}m) exceeds recommended limit ({social_limit:g}m)",
                 "severity": "high",
             })
             # Recommend blocking top social apps
             for app in apps:
-                if app.get("category") == "social_media" and app.get("totalTimeMinutes", 0) > 15:
+                app_minutes = _as_number(app.get("totalTimeMinutes", 0))
+                if app.get("category") == "social_media" and app_minutes > 15:
                     recommendations.append({
                         "action": "block",
                         "packageName": app["packageName"],
                         "appName": app["appName"],
-                        "reason": f"Used {app['totalTimeMinutes']}m today, exceeds healthy limit",
+                        "reason": f"Used {app_minutes:g}m today, exceeds healthy limit",
                     })
 
         if entertainment_time > entertainment_limit:
             alerts.append({
                 "type": "limit_exceeded",
                 "category": "entertainment",
-                "message": f"Entertainment usage ({entertainment_time}m) exceeds recommended limit ({entertainment_limit}m)",
+                "message": f"Entertainment usage ({entertainment_time:g}m) exceeds recommended limit ({entertainment_limit:g}m)",
                 "severity": "medium",
             })
 
@@ -231,8 +251,12 @@ class AppClassifier:
 
         return " ".join(lines)
 
-    def _calculate_focus_score(self, total_time: int, social_time: int, entertainment_time: int) -> int:
+    def _calculate_focus_score(self, total_time: Any, social_time: Any, entertainment_time: Any) -> int:
         """Calculate a focus score (0-100) based on usage patterns."""
+        # M1: inputs may arrive as strings from client JSON
+        total_time = _as_number(total_time)
+        social_time = _as_number(social_time)
+        entertainment_time = _as_number(entertainment_time)
         if total_time == 0:
             return 100
 

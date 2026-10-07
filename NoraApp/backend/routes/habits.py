@@ -108,14 +108,17 @@ def complete_habit(
         raise HTTPException(status_code=404, detail="Habit not found")
 
     # Check daily limit
-    today_start = _local_today_start(getattr(request, "tz_offset_minutes", 0))
+    today_start = _local_today_start(request.tz_offset_minutes)
     today_completions = db.query(HabitCompletionModel).filter(
         HabitCompletionModel.habit_id == habit.id,
         HabitCompletionModel.user_id == current_user.id,
         HabitCompletionModel.completed_at >= today_start,
     ).count()
 
-    if today_completions >= habit.target_per_day:
+    # M10: legacy rows may hold target_per_day 0/negative — clamp so a habit
+    # is never permanently "already reached"
+    daily_target = max(1, int(habit.target_per_day or 1))
+    if today_completions >= daily_target:
         raise HTTPException(status_code=400, detail="Daily target already reached")
 
     # Create completion
@@ -132,7 +135,7 @@ def complete_habit(
         "success": True,
         "screen_time_earned": habit.screen_time_minutes,
         "completions_today": today_completions + 1,
-        "target_per_day": habit.target_per_day,
+        "target_per_day": daily_target,
     }
 
 

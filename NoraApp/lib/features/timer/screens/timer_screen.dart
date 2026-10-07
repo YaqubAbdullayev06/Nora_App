@@ -89,53 +89,48 @@ class _TimerScreenState extends State<TimerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<PersonaProvider, TimerProvider>(
-      builder: (context, personaProvider, timerProvider, _) {
-        final persona = personaProvider.persona;
-        final progress = timerProvider.timerProgress;
+    final persona = context.select<PersonaProvider, PersonaTheme>((p) => p.persona);
+    final timerProvider = context.read<TimerProvider>();
 
-        // Auto-navigate to break screen when break phase starts (once)
-        if (!timerProvider.isBreakPhase) {
-          _breakHandled = false;
-        } else if (!_breakHandled) {
-          _breakHandled = true;
-          // Record session + navigate exactly once per break phase
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && timerProvider.isBreakPhase) {
-              final pomodoro = context.read<PomodoroProvider>();
-              pomodoro.recordSession(timerProvider.lastFocusDurationSeconds ~/ 60);
+    // Auto-navigate to break screen when break phase starts (once)
+    if (timerProvider.isBreakPhase && !_breakHandled) {
+      _breakHandled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && timerProvider.isBreakPhase) {
+          final pomodoro = context.read<PomodoroProvider>();
+          pomodoro.recordSession(timerProvider.lastFocusDurationSeconds ~/ 60);
 
-              Navigator.of(context).push(
-                FadePageRoute(
-                  pageBuilder: (_, __, ___) => ChangeNotifierProvider.value(
-                    value: timerProvider,
-                    child: const BreakScreen(),
-                  ),
-                ),
-              );
-            }
-          });
-        }
-
-        return Scaffold(
-          backgroundColor: DesignTokens.background,
-          body: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(persona, timerProvider),
-                _buildTabSelector(persona),
-                Expanded(
-                  child: _selectedTab == 0
-                      ? _buildFocusTab(timerProvider, persona, progress)
-                      : _buildBreatheTab(persona),
-                ),
-                // AI Interrupter overlay
-                if (_showInterrupter) _buildInterrupterOverlay(persona),
-              ],
+          Navigator.of(context).push(
+            FadePageRoute(
+              pageBuilder: (_, __, ___) => ChangeNotifierProvider.value(
+                value: timerProvider,
+                child: const BreakScreen(),
+              ),
             ),
-          ),
-        );
-      },
+          );
+        }
+      });
+    } else if (!timerProvider.isBreakPhase) {
+      _breakHandled = false;
+    }
+
+    return Scaffold(
+      backgroundColor: DesignTokens.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(persona, timerProvider),
+            _buildTabSelector(persona),
+            Expanded(
+              child: _selectedTab == 0
+                  ? _buildFocusTab(timerProvider, persona)
+                  : _buildBreatheTab(persona),
+            ),
+            // AI Interrupter overlay
+            if (_showInterrupter) _buildInterrupterOverlay(persona),
+          ],
+        ),
+      ),
     );
   }
 
@@ -353,7 +348,7 @@ class _TimerScreenState extends State<TimerScreen>
   // ═══════════════════════════════════════════════
 
   Widget _buildFocusTab(
-      TimerProvider provider, PersonaTheme persona, double progress) {
+      TimerProvider provider, PersonaTheme persona) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(DesignTokens.spacing24),
@@ -362,13 +357,13 @@ class _TimerScreenState extends State<TimerScreen>
           children: [
             _buildPhaseIndicator(persona, provider),
             const SizedBox(height: DesignTokens.spacing16),
-            _buildTimerRing(provider, progress, persona),
+            _buildTimerRing(provider, persona),
             const SizedBox(height: DesignTokens.spacing24),
-            _buildSessionDots(provider, persona),
+            _buildSessionDots(persona),
             const SizedBox(height: DesignTokens.spacing24),
-            _buildDurationSelector(provider, persona),
+            _buildDurationSelector(persona),
             const SizedBox(height: DesignTokens.spacing24),
-            _buildControls(provider, persona),
+            _buildControls(persona),
             if (persona.ageGroup != AgeGroup.baby) ...[
               const SizedBox(height: DesignTokens.spacing24),
               _buildInterrupterButton(persona),
@@ -398,7 +393,7 @@ class _TimerScreenState extends State<TimerScreen>
   }
 
   Widget _buildTimerRing(
-      TimerProvider provider, double progress, PersonaTheme persona) {
+      TimerProvider provider, PersonaTheme persona) {
     final isRunning = provider.isTimerRunning;
     final size = persona.ageGroup == AgeGroup.baby ? 220.0 : 260.0;
 
@@ -485,135 +480,150 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
-  Widget _buildSessionDots(TimerProvider provider, PersonaTheme persona) {
-    final total = persona.ageGroup.pomodoroSessionsPerCycle;
-    final completed = provider.completedSessionsInCycle;
+  Widget _buildSessionDots(PersonaTheme persona) {
+    return Selector<TimerProvider, int>(
+      selector: (_, provider) => provider.completedSessionsInCycle,
+      builder: (context, completed, _) {
+        final total = persona.ageGroup.pomodoroSessionsPerCycle;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(total, (index) {
-        final isCompleted = index < completed;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: isCompleted ? 24 : 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: isCompleted
-                  ? persona.primary
-                  : DesignTokens.border,
-              borderRadius: BorderRadius.circular(DesignTokens.radiusRound),
-            ),
-          ),
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(total, (index) {
+            final isCompleted = index < completed;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: isCompleted ? 24 : 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? persona.primary
+                      : DesignTokens.border,
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusRound),
+                ),
+              ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 
-  Widget _buildDurationSelector(TimerProvider provider, PersonaTheme persona) {
-    final durations = _getDurationsForAgeGroup(persona.ageGroup);
-    final currentMinutes = provider.totalTimerSeconds ~/ 60;
+  Widget _buildDurationSelector(PersonaTheme persona) {
+    return Selector<TimerProvider, int>(
+      selector: (_, provider) => provider.totalTimerSeconds ~/ 60,
+      builder: (context, currentMinutes, _) {
+        final provider = context.read<TimerProvider>();
+        final durations = _getDurationsForAgeGroup(persona.ageGroup);
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: durations.map((minutes) {
-        final isSelected = currentMinutes == minutes;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: GestureDetector(
-            onTap: provider.isTimerRunning
-                ? null
-                : () => provider.setTimerDuration(minutes),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? persona.primary : DesignTokens.surface,
-                borderRadius: BorderRadius.circular(DesignTokens.radius20),
-                border: Border.all(
-                  color: isSelected ? persona.primary : DesignTokens.border,
-                  width: 1,
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: durations.map((minutes) {
+            final isSelected = currentMinutes == minutes;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: GestureDetector(
+                onTap: provider.isTimerRunning
+                    ? null
+                    : () => provider.setTimerDuration(minutes),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? persona.primary : DesignTokens.surface,
+                    borderRadius: BorderRadius.circular(DesignTokens.radius20),
+                    border: Border.all(
+                      color: isSelected ? persona.primary : DesignTokens.border,
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    '$minutes min',
+                    style: TextStyle(
+                      color: isSelected
+                          ? (persona.isDark
+                              ? DesignTokens.background
+                              : Colors.white)
+                          : DesignTokens.textMuted,
+                      fontSize: DesignTokens.fontSizeCaption,
+                      fontWeight: DesignTokens.fontWeightMedium,
+                      fontFamily: DesignTokens.fontFamilyPrimary,
+                    ),
+                  ),
                 ),
               ),
-              child: Text(
-                '$minutes min',
-                style: TextStyle(
-                  color: isSelected
-                      ? (persona.isDark
-                          ? DesignTokens.background
-                          : Colors.white)
-                      : DesignTokens.textMuted,
-                  fontSize: DesignTokens.fontSizeCaption,
-                  fontWeight: DesignTokens.fontWeightMedium,
-                  fontFamily: DesignTokens.fontFamilyPrimary,
-                ),
-              ),
-            ),
-          ),
+            );
+          }).toList(),
         );
-      }).toList(),
+      },
     );
   }
 
-  Widget _buildControls(TimerProvider provider, PersonaTheme persona) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Reset button
-        _buildTimerIconButton(
-          onTap: provider.resetTimer,
-          icon: Icons.refresh_rounded,
-          color: DesignTokens.textMuted,
-        ),
-        const SizedBox(width: DesignTokens.spacing24),
-        // Play/Pause button
-        GestureDetector(
-          onTap: () {
-            if (provider.isTimerRunning) {
-              HapticService.timerPaused();
-              provider.pauseTimer();
-            } else {
-              HapticService.timerStarted();
-              provider.startTimer();
-            }
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [persona.primary, persona.secondary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: persona.primary.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  spreadRadius: 2,
+  Widget _buildControls(PersonaTheme persona) {
+    return Selector<TimerProvider, bool>(
+      selector: (_, provider) => provider.isTimerRunning,
+      builder: (context, isRunning, _) {
+        final provider = context.read<TimerProvider>();
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Reset button
+            _buildTimerIconButton(
+              onTap: provider.resetTimer,
+              icon: Icons.refresh_rounded,
+              color: DesignTokens.textMuted,
+            ),
+            const SizedBox(width: DesignTokens.spacing24),
+            // Play/Pause button
+            GestureDetector(
+              onTap: () {
+                if (isRunning) {
+                  HapticService.timerPaused();
+                  provider.pauseTimer();
+                } else {
+                  HapticService.timerStarted();
+                  provider.startTimer();
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [persona.primary, persona.secondary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: persona.primary.withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
-              ],
+                child: Icon(
+                  isRunning
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
             ),
-            child: Icon(
-              provider.isTimerRunning
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
-              color: Colors.white,
-              size: 40,
+            const SizedBox(width: DesignTokens.spacing24),
+            // Skip button
+            _buildTimerIconButton(
+              onTap: provider.completeTimer,
+              icon: Icons.skip_next_rounded,
+              color: DesignTokens.textMuted,
             ),
-          ),
-        ),
-        const SizedBox(width: DesignTokens.spacing24),
-        // Skip button
-        _buildTimerIconButton(
-          onTap: provider.completeTimer,
-          icon: Icons.skip_next_rounded,
-          color: DesignTokens.textMuted,
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 

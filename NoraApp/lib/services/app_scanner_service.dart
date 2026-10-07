@@ -53,6 +53,8 @@ class AppScannerService {
           .map((app) => AppInfo.fromMap(Map<String, dynamic>.from(app as Map)))
           .toList();
       return apps;
+    } on MissingPluginException {
+      return []; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner scanAllApps failed: ${e.message}');
       return [];
@@ -75,6 +77,8 @@ class AppScannerService {
           .map((item) => item.toString())
           .toList();
       return categories;
+    } on MissingPluginException {
+      return []; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner selectIOSCategories failed: ${e.message}');
       return [];
@@ -97,6 +101,8 @@ class AppScannerService {
       final app = result['app'];
       if (app == null) return null;
       return AppInfo.fromMap(Map<String, dynamic>.from(app as Map));
+    } on MissingPluginException {
+      return null; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner getAppDetails failed: ${e.message}');
       return null;
@@ -114,6 +120,8 @@ class AppScannerService {
           .map((item) => item.toString())
           .toList();
       return blocked;
+    } on MissingPluginException {
+      return []; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner getBlockedApps failed: ${e.message}');
       return [];
@@ -139,6 +147,8 @@ class AppScannerService {
           .map((item) => item.toString())
           .toList();
       return blocked;
+    } on MissingPluginException {
+      return []; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner setBlockedApps failed: ${e.message}');
       return [];
@@ -160,6 +170,8 @@ class AppScannerService {
           .map((item) => item.toString())
           .toList();
       return blocked;
+    } on MissingPluginException {
+      return []; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner addToBlocked failed: ${e.message}');
       return [];
@@ -181,6 +193,8 @@ class AppScannerService {
           .map((item) => item.toString())
           .toList();
       return blocked;
+    } on MissingPluginException {
+      return []; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner removeFromBlocked failed: ${e.message}');
       return [];
@@ -214,6 +228,8 @@ class AppScannerService {
         _iconCache[packageName] = result;
       }
       return result;
+    } on MissingPluginException {
+      return null; // M30
     } on PlatformException catch (e) {
       debugPrint('AppScanner getAppIcon failed: ${e.message}');
       return null;

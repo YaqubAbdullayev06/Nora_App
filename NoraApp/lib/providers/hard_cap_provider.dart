@@ -21,6 +21,10 @@ class HardCapProvider extends ChangeNotifier {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final ApiService _api = ApiService();
   bool _isInitialized = false;
+  Timer? _dayCheckTimer;
+  /// M35: mutation epoch so a stale async `_loadLocalCap`/`_loadLocalUsage`
+  /// can't overwrite usage the user changed while the load was in flight.
+  int _mutationEpoch = 0;
 
   // ─── State ───
   bool _isActive = false;
@@ -96,7 +100,18 @@ class HardCapProvider extends ChangeNotifier {
     _isInitialized = true;
     await _loadLocalCap();
     await _checkDailyReset();
+    _startDayWatch();
     notifyListeners();
+  }
+
+  /// M15: rollover check while the app stays open past midnight —
+  /// `_checkDailyReset` previously ran only once, during initialize().
+  void _startDayWatch() {
+    _dayCheckTimer?.cancel();
+    _dayCheckTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkDailyReset(),
+    );
   }
 
   // ─── Setup ───
@@ -108,6 +123,7 @@ class HardCapProvider extends ChangeNotifier {
     int hardWarningPercent = 90,
     bool requirePinToOverride = false,
   }) async {
+    _mutationEpoch++; // M35
     _setupInProgress = true;
     _error = null;
     notifyListeners();
@@ -135,7 +151,10 @@ class HardCapProvider extends ChangeNotifier {
         return true;
       }
 
-      _error = response['detail'] ?? 'Failed to set up hard cap';
+      final detail = response['detail'];
+      _error = detail is String && detail.isNotEmpty
+          ? detail
+          : 'Failed to set up hard cap'; // M25: detail may be a validation List
       _setupInProgress = false;
       notifyListeners();
       return false;
@@ -148,25 +167,39 @@ class HardCapProvider extends ChangeNotifier {
   }
 
   /// Deactivate the hard cap.
-  Future<bool> deactivateCap() async {
+  /// [pin] is required server-side when an active accountability lock
+  /// exists and the cap was configured with require_pin_to_override (M32).
+  Future<bool> deactivateCap({String? pin}) async {
+    _mutationEpoch++; // M35
     try {
-      final response = await _api.deactivateHardCap();
+      final response = await _api.deactivateHardCap(pin: pin);
       if (response['success'] == true) {
         _isActive = false;
         await _clearLocalCap();
         notifyListeners();
         return true;
       }
+      _error = _extractError(response);
+      notifyListeners();
       return false;
     } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
       return false;
     }
+  }
+
+  String _extractError(Map<String, dynamic> response) {
+    final detail = response['detail'] ?? response['error'];
+    if (detail is String && detail.isNotEmpty) return detail;
+    return 'Failed to deactivate hard cap';
   }
 
   // ─── Usage Tracking ───
 
   /// Record additional screen time usage (in minutes).
   void recordUsage(int minutes) {
+    _mutationEpoch++; // M35
     _todayUsageMinutes += minutes;
     _saveLocalUsage();
     _checkFriction();
@@ -175,6 +208,7 @@ class HardCapProvider extends ChangeNotifier {
 
   /// Set total usage for today (from screen time API).
   void setTodayUsage(int minutes) {
+    _mutationEpoch++; // M35
     _todayUsageMinutes = minutes;
     _saveLocalUsage();
     _checkFriction();
@@ -183,6 +217,7 @@ class HardCapProvider extends ChangeNotifier {
 
   /// Add bonus minutes earned from completing real-world habits.
   void addBonusMinutes(int minutes) {
+    _mutationEpoch++; // M35
     _bonusMinutesToday += minutes;
     _saveLocalUsage();
     _checkFriction();
@@ -191,18 +226,21 @@ class HardCapProvider extends ChangeNotifier {
 
   /// Mark a friction warning as shown.
   void markSoftWarningShown() {
+    _mutationEpoch++; // M35
     _softWarningShown = true;
     _saveLocalUsage();
     notifyListeners();
   }
 
   void markHardWarningShown() {
+    _mutationEpoch++; // M35
     _hardWarningShown = true;
     _saveLocalUsage();
     notifyListeners();
   }
 
   void markBlockedShown() {
+    _mutationEpoch++; // M35
     _blockedShown = true;
     _saveLocalUsage();
     notifyListeners();
@@ -210,6 +248,7 @@ class HardCapProvider extends ChangeNotifier {
 
   /// Reset friction warnings (e.g., after PIN override or new day).
   void resetFrictionWarnings() {
+    _mutationEpoch++; // M35
     _softWarningShown = false;
     _hardWarningShown = false;
     _blockedShown = false;
@@ -236,6 +275,7 @@ class HardCapProvider extends ChangeNotifier {
   }
 
   Future<void> _checkDailyReset() async {
+    _mutationEpoch++; // M35
     final savedDate = await _storage.read(key: _usageDateKey);
     final today = DateTime.now().toIso8601String().substring(0, 10);
 
@@ -255,6 +295,8 @@ class HardCapProvider extends ChangeNotifier {
   // ─── Local Storage ───
 
   Future<void> _loadLocalCap() async {
+    // M35: collect reads first; assign only if no mutation happened meanwhile
+    final epoch = _mutationEpoch;
     try {
       final results = await Future.wait([
         _storage.read(key: _isActiveKey),
@@ -263,11 +305,18 @@ class HardCapProvider extends ChangeNotifier {
         _storage.read(key: _hardWarningKey),
         _storage.read(key: _requirePinKey),
       ]);
-      _isActive = results[0] == 'true';
-      if (results[1] != null) _capMinutes = int.tryParse(results[1]!) ?? 120;
-      if (results[2] != null) _softWarningPercent = int.tryParse(results[2]!) ?? 80;
-      if (results[3] != null) _hardWarningPercent = int.tryParse(results[3]!) ?? 90;
-      _requirePinToOverride = results[4] == 'true';
+
+      if (epoch == _mutationEpoch) {
+        _isActive = results[0] == 'true';
+        if (results[1] != null) _capMinutes = int.tryParse(results[1]!) ?? 120;
+        if (results[2] != null) {
+          _softWarningPercent = int.tryParse(results[2]!) ?? 80;
+        }
+        if (results[3] != null) {
+          _hardWarningPercent = int.tryParse(results[3]!) ?? 90;
+        }
+        _requirePinToOverride = results[4] == 'true';
+      }
 
       await _loadLocalUsage();
     } catch (e) {
@@ -276,6 +325,7 @@ class HardCapProvider extends ChangeNotifier {
   }
 
   Future<void> _loadLocalUsage() async {
+    final epoch = _mutationEpoch;
     try {
       final results = await Future.wait([
         _storage.read(key: _todayUsageKey),
@@ -284,6 +334,8 @@ class HardCapProvider extends ChangeNotifier {
         _storage.read(key: _hardShownKey),
         _storage.read(key: _blockedShownKey),
       ]);
+      if (epoch != _mutationEpoch) return; // stale — discard
+
       if (results[0] != null) _todayUsageMinutes = int.tryParse(results[0]!) ?? 0;
       if (results[1] != null) _bonusMinutesToday = int.tryParse(results[1]!) ?? 0;
       _softWarningShown = results[2] == 'true';
@@ -342,5 +394,11 @@ class HardCapProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('HardCapProvider: failed to clear cap: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _dayCheckTimer?.cancel();
+    super.dispose();
   }
 }

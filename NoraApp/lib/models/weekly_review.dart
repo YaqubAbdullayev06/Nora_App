@@ -1,4 +1,5 @@
 import '../core/enums/age_group.dart';
+import '../core/utils/week_utils.dart';
 
 /// Mood options for weekly review.
 enum WeeklyMood {
@@ -79,11 +80,11 @@ class WeeklyReflection {
 
   factory WeeklyReflection.fromJson(Map<String, dynamic> json) {
     return WeeklyReflection(
-      id: json['id'] ?? '',
-      question: json['question'] ?? '',
-      answer: json['answer'] ?? '',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
+      id: json['id']?.toString() ?? '',
+      question: json['question'] is String ? json['question'] as String : '',
+      answer: json['answer'] is String ? json['answer'] as String : '',
+      createdAt: json['createdAt'] is String
+          ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
           : DateTime.now(),
     );
   }
@@ -123,13 +124,13 @@ class WeeklyGoal {
 
   factory WeeklyGoal.fromJson(Map<String, dynamic> json) {
     return WeeklyGoal(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      targetMinutes: json['targetMinutes'] ?? 0,
-      completedMinutes: json['completedMinutes'] ?? 0,
-      isCompleted: json['isCompleted'] ?? false,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
+      id: json['id']?.toString() ?? '',
+      title: json['title'] is String ? json['title'] as String : '',
+      targetMinutes: (json['targetMinutes'] as num?)?.toInt() ?? 0,
+      completedMinutes: (json['completedMinutes'] as num?)?.toInt() ?? 0,
+      isCompleted: json['isCompleted'] == true,
+      createdAt: json['createdAt'] is String
+          ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
           : DateTime.now(),
     );
   }
@@ -225,38 +226,39 @@ class WeeklyReview {
   }
 
   static List<WeeklyGoal> getDefaultGoals(AgeGroup ageGroup) {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    // M1: midnight-truncated Monday, not `now.subtract(Duration(...))` — the
+    // goal createdAt stamps should land on the same boundary the review uses.
+    final goalWeekStart = startOfWeek(DateTime.now());
 
     switch (ageGroup) {
       case AgeGroup.baby:
         return [
-          WeeklyGoal(id: 'goal_1', title: 'Learning Time', targetMinutes: 15, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_2', title: 'Play & Explore', targetMinutes: 20, createdAt: startOfWeek),
+          WeeklyGoal(id: 'goal_1', title: 'Learning Time', targetMinutes: 15, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_2', title: 'Play & Explore', targetMinutes: 20, createdAt: goalWeekStart),
         ];
       case AgeGroup.child:
         return [
-          WeeklyGoal(id: 'goal_1', title: 'Fun Learning', targetMinutes: 20, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_2', title: 'Creative Play', targetMinutes: 25, createdAt: startOfWeek),
+          WeeklyGoal(id: 'goal_1', title: 'Fun Learning', targetMinutes: 20, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_2', title: 'Creative Play', targetMinutes: 25, createdAt: goalWeekStart),
         ];
       case AgeGroup.kid:
         return [
-          WeeklyGoal(id: 'goal_1', title: 'Study Focus', targetMinutes: 60, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_2', title: 'Reading Time', targetMinutes: 30, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_3', title: 'Creative Activities', targetMinutes: 20, createdAt: startOfWeek),
+          WeeklyGoal(id: 'goal_1', title: 'Study Focus', targetMinutes: 60, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_2', title: 'Reading Time', targetMinutes: 30, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_3', title: 'Creative Activities', targetMinutes: 20, createdAt: goalWeekStart),
         ];
       case AgeGroup.teen:
         return [
-          WeeklyGoal(id: 'goal_1', title: 'Deep Study Sessions', targetMinutes: 120, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_2', title: 'Skill Practice', targetMinutes: 60, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_3', title: 'Mindfulness', targetMinutes: 30, createdAt: startOfWeek),
+          WeeklyGoal(id: 'goal_1', title: 'Deep Study Sessions', targetMinutes: 120, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_2', title: 'Skill Practice', targetMinutes: 60, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_3', title: 'Mindfulness', targetMinutes: 30, createdAt: goalWeekStart),
         ];
       case AgeGroup.adult:
         return [
-          WeeklyGoal(id: 'goal_1', title: 'Deep Work Hours', targetMinutes: 300, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_2', title: 'Learning & Growth', targetMinutes: 120, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_3', title: 'Exercise & Wellness', targetMinutes: 150, createdAt: startOfWeek),
-          WeeklyGoal(id: 'goal_4', title: 'Side Projects', targetMinutes: 60, createdAt: startOfWeek),
+          WeeklyGoal(id: 'goal_1', title: 'Deep Work Hours', targetMinutes: 300, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_2', title: 'Learning & Growth', targetMinutes: 120, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_3', title: 'Exercise & Wellness', targetMinutes: 150, createdAt: goalWeekStart),
+          WeeklyGoal(id: 'goal_4', title: 'Side Projects', targetMinutes: 60, createdAt: goalWeekStart),
         ];
     }
   }
@@ -279,27 +281,39 @@ class WeeklyReview {
   }
 
   factory WeeklyReview.fromJson(Map<String, dynamic> json) {
+    // M38: defensive — an out-of-range mood index or malformed date used to
+    // throw RangeError/FormatException and blank out the whole review list.
+    DateTime? tryParse(dynamic v) => v is String ? DateTime.tryParse(v) : null;
+    WeeklyMood? mood;
+    final rawMood = json['mood'];
+    if (rawMood is num) {
+      final idx = rawMood.toInt();
+      if (idx >= 0 && idx < WeeklyMood.values.length) {
+        mood = WeeklyMood.values[idx];
+      }
+    }
     return WeeklyReview(
-      id: json['id'] ?? '',
-      weekStart: DateTime.parse(json['weekStart'] ?? DateTime.now().toIso8601String()),
-      weekEnd: DateTime.parse(json['weekEnd'] ?? DateTime.now().toIso8601String()),
-      mood: json['mood'] != null ? WeeklyMood.values[json['mood']] : null,
+      id: json['id']?.toString() ?? '',
+      weekStart: tryParse(json['weekStart']) ?? DateTime.now(),
+      weekEnd: tryParse(json['weekEnd']) ?? DateTime.now(),
+      mood: mood,
       reflections: (json['reflections'] as List?)
-              ?.map((r) => WeeklyReflection.fromJson(r))
+              ?.whereType<Map>()
+              .map((r) =>
+                  WeeklyReflection.fromJson(Map<String, dynamic>.from(r)))
               .toList() ??
           [],
       goals: (json['goals'] as List?)
-              ?.map((g) => WeeklyGoal.fromJson(g))
+              ?.whereType<Map>()
+              .map((g) => WeeklyGoal.fromJson(Map<String, dynamic>.from(g)))
               .toList() ??
           [],
-      totalFocusMinutes: json['totalFocusMinutes'] ?? 0,
-      totalSessions: json['totalSessions'] ?? 0,
-      totalPointsEarned: json['totalPointsEarned'] ?? 0,
-      streakDays: json['streakDays'] ?? 0,
-      aiInsight: json['aiInsight'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+      totalFocusMinutes: (json['totalFocusMinutes'] as num?)?.toInt() ?? 0,
+      totalSessions: (json['totalSessions'] as num?)?.toInt() ?? 0,
+      totalPointsEarned: (json['totalPointsEarned'] as num?)?.toInt() ?? 0,
+      streakDays: (json['streakDays'] as num?)?.toInt() ?? 0,
+      aiInsight: json['aiInsight'] is String ? json['aiInsight'] as String : null,
+      createdAt: tryParse(json['createdAt']) ?? DateTime.now(),
     );
   }
 }

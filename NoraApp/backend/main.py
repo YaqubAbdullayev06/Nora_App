@@ -19,7 +19,7 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 # ─── Load .env BEFORE importing AI modules (they read env vars at import time) ───
 load_dotenv()
@@ -33,7 +33,19 @@ from models.orm import ContentModel
 
 
 def seed_content(db):
-    """Populate the content library if empty."""
+    """Populate the content library if empty.
+
+    Never lets a seeding failure abort application startup: a poisoned
+    transaction here previously crashed boot with InFailedSqlTransaction.
+    """
+    try:
+        _seed_content_inner(db)
+    except Exception as exc:
+        db.rollback()
+        print(f"[startup] seed_content skipped: {exc}")
+
+
+def _seed_content_inner(db):
     if db.query(ContentModel).count() == 0:
         contents = [
             ContentModel(
@@ -111,7 +123,7 @@ CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o
 _allow_credentials = bool(CORS_ORIGINS) and CORS_ORIGINS != ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS or ["*"],
+    allow_origins=CORS_ORIGINS if CORS_ORIGINS else ["*"],
     allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -140,38 +152,59 @@ async def health_check():
 # ─── Startup ───
 
 
+def _run_migration(db, sql: str) -> None:
+    """Run one migration statement in its own transaction.
+
+    On failure we MUST rollback: PostgreSQL aborts the whole transaction on
+    error, and leaving it open made every later statement (including
+    seed_content's count) fail with InFailedSqlTransaction, crashing startup.
+    """
+    try:
+        db.execute(text(sql))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        print(f"[startup] migration skipped ({exc.__class__.__name__}): {sql}")
+
+
+def _add_column_if_missing(db, table: str, column: str, ddl: str) -> None:
+    """Dialect-portable ADD COLUMN (works on PostgreSQL and SQLite).
+
+    Uses the inspector instead of `ADD COLUMN IF NOT EXISTS` (Postgres-only),
+    so no statement ever fails and the transaction is never aborted.
+    """
+    try:
+        existing = {c["name"] for c in inspect(engine).get_columns(table)}
+        if column not in existing:
+            db.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+            db.commit()
+    except Exception as exc:
+        db.rollback()
+        print(f"[startup] column add skipped ({exc.__class__.__name__}): {table}.{column}")
+
+
 @app.on_event("startup")
 def startup():
+    # create_all creates missing tables (incl. agent_state); it does NOT
+    # alter existing tables, so existing-database columns are added below.
     Base.metadata.create_all(bind=engine)
-    # ─── Migrations for existing databases ───
     db = SessionLocal()
     try:
-        db.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token_family VARCHAR(36)"
-        ))
-        db.commit()
-    except Exception:
-        pass  # Column already exists or dialect doesn't support IF NOT EXISTS
-    try:
-        db.execute(text(
-            "ALTER TABLE accountability_locks DROP CONSTRAINT IF EXISTS accountability_locks_user_id_key"
-        ))
-        db.commit()
-    except Exception:
-        pass  # Constraint doesn't exist or dialect doesn't support DROP CONSTRAINT IF EXISTS
-    try:
-        db.execute(text("ALTER TABLE users ADD COLUMN age_group VARCHAR(20)"))
-        db.commit()
-    except Exception:
-        pass  # Column already exists
-    try:
+        _add_column_if_missing(db, "users", "refresh_token_family", "VARCHAR(36)")
+        _add_column_if_missing(db, "users", "age_group", "VARCHAR(20)")
         # H1: admin role for privileged writes (content creation)
-        db.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
-        db.commit()
-    except Exception:
-        pass  # Column already exists
-    seed_content(db)
-    db.close()
+        _add_column_if_missing(db, "users", "is_admin", "BOOLEAN NOT NULL DEFAULT FALSE")
+        # M28: content cover image
+        _add_column_if_missing(db, "content", "image_url", "VARCHAR(500)")
+        if engine.dialect.name == "postgresql":
+            # PostgreSQL-only syntax; drop unique constraint on user_id
+            _run_migration(
+                db,
+                "ALTER TABLE accountability_locks DROP CONSTRAINT IF EXISTS accountability_locks_user_id_key",
+            )
+        seed_content(db)
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

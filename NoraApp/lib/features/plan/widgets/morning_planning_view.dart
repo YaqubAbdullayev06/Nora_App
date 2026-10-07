@@ -397,14 +397,19 @@ class _MorningPlanningViewState extends State<MorningPlanningView> {
   void _applyDecomposition(DecomposedTask result, int taskIndex) {
     HapticService.timerStarted();
 
-    if (result.subtasks.isNotEmpty) {
-      _taskControllers[taskIndex].text = result.subtasks.first.title;
-    }
+    if (result.subtasks.isEmpty) return;
 
+    // The slot the user decomposed is replaced (explicit Apply action)…
+    _taskControllers[taskIndex].text = result.subtasks.first.title;
+
+    // M40: …but never clobber OTHER slots the user already typed into —
+    // the old loop overwrote every non-empty controller it reached.
     for (int i = 1;
         i < result.subtasks.length && i < _taskControllers.length;
         i++) {
-      _taskControllers[i].text = result.subtasks[i].title;
+      if (_taskControllers[i].text.trim().isEmpty) {
+        _taskControllers[i].text = result.subtasks[i].title;
+      }
     }
   }
 }

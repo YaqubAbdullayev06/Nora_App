@@ -231,10 +231,41 @@ class ApiService {
       ),
     );
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      // M18: guard jsonDecode — a proxy/HTML body must not crash with FormatException
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+      } catch (_) {
+        // fall through to generic error below
+      }
+      throw Exception('Unexpected profile payload from server');
     }
-    throw Exception(
-        jsonDecode(response.body)['detail'] ?? 'Failed to get user profile');
+    // M17/M18: extract detail safely (FastAPI `detail` may be a List, body may be HTML)
+    throw Exception(_extractDetail(response) ?? 'Failed to get user profile');
+  }
+
+  /// Pull a human-readable error message out of an HTTP error response.
+  /// Returns null when the body is not JSON or has no usable detail.
+  String? _extractDetail(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final detail = decoded['detail'] ?? decoded['error'];
+        if (detail is String && detail.isNotEmpty) return detail;
+        if (detail is List) {
+          // FastAPI validation errors: [{"msg": "...", "loc": ...}, ...]
+          final msgs = detail
+              .whereType<Map>()
+              .map((e) => (e['msg'] ?? e['type'] ?? '').toString())
+              .where((s) => s.isNotEmpty)
+              .join('; ');
+          if (msgs.isNotEmpty) return msgs;
+        }
+      }
+    } catch (_) {
+      // non-JSON body (HTML 500 page etc.)
+    }
+    return null;
   }
 
   // ─── Users ───
@@ -258,44 +289,61 @@ class ApiService {
   // ─── Focus Sessions ───
 
   Future<FocusSession> createSession(FocusSession session) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/sessions/'),
-      headers: _headers,
-      // SessionCreate expects snake_case fields (duration_minutes etc.)
-      body: jsonEncode({
-        'duration_minutes': session.durationMinutes,
-        'session_type': 'pomodoro',
-        'notes': null,
-      }),
+    // M27: authenticated request — auto-refreshes token on 401 like other calls
+    final response = await _authenticatedRequest(
+      (token) => _client.post(
+        Uri.parse('$baseUrl/sessions/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        // SessionCreate expects snake_case fields (duration_minutes etc.)
+        body: jsonEncode({
+          'duration_minutes': session.durationMinutes,
+          'session_type': 'pomodoro',
+          'notes': null,
+        }),
+      ),
     );
     if (response.statusCode == 201) {
       return FocusSession.fromJson(jsonDecode(response.body));
     }
-    throw Exception('Failed to create session');
+    throw Exception(_extractDetail(response) ?? 'Failed to create session');
   }
 
   Future<List<FocusSession>> getUserSessions(String userId) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/sessions/'),
-      headers: _headers,
+    final response = await _authenticatedRequest(
+      (token) => _client.get(
+        Uri.parse('$baseUrl/sessions/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((s) => FocusSession.fromJson(s)).toList();
     }
-    throw Exception('Failed to get sessions');
+    throw Exception(_extractDetail(response) ?? 'Failed to get sessions');
   }
 
   Future<int> completeSession(String sessionId) async {
-    final response = await _client.put(
-      Uri.parse('$baseUrl/sessions/$sessionId/complete'),
-      headers: _headers,
+    final response = await _authenticatedRequest(
+      (token) => _client.put(
+        Uri.parse('$baseUrl/sessions/$sessionId/complete'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['points_earned'] ?? 0;
+      // M25: safe cast — points_earned may arrive as num/int from JSON
+      return (data['points_earned'] as num?)?.toInt() ?? 0;
     }
-    throw Exception('Failed to complete session');
+    throw Exception(_extractDetail(response) ?? 'Failed to complete session');
   }
 
   // ─── Content ───
@@ -304,51 +352,74 @@ class ApiService {
     final uri = category != null
         ? Uri.parse('$baseUrl/content/?category=$category')
         : Uri.parse('$baseUrl/content/');
-    final response = await _client.get(uri, headers: _headers);
+    final response = await _authenticatedRequest(
+      (token) => _client.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((c) => ContentItem.fromJson(c)).toList();
     }
-    throw Exception('Failed to get content');
+    throw Exception(_extractDetail(response) ?? 'Failed to get content');
   }
 
   Future<ContentItem> createContent(ContentItem content) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/content/'),
-      headers: _headers,
-      body: jsonEncode(content.toJson()),
+    final response = await _authenticatedRequest(
+      (token) => _client.post(
+        Uri.parse('$baseUrl/content/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(content.toJson()),
+      ),
     );
     if (response.statusCode == 201) {
       return ContentItem.fromJson(jsonDecode(response.body));
     }
-    throw Exception('Failed to create content');
+    throw Exception(_extractDetail(response) ?? 'Failed to create content');
   }
 
   // ─── Recommendations ───
 
   Future<List<AIRecommendation>> getRecommendations(String userId) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/recommendations/'),
-      headers: _headers,
+    final response = await _authenticatedRequest(
+      (token) => _client.get(
+        Uri.parse('$baseUrl/recommendations/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((r) => AIRecommendation.fromJson(r)).toList();
     }
-    throw Exception('Failed to get recommendations');
+    throw Exception(_extractDetail(response) ?? 'Failed to get recommendations');
   }
 
   // ─── Focus Score ───
 
   Future<FocusScore> getFocusScore(String userId) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/focus-score/'),
-      headers: _headers,
+    final response = await _authenticatedRequest(
+      (token) => _client.get(
+        Uri.parse('$baseUrl/focus-score/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
     );
     if (response.statusCode == 200) {
       return FocusScore.fromJson(jsonDecode(response.body));
     }
-    throw Exception('Failed to get focus score');
+    throw Exception(_extractDetail(response) ?? 'Failed to get focus score');
   }
 
   /// Authenticated GET returning decoded JSON.
@@ -382,18 +453,42 @@ class ApiService {
   }
 
   /// Decode a JSON response, throwing on non-2xx.
+  ///
+  /// M17: the old implementation caught its OWN thrown detail message and
+  /// replaced real errors ("Incorrect PIN") with "Server error (401)" unless
+  /// it happened to contain the magic substring 'Agent request'.
   Map<String, dynamic> decodeJsonResponse(http.Response response) {
+    Map<String, dynamic> decoded;
     try {
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
+      final parsed = jsonDecode(response.body);
+      if (parsed is! Map<String, dynamic>) {
+        throw const FormatException('Response is not a JSON object');
       }
-      throw Exception(
-          decoded['detail'] ?? decoded['error'] ?? 'Agent request failed');
-    } catch (e) {
-      if (e is Exception && e.toString().contains('Agent request')) rethrow;
+      decoded = parsed;
+    } catch (_) {
+      // HTML 500 page / empty body / non-JSON proxy error
       throw Exception('Server error (${response.statusCode})');
     }
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    throw Exception(
+        _extractDetailFromMap(decoded) ?? 'Request failed (${response.statusCode})');
+  }
+
+  /// M17: detail may be a String, or a List of FastAPI validation errors.
+  String? _extractDetailFromMap(Map<String, dynamic> decoded) {
+    final detail = decoded['detail'] ?? decoded['error'];
+    if (detail is String && detail.isNotEmpty) return detail;
+    if (detail is List) {
+      final msgs = detail
+          .whereType<Map>()
+          .map((e) => (e['msg'] ?? e['type'] ?? '').toString())
+          .where((s) => s.isNotEmpty)
+          .join('; ');
+      if (msgs.isNotEmpty) return msgs;
+    }
+    return null;
   }
 
   // ─── AI App Classification ───
@@ -498,8 +593,11 @@ class ApiService {
     return getJson('/hardcap/status');
   }
 
-  Future<Map<String, dynamic>> deactivateHardCap() async {
-    return postJson('/hardcap/deactivate', {});
+  Future<Map<String, dynamic>> deactivateHardCap({String? pin}) async {
+    // M32: send the PIN so the backend can enforce require_pin_to_override
+    return postJson('/hardcap/deactivate', {
+      if (pin != null && pin.isNotEmpty) 'pin': pin,
+    });
   }
 
   // ─── Habits ───

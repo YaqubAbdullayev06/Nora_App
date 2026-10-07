@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../core/utils/week_utils.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 
@@ -13,6 +15,10 @@ class HabitProvider extends ChangeNotifier {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final ApiService _api = ApiService();
   bool _isInitialized = false;
+  Timer? _dayCheckTimer;
+  /// M35: mutation epoch — bumped by every user mutation so an in-flight
+  /// async `_loadLocal` can detect it holds stale data and discard it.
+  int _mutationEpoch = 0;
 
   // ─── State ───
   List<Habit> _habits = [];
@@ -27,6 +33,7 @@ class HabitProvider extends ChangeNotifier {
   static const _todayEarnedKey = 'habits_today_earned';
   static const _weekEarnedKey = 'habits_week_earned';
   static const _lastDateKey = 'habits_last_date';
+  static const _lastWeekKey = 'habits_last_week';
 
   // ─── Getters ───
   List<Habit> get habits {
@@ -54,7 +61,18 @@ class HabitProvider extends ChangeNotifier {
     _isInitialized = true;
     await _loadLocal();
     await _checkDailyReset();
+    _startDayWatch();
     notifyListeners();
+  }
+
+  /// M15: watch for date/week rollover while the app stays open past
+  /// midnight — `_checkDailyReset` only ran once during initialize().
+  void _startDayWatch() {
+    _dayCheckTimer?.cancel();
+    _dayCheckTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkDailyReset(),
+    );
   }
 
   // ─── CRUD ───
@@ -68,6 +86,7 @@ class HabitProvider extends ChangeNotifier {
     int screenTimeMinutes = 15,
     int targetPerDay = 1,
   }) async {
+    _mutationEpoch++; // M35
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -89,7 +108,10 @@ class HabitProvider extends ChangeNotifier {
         return true;
       }
 
-      _error = response['detail'] ?? 'Failed to create habit';
+      final detail = response['detail'];
+      _error = detail is String && detail.isNotEmpty
+          ? detail
+          : 'Failed to create habit'; // M25: detail may be a validation List
       _isLoading = false;
       notifyListeners();
       return false;
@@ -103,6 +125,7 @@ class HabitProvider extends ChangeNotifier {
 
   /// Complete a habit and earn screen time.
   Future<int?> completeHabit(int habitId, {int durationMinutes = 0}) async {
+    _mutationEpoch++; // M35
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -114,10 +137,13 @@ class HabitProvider extends ChangeNotifier {
       );
 
       if (response['success'] == true) {
-        final screenTimeEarned = (response['screen_time_earned'] ?? 0) as int;
+        // M25: safe casts — JSON numbers can arrive as num/double
+        final screenTimeEarned =
+            ((response['screen_time_earned'] ?? 0) as num).toInt();
         _todayScreenTimeEarned += screenTimeEarned;
         _weekScreenTimeEarned += screenTimeEarned;
-        _todayCompletions = (response['completions_today'] ?? _todayCompletions) as int;
+        _todayCompletions =
+            ((response['completions_today'] ?? _todayCompletions) as num).toInt();
         await _saveLocal();
         // refreshHabits() calls _saveLocal + notifyListeners — no extra call needed
         await refreshHabits();
@@ -125,7 +151,11 @@ class HabitProvider extends ChangeNotifier {
         return screenTimeEarned;
       }
 
-      _error = response['detail'] ?? 'Failed to complete habit';
+      // M25: detail may be a String OR a FastAPI validation List
+      final detail = response['detail'];
+      _error = detail is String && detail.isNotEmpty
+          ? detail
+          : 'Failed to complete habit';
       _isLoading = false;
       notifyListeners();
       return null;
@@ -139,6 +169,7 @@ class HabitProvider extends ChangeNotifier {
 
   /// Delete (deactivate) a habit.
   Future<bool> deleteHabit(int habitId) async {
+    _mutationEpoch++; // M35
     try {
       final response = await _api.deleteHabit(habitId);
       if (response['success'] == true) {
@@ -155,6 +186,7 @@ class HabitProvider extends ChangeNotifier {
 
   /// Refresh habits from backend.
   Future<void> refreshHabits() async {
+    _mutationEpoch++; // M35
     try {
       final response = await _api.listHabits();
       if (response['success'] == true) {
@@ -170,12 +202,16 @@ class HabitProvider extends ChangeNotifier {
 
   /// Refresh stats from backend.
   Future<void> refreshStats() async {
+    _mutationEpoch++; // M35
     try {
       final response = await _api.getHabitStats();
       if (response['success'] == true) {
-        _todayCompletions = response['today_completions'] ?? 0;
-        _todayScreenTimeEarned = response['today_screen_time_earned'] ?? 0;
-        _weekScreenTimeEarned = response['week_screen_time_earned'] ?? 0;
+        _todayCompletions =
+            ((response['today_completions'] ?? 0) as num).toInt(); // M25
+        _todayScreenTimeEarned =
+            ((response['today_screen_time_earned'] ?? 0) as num).toInt();
+        _weekScreenTimeEarned =
+            ((response['week_screen_time_earned'] ?? 0) as num).toInt();
         await _saveLocal();
         notifyListeners();
       }
@@ -187,6 +223,7 @@ class HabitProvider extends ChangeNotifier {
   // ─── Private Methods ───
 
   Future<void> _checkDailyReset() async {
+    _mutationEpoch++; // M35
     final savedDate = await _storage.read(key: _lastDateKey);
     final today = DateTime.now().toIso8601String().substring(0, 10);
 
@@ -198,21 +235,43 @@ class HabitProvider extends ChangeNotifier {
       await _saveLocal();
       notifyListeners();
     }
+
+    // M16: reset weekly earnings when the ISO week (Monday start) rolls over
+    final savedWeek = await _storage.read(key: _lastWeekKey);
+    final thisWeek = _weekStartString(DateTime.now());
+    if (savedWeek != thisWeek) {
+      _weekScreenTimeEarned = 0;
+      await _storage.write(key: _lastWeekKey, value: thisWeek);
+      await _saveLocal();
+      notifyListeners();
+    }
+  }
+
+  /// Monday of the week containing [day], as 'yyyy-MM-dd'.
+  static String _weekStartString(DateTime day) {
+    // M1: calendar arithmetic (see core/utils/week_utils) — subtracting a raw
+    // Duration across a DST change could land before midnight and roll the
+    // date back a day.
+    final monday = startOfWeek(day);
+    return monday.toIso8601String().substring(0, 10);
   }
 
   // ─── Local Storage ───
 
   Future<void> _loadLocal() async {
+    // M35: read first, assign only if no mutation happened during the awaits
+    final epoch = _mutationEpoch;
     try {
       final todayStr = await _storage.read(key: _todayCompletionsKey);
-      if (todayStr != null) _todayCompletions = int.tryParse(todayStr) ?? 0;
-
       final earnedStr = await _storage.read(key: _todayEarnedKey);
+      final weekStr = await _storage.read(key: _weekEarnedKey);
+
+      if (epoch != _mutationEpoch) return; // stale — user already mutated
+
+      if (todayStr != null) _todayCompletions = int.tryParse(todayStr) ?? 0;
       if (earnedStr != null) {
         _todayScreenTimeEarned = int.tryParse(earnedStr) ?? 0;
       }
-
-      final weekStr = await _storage.read(key: _weekEarnedKey);
       if (weekStr != null) _weekScreenTimeEarned = int.tryParse(weekStr) ?? 0;
     } catch (e) {
       debugPrint('HabitProvider: failed to load local: $e');
@@ -232,5 +291,11 @@ class HabitProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('HabitProvider: failed to save: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _dayCheckTimer?.cancel();
+    super.dispose();
   }
 }

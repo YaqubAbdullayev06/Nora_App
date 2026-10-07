@@ -16,6 +16,7 @@ class AccountabilityProvider extends ChangeNotifier {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   // ─── State ───
+  bool _disposed = false;
   bool _isInitialized = false;
   bool _isLockActive = false;
   String? _guardianName;
@@ -123,18 +124,18 @@ class AccountabilityProvider extends ChangeNotifier {
 
         await _saveLocalLock();
         _setupInProgress = false;
-        notifyListeners();
+        if (!_disposed) notifyListeners();
         return true;
       }
 
       _error = 'Setup failed';
       _setupInProgress = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
       _setupInProgress = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     }
   }
@@ -153,7 +154,7 @@ class AccountabilityProvider extends ChangeNotifier {
       if (response['success'] == true && response['verified'] == true) {
         _isVerified = true;
         _verifyAttempts = 0;
-        notifyListeners();
+        if (!_disposed) notifyListeners();
         return true;
       }
 
@@ -174,7 +175,7 @@ class AccountabilityProvider extends ChangeNotifier {
     } else {
       _error = 'Incorrect PIN. ${_maxAttempts - _verifyAttempts} attempts remaining.';
     }
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   void _startCooldown() {
@@ -183,7 +184,7 @@ class AccountabilityProvider extends ChangeNotifier {
       _isCooldown = false;
       _verifyAttempts = 0;
       _error = null;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     });
   }
 
@@ -203,16 +204,16 @@ class AccountabilityProvider extends ChangeNotifier {
         _isExpired = false;
         _isVerified = false;
         await _clearLocalLock();
-        notifyListeners();
+        if (!_disposed) notifyListeners();
         return true;
       }
 
       _error = 'Failed to unlink';
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return false;
     }
   }
@@ -224,13 +225,13 @@ class AccountabilityProvider extends ChangeNotifier {
     _isCooldown = false;
     _cooldownTimer?.cancel();
     _error = null;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   /// Clear error state.
   void clearError() {
     _error = null;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   // ─── Local Storage ───
@@ -291,7 +292,7 @@ class AccountabilityProvider extends ChangeNotifier {
       _isExpired = lock.isExpired;
       if (lock.expiresAt != null) _lockExpiresAt = lock.expiresAt;
       await _saveLocalLock();
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     } catch (e) {
       // Backend unavailable — rely on local state
       debugPrint('AccountabilityProvider: backend sync failed: $e');
@@ -300,6 +301,7 @@ class AccountabilityProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _cooldownTimer?.cancel();
     super.dispose();
   }

@@ -10,8 +10,12 @@ import Foundation
 ///
 /// IMPORTANT: This extension runs in a separate process and has limited
 /// access to shared resources. Use App Groups for data sharing.
+// C4: module-qualified superclass. The class name collides with the
+// framework's own DeviceActivityMonitor, so an unqualified superclass is
+// ambiguous — and this file is now compiled into BOTH the NoraScreenTime
+// extension and the Runner app (AppDelegate decodes its nested Codable types).
 @available(iOS 16.0, *)
-class DeviceActivityMonitor: DeviceActivityMonitor {
+class DeviceActivityMonitor: DeviceActivity.DeviceActivityMonitor {
 
   // MARK: - Types
 

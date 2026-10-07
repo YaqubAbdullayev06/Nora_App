@@ -206,9 +206,9 @@ async def ai_chat(
     # Add current user message
     messages.append({"role": "user", "content": request.message})
 
-    # Get response from Ollama
+    # Get response from LLM (using fallback chain)
     try:
-        response = await ollama.chat(messages, temperature=0.7)
+        response = await llm.chat(messages, temperature=0.7)
 
         # CRISIS DETECTION: Check AI response for crisis content
         if check_crisis(response):
@@ -216,9 +216,11 @@ async def ai_chat(
 
         return ChatResponse(response=response, model=model)
     except Exception as e:
+        # M5: never echo raw exception details to the client (may leak keys/paths)
         logger.error("AI chat failed: %s", e, exc_info=True)
         return ChatResponse(
-            response=f"I'm having trouble connecting to my brain right now. All LLM providers failed. Error: {str(e)}",
+            response="I'm having trouble connecting to my brain right now. "
+            "All LLM providers failed — please try again in a moment.",
             model=model,
         )
 
@@ -263,7 +265,7 @@ async def ai_command(
     messages.append({"role": "user", "content": request.command})
 
     try:
-        response = await ollama.chat(messages, temperature=0.5)
+        response = await llm.chat(messages, temperature=0.5)
 
         # CRISIS DETECTION: Check AI response for crisis content too
         if check_crisis(response):
@@ -286,9 +288,10 @@ async def ai_command(
             "actions": validated_actions,
         }
     except Exception as e:
+        # M5: never echo raw exception details to the client (may leak keys/paths)
         logger.error("AI command failed: %s", e, exc_info=True)
         return {
-            "response": f"I had trouble processing that. Error: {str(e)}",
+            "response": "I had trouble processing that — please try again in a moment.",
             "model": model,
             "actions": [],
         }
@@ -335,6 +338,20 @@ async def generate_notification_text(
     }
 
     NOTIFICATION_PROMPTS = {
+        "baby": """Generate a very short, sweet notification message for a baby/toddler (under 6).
+Rules:
+- Use baby-talk friendly, cheerful language
+- Add one cute emoji
+- Keep it under 8 words
+- Always positive and gentle
+- A parent will read it aloud""",
+        "child": """Generate a short, fun notification message for a young child (ages 6-12).
+Rules:
+- Use simple, encouraging language
+- Add a fun emoji
+- Keep it under 15 words
+- Be enthusiastic and positive
+- Never mention screen time limits negatively""",
         "kid": """Generate a short, fun notification message for a kid (ages 6-12).
 Rules:
 - Use simple, encouraging language
@@ -370,7 +387,7 @@ CONTEXT: {_json.dumps(request.context) if request.context else 'None'}
 Generate ONLY the notification text. No quotes, no explanation. Just the message."""
 
     try:
-        response = await ollama.chat(
+        response = await llm.chat(
             [{"role": "user", "content": prompt}],
             temperature=0.8,
         )
@@ -521,7 +538,7 @@ USER PROFILE:
 Create an optimized daily schedule."""
 
     try:
-        response = await ollama.chat(
+        response = await llm.chat(
             [{"role": "user", "content": prompt}],
             temperature=0.4,
         )
@@ -540,12 +557,14 @@ Create an optimized daily schedule."""
         logger.warning("Daily plan LLM path failed, using fallback: %s", e)
 
     # Fallback: generate a basic plan
+    # M4: clamp hours here too — the LLM-path totals use the same value
+    safe_hours = _safe_hours(request.available_hours)
     return {
         "success": True,
-        "plan": _generate_fallback_plan(request.available_hours, request.energy_pattern),
+        "plan": _generate_fallback_plan(safe_hours, request.energy_pattern),
         "summary": f"A productive {request.age_group}-focused day with balanced work and breaks.",
-        "total_focus_minutes": int(request.available_hours * 60 * 0.6),
-        "total_break_minutes": int(request.available_hours * 60 * 0.4),
+        "total_focus_minutes": int(safe_hours * 60 * 0.6),
+        "total_break_minutes": int(safe_hours * 60 * 0.4),
         "tip": "Start with your most important task when energy is highest.",
     }
 
@@ -574,11 +593,23 @@ def _parse_json_from_response(response: str) -> Optional[dict]:
     return None
 
 
+def _safe_hours(value) -> float:
+    """M4: clamp available_hours to a sane 0.5–24h range (NaN/non-numeric → 8)."""
+    try:
+        hours = float(value)
+    except (TypeError, ValueError):
+        return 8.0
+    if hours != hours or hours <= 0:  # NaN or non-positive
+        return 8.0
+    return min(hours, 24.0)
+
+
 def _generate_fallback_plan(available_hours: float, energy_pattern: str) -> list[dict]:
     """Generate a basic fallback plan when LLM fails."""
     blocks = []
     start_hour = 9 if energy_pattern != "night_owl" else 11
-    total_minutes = int(available_hours * 60)
+    # M4: defensive clamp — negative/NaN/huge values produced empty or runaway plans
+    total_minutes = max(30, int(_safe_hours(available_hours) * 60))
     elapsed = 0
 
     while elapsed < total_minutes - 25:
@@ -668,7 +699,7 @@ Rules:
 Respond with ONLY the JSON."""
 
     try:
-        response = await ollama.chat(
+        response = await llm.chat(
             [{"role": "user", "content": sentiment_prompt}],
             temperature=0.6,
         )
@@ -801,7 +832,7 @@ USER PROFILE:
 Analyze patterns and predict procrastination windows."""
 
     try:
-        response = await ollama.chat(
+        response = await llm.chat(
             [{"role": "user", "content": prompt}],
             temperature=0.5,
         )
@@ -824,8 +855,23 @@ Analyze patterns and predict procrastination windows."""
 
 def _generate_fallback_predictions(age_group: str, current_time: str, recent_usage: dict) -> dict:
     """Generate rule-based predictions when LLM fails."""
-    social_time = recent_usage.get("socialMediaMinutes", 0)
-    total_time = recent_usage.get("totalScreenTimeMinutes", 0)
+
+    def _as_number(value, default=0):
+        # M2: client JSON may send minute counts as strings ("120");
+        # `str > int` raises TypeError and crashed the fallback path.
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, (int, float)):
+            return value
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return default
+        return default
+
+    social_time = _as_number(recent_usage.get("socialMediaMinutes", 0))
+    total_time = _as_number(recent_usage.get("totalScreenTimeMinutes", 0))
 
     predictions = []
     nudges = []

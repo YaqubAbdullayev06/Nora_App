@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/enums/age_group.dart';
+import '../core/utils/week_utils.dart';
 import '../models/models.dart';
-import '../services/notification_service.dart';
+import '../services/notification_service.dart' as notifications;
+import '../services/proactive_assist_service.dart';
 import 'persona_provider.dart';
 
 /// Manages focus scores, sessions history, streaks, and achievements.
@@ -14,6 +16,7 @@ class FocusProvider extends ChangeNotifier {
   static const _sessionsKey = 'nora_focus_sessions';
   static const _statsKey = 'nora_focus_stats';
 
+  bool _disposed = false;
   int _focusScore = 0;
   int _totalFocusMinutes = 0;
   int _streakDays = 0;
@@ -37,6 +40,33 @@ class FocusProvider extends ChangeNotifier {
   int get sessionsCompleted => _sessionsCompleted;
   List<String> get achievements => _achievements;
   List<FocusSession> get sessions => _sessions;
+
+  /// Summary of today's focus activity for the Home screen.
+  /// Note: We return a SmartSummary since that's what the Home screen expects.
+  /// We map internal focus stats to the SmartSummary fields.
+  SmartSummary get todaySummary {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todaySessions = _sessions
+        .where((s) =>
+            DateTime(s.startTime.year, s.startTime.month, s.startTime.day) == today)
+        .toList();
+
+    final minutes = todaySessions.fold<int>(0, (sum, s) => sum + s.durationMinutes);
+    final sessionsCount = todaySessions.length;
+
+    return SmartSummary(
+      totalScreenTime: '${minutes}m focused',
+      socialMediaTime: 'N/A',
+      topApps: [], // FocusProvider doesn't track per-app usage, only sessions
+      suggestions: sessionsCount == 0
+          ? ['Start your first focus session of the day!']
+          : ['Great job focusing for $minutes minutes today!'],
+      alerts: [],
+      blockedAppsCount: 0,
+      focusScore: _focusScore,
+    );
+  }
 
   /// Load persisted sessions and stats from secure storage.
   Future<void> load() async {
@@ -65,7 +95,7 @@ class FocusProvider extends ChangeNotifier {
 
     // Recompute streak from persisted sessions
     _streakDays = computedStreakDays;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   /// Persist sessions and stats to secure storage.
@@ -89,25 +119,14 @@ class FocusProvider extends ChangeNotifier {
     );
   }
 
-  List<int> get weeklyFocusMinutes {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-
-    final List<int> minutes = List.filled(7, 0);
-    for (final session in _sessions) {
-      if (!session.completed) continue;
-      final sessionDate = DateTime(
-        session.startTime.year,
-        session.startTime.month,
-        session.startTime.day,
-      );
-      final dayIndex = sessionDate.difference(startOfWeek).inDays;
-      if (dayIndex >= 0 && dayIndex < 7) {
-        minutes[dayIndex] += session.durationMinutes;
-      }
-    }
-    return minutes;
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
+
+  List<int> get weeklyFocusMinutes =>
+      weeklyMinutesByDay(_sessions, DateTime.now());
 
   int get computedStreakDays {
     if (_sessions.isEmpty) return 0;
@@ -152,8 +171,8 @@ class FocusProvider extends ChangeNotifier {
     notifyListeners();
 
     // Send AI notification for session complete
-    NotificationService().showAlert(
-      type: NotificationType.sessionComplete,
+    notifications.NotificationService().showAlert(
+      type: notifications.NotificationType.sessionComplete,
       ageGroup: _personaProvider.ageGroup.name,
       context: {
         'duration': session.durationMinutes,
@@ -184,8 +203,8 @@ class FocusProvider extends ChangeNotifier {
     notifyListeners();
 
     // Send AI notification for session complete
-    NotificationService().showAlert(
-      type: NotificationType.sessionComplete,
+    notifications.NotificationService().showAlert(
+      type: notifications.NotificationType.sessionComplete,
       ageGroup: _personaProvider.ageGroup.name,
       context: {'duration': minutes, 'points': points},
     );

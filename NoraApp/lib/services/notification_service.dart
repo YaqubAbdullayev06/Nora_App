@@ -45,15 +45,30 @@ class NotificationService {
       _onNotificationTapped.stream;
 
   bool _isInitialized = false;
+  /// M36: single-flight init — concurrent showAlert() calls previously
+  /// each ran the full plugin initialization because _isInitialized is
+  /// only set at the end.
+  Future<void>? _initializing;
 
   // ─── AI Notification Text Cache ───
   // Cache AI-generated texts to avoid repeated API calls
   final Map<String, String> _textCache = {};
 
-  /// Initialize the notification service.
+  /// Initialize the notification service (idempotent + single-flight).
   Future<void> init() async {
     if (_isInitialized) return;
+    final pending = _initializing;
+    if (pending != null) return pending;
+    final future = _initInternal();
+    _initializing = future;
+    try {
+      await future;
+    } finally {
+      _initializing = null;
+    }
+  }
 
+  Future<void> _initInternal() async {
     // Initialize timezone database
     tz.initializeTimeZones();
 
@@ -117,7 +132,13 @@ class NotificationService {
     required String ageGroup,
     Map<String, dynamic>? context,
   }) async {
-    final cacheKey = '${eventType}_${ageGroup}_${context.hashCode}';
+    // M36: Map.hashCode is identity-based — identical contexts produced
+    // different keys, so the cache never hit. Use a content-based key.
+    final cacheKey = jsonEncode({
+      'event': eventType,
+      'age': ageGroup,
+      'context': context ?? {},
+    });
     if (_textCache.containsKey(cacheKey)) {
       return _textCache[cacheKey]!;
     }
@@ -183,7 +204,7 @@ class NotificationService {
     required String ageGroup,
     Map<String, dynamic>? context,
     String? customTitle,
-    int id = 0,
+    int? id,
   }) async {
     if (!_isInitialized) await init();
 
@@ -212,7 +233,43 @@ class NotificationService {
       ),
     );
 
-    await _plugin.show(id, title, body, details, payload: eventType);
+    // M19: default id was 0 for every type — a focus alert silently
+    // replaced a habit reminder (and vice versa). Use a stable per-type id.
+    await _plugin.show(
+      id ?? _eventNotificationId(eventType),
+      title,
+      body,
+      details,
+      payload: eventType,
+    );
+  }
+
+  /// Stable, collision-free notification id per event type.
+  /// (IDs must also be stable across app launches so scheduled and
+  /// instant notifications referring to the same event replace each other.)
+  int _eventNotificationId(String eventType) {
+    switch (eventType) {
+      case 'focus_start':
+        return 1001;
+      case 'focus_end':
+        return 1002;
+      case 'focus_break':
+        return 1003;
+      case 'habit_reminder':
+        return 1004;
+      case 'hard_cap_warning':
+        return 1005;
+      case 'hard_cap_reached':
+        return 1006;
+      case 'accountability_alert':
+        return 1007;
+      case 'daily_motivation':
+        return 1008;
+      case 'session_complete':
+        return 1009;
+      default:
+        return 1000;
+    }
   }
 
   // ─── Scheduled Notifications ───

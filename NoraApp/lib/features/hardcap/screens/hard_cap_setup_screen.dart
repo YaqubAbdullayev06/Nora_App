@@ -613,8 +613,16 @@ class _HardCapSetupScreenState extends State<HardCapSetupScreen> {
       icon: Icons.close_rounded,
       outlined: true,
       onPressed: () async {
-        final success = await cap.deactivateCap();
-        if (success && mounted) {
+        // M32: server enforces PIN when an accountability lock is active —
+        // prompt for it up front so the request can succeed.
+        String? pin;
+        if (cap.requirePinToOverride) {
+          pin = await _showPinDialog();
+          if (pin == null || !mounted) return; // cancelled
+        }
+        final success = await cap.deactivateCap(pin: pin);
+        if (!mounted) return;
+        if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Hard cap removed'),
@@ -622,8 +630,56 @@ class _HardCapSetupScreenState extends State<HardCapSetupScreen> {
             ),
           );
           Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(cap.error ?? 'Failed to remove hard cap'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       },
     );
+  }
+
+  /// M32: PIN entry dialog for hard-cap deactivation. Returns null if cancelled.
+  Future<String?> _showPinDialog() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: DesignTokens.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.cardRadius),
+        ),
+        title: const Text('Enter accountability PIN'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          obscureText: true,
+          style: const TextStyle(fontSize: 18, letterSpacing: 6),
+          textAlign: TextAlign.center,
+          decoration: const InputDecoration(
+            hintText: '• • • •',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    ).then((value) {
+      controller.dispose();
+      return value;
+    });
   }
 }

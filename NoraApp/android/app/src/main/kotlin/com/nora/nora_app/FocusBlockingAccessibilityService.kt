@@ -50,11 +50,11 @@ class FocusBlockingAccessibilityService : AccessibilityService() {
         lastBlockedPackage = packageName
         lastBlockedAt = now
 
-        startActivity(
-            Intent(this, BlockedAppActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                .putExtra(BlockedAppActivity.BLOCKED_PACKAGE_EXTRA, packageName),
-        )
+        val intent = Intent(this, BlockedAppActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            intent.putExtra(BlockedAppActivity.BLOCKED_PACKAGE_EXTRA, packageName)
+
+        startActivity(intent)
     }
 
     override fun onDestroy() {

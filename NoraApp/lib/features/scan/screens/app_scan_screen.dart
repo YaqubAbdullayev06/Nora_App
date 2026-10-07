@@ -146,8 +146,10 @@ class _AppScanScreenState extends State<AppScanScreen>
           _appIcons[entry.key] = entry.value!;
         }
       }
+      // Update UI periodically in batches to show progress, but not too often
+      setState(() {});
     }
-    // Single setState after ALL icons loaded — prevents repeated rebuilds
+    // Final setState to ensure everything is rendered
     if (mounted) setState(() {});
   }
 
@@ -526,113 +528,18 @@ class _AppScanScreenState extends State<AppScanScreen>
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: apps.length,
       itemBuilder: (context, index) {
-        final app = apps[index];
-        return _buildAppTile(app, showRecommendation: showRecommendation);
+        return AppTile(
+          app: apps[index],
+          appIcons: _appIcons,
+          showRecommendation: showRecommendation,
+          onToggleBlock: (app) => _toggleBlock(app),
+        );
       },
     );
   }
 
-  Widget _buildAppTile(AppInfo app, {bool showRecommendation = false}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: DesignTokens.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: showRecommendation
-              ? DesignTokens.danger.withValues(alpha: 0.3)
-              : app.isBlocked
-                  ? DesignTokens.danger.withValues(alpha: 0.2)
-                  : DesignTokens.border,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // App icon — real icon or category emoji fallback
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _getCategoryColor(app.category).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: _buildAppIcon(app),
-          ),
-          const SizedBox(width: 12),
-          // App info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  app.appName,
-                  style: TextStyle(
-                    color: DesignTokens.textPrimary,
-                    fontSize: DesignTokens.fontSizeBody,
-                    fontWeight: DesignTokens.fontWeightMedium,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Text(
-                      app.categoryDisplayName,
-                      style: TextStyle(
-                        color: DesignTokens.textMuted,
-                        fontSize: DesignTokens.fontSizeCaption,
-                      ),
-                    ),
-                    if (app.usageTodayMinutes > 0) ...[
-                      Text(' • ',
-                          style: TextStyle(color: DesignTokens.textMuted)),
-                      Text(
-                        '${app.usageTodayMinutes}m today',
-                        style: TextStyle(
-                          color: app.usageTodayMinutes > 60
-                              ? DesignTokens.warning
-                              : DesignTokens.textMuted,
-                          fontSize: DesignTokens.fontSizeCaption,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // AI recommendation badge
-          if (app.aiRecommendedBlock && !app.isBlocked)
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: DesignTokens.warning.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'AI: Block',
-                style: TextStyle(
-                  color: DesignTokens.warning,
-                  fontSize: DesignTokens.fontSizeTiny,
-                  fontWeight: DesignTokens.fontWeightSemiBold,
-                ),
-              ),
-            ),
-          // Block toggle
-          Switch(
-            value: app.isBlocked,
-            onChanged: (_) => _toggleBlock(app),
-            activeThumbColor: DesignTokens.danger,
-            activeTrackColor: DesignTokens.danger.withValues(alpha: 0.3),
-            inactiveThumbColor: DesignTokens.textMuted,
-          ),
-        ],
-      ),
-    );
-  }
-
+  // Extracted to a separate widget to prevent entire list rebuilds when one icon loads
+  // and to allow the use of const constructors where possible.
   Widget _buildApplyButton(dynamic persona) {
     final count = _allApps.where((a) => a.aiRecommendedBlock).length;
 
@@ -798,5 +705,186 @@ class _AppScanScreenState extends State<AppScanScreen>
         color: _getCategoryColor(category),
       ),
     );
+  }
+}
+
+class AppTile extends StatelessWidget {
+  final AppInfo app;
+  final Map<String, Uint8List> appIcons;
+  final bool showRecommendation;
+  final Function(AppInfo) onToggleBlock;
+
+  const AppTile({
+    super.key,
+    required this.app,
+    required this.appIcons,
+    required this.onToggleBlock,
+    this.showRecommendation = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: DesignTokens.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: showRecommendation
+              ? DesignTokens.danger.withValues(alpha: 0.3)
+              : app.isBlocked
+                  ? DesignTokens.danger.withValues(alpha: 0.2)
+                  : DesignTokens.border,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // App icon — real icon or category emoji fallback
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _getCategoryColor(app.category).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: _buildAppIcon(),
+          ),
+          const SizedBox(width: 12),
+          // App info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  app.appName,
+                  style: TextStyle(
+                    color: DesignTokens.textPrimary,
+                    fontSize: DesignTokens.fontSizeBody,
+                    fontWeight: DesignTokens.fontWeightMedium,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      app.categoryDisplayName,
+                      style: TextStyle(
+                        color: DesignTokens.textMuted,
+                        fontSize: DesignTokens.fontSizeCaption,
+                      ),
+                    ),
+                    if (app.usageTodayMinutes > 0) ...[
+                      Text(' • ',
+                          style: TextStyle(color: DesignTokens.textMuted)),
+                      Text(
+                        '${app.usageTodayMinutes}m today',
+                        style: TextStyle(
+                          color: app.usageTodayMinutes > 60
+                              ? DesignTokens.warning
+                              : DesignTokens.textMuted,
+                          fontSize: DesignTokens.fontSizeCaption,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // AI recommendation badge
+          if (app.aiRecommendedBlock && !app.isBlocked)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: DesignTokens.warning.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'AI: Block',
+                style: TextStyle(
+                  color: DesignTokens.warning,
+                  fontSize: DesignTokens.fontSizeTiny,
+                  fontWeight: DesignTokens.fontWeightSemiBold,
+                ),
+              ),
+            ),
+          // Block toggle
+          Switch(
+            value: app.isBlocked,
+            onChanged: (_) => onToggleBlock(app),
+            activeThumbColor: DesignTokens.danger,
+            activeTrackColor: DesignTokens.danger.withValues(alpha: 0.3),
+            inactiveThumbColor: DesignTokens.textMuted,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppIcon() {
+    final icon = appIcons[app.packageName];
+    if (icon != null && icon.isNotEmpty) {
+      try {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.memory(
+            icon,
+            width: 44,
+            height: 44,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildCategoryIcon(),
+          ),
+        );
+      } catch (_) {}
+    }
+    return _buildCategoryIcon();
+  }
+
+  Widget _buildCategoryIcon() {
+    return Center(
+      child: Icon(
+        _getCategoryIcon(app.category),
+        size: 24,
+        color: _getCategoryColor(app.category),
+      ),
+    );
+  }
+
+  static IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'social_media': return Icons.chat_rounded;
+      case 'entertainment': return Icons.movie_rounded;
+      case 'games': return Icons.sports_esports_rounded;
+      case 'productivity': return Icons.work_rounded;
+      case 'messaging': return Icons.forum_rounded;
+      case 'education': return Icons.auto_stories_rounded;
+      case 'news': return Icons.article_rounded;
+      case 'photography': return Icons.camera_alt_rounded;
+      case 'navigation': return Icons.map_rounded;
+      case 'finance': return Icons.account_balance_rounded;
+      case 'health': return Icons.local_hospital_rounded;
+      case 'shopping': return Icons.shopping_cart_rounded;
+      default: return Icons.apps_rounded;
+    }
+  }
+
+  static Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'social_media': return DesignTokens.categorySocial;
+      case 'entertainment': return DesignTokens.categoryEntertainment;
+      case 'games': return DesignTokens.categoryProductivity;
+      case 'productivity': return DesignTokens.categoryGames;
+      case 'messaging': return DesignTokens.categoryEducation;
+      case 'education': return DesignTokens.categoryHealth;
+      case 'finance': return DesignTokens.categoryFinance;
+      case 'health': return DesignTokens.categoryNews;
+      case 'navigation': return DesignTokens.categoryShopping;
+      case 'shopping': return DesignTokens.categoryCreativity;
+      case 'news': return DesignTokens.categoryCommunication;
+      default: return DesignTokens.textMuted;
+    }
   }
 }
